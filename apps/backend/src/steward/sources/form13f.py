@@ -215,8 +215,9 @@ def parse_dataset(
     """Every holdings filing, and rows for portfolio CUSIPs or tracked managers.
 
     `depositary_names` maps `issuer_key` names to tickers of US-listed holdings with no known
-    CUSIP: depositary-receipt rows (ADR/ADS class) of that issuer are kept under the one CUSIP
-    most filings report, when at least MIN_NAME_MATCH_FILINGS do."""
+    CUSIP: depositary-receipt rows (ADR/ADS class) or CINS rows (its US-listed ordinaries) of
+    that issuer are kept under the one CUSIP most filings report, when at least
+    MIN_NAME_MATCH_FILINGS do."""
     wanted = {c.upper() for c in cusips}
     managers = {c.zfill(10) for c in (tracked_ciks or set())}
     by_name = {k: t for k, t in (depositary_names or {}).items() if len(k) >= 3}
@@ -254,7 +255,11 @@ def parse_dataset(
                 elif (
                     by_name
                     and cusip
-                    and _DEPOSITARY.search(r.get("TITLEOFCLASS", "").upper())
+                    # An ADR, or a foreign issuer's own shares listed in the US (a CINS, letter
+                    # first): AstraZeneca's NYSE ordinaries replaced its ADRs in February 2026.
+                    and (
+                        _DEPOSITARY.search(r.get("TITLEOFCLASS", "").upper()) or cusip[0].isalpha()
+                    )
                     and (ticker := by_name.get(issuer_key(r.get("NAMEOFISSUER"))))
                 ):
                     candidates[(ticker, cusip)].append(

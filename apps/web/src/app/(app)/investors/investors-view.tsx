@@ -2,9 +2,8 @@
 
 import { LoaderCircleIcon, RefreshCwIcon } from "lucide-react";
 import Link from "next/link";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useState } from "react";
 
-import { DivergingBar } from "@/components/charts";
 import { EmptyState } from "@/components/empty-state";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
@@ -14,6 +13,8 @@ import { useApiResource } from "@/lib/hooks/use-api-resource";
 import { CONCENTRATION_LABEL, concentrationTier, signedPercent, valueChange, type Concentration } from "@/lib/investors/investors";
 import { jobHref } from "@/lib/jobs/job-detail";
 import { cn } from "@/lib/utils";
+
+import { HoldersByHolding } from "./holders-by-holding";
 
 function money(value: number | string | null | undefined) {
   return value == null ? "—" : new Intl.NumberFormat(undefined, { style: "currency", currency: "USD", notation: "compact", maximumFractionDigits: 1 }).format(Number(value));
@@ -40,21 +41,14 @@ export function InvestorsView() {
   const fetcher = useCallback(() => getBrowserApiClient().GET("/investors"), []);
   const { state } = useApiResource(fetcher);
   const data = state.kind === "ok" ? state.data : state.kind === "error" ? state.previous : null;
-  const bars = useMemo(
-    () =>
-      (data ?? []).flatMap((m) => {
-        const change = valueChange(m.reported_value_usd, m.previous_value_usd);
-        return change === null ? [] : [{ label: m.name, value: change * 100 }];
-      }),
-    [data],
-  );
 
   return (
     <div className="space-y-5">
-      <PageHeader title="13F investors" description="What well-known managers reported owning at the end of each quarter, from their SEC Form 13F filings." />
-
-      <div className="flex flex-wrap items-center gap-3">
-        <Button
+      <PageHeader
+        title="13F investors"
+        description="Which US funds own your holdings and what they bought or sold last quarter, from their SEC Form 13F filings."
+        aside={
+          <Button
           size="sm"
           variant="outline"
           disabled={pending}
@@ -73,18 +67,21 @@ export function InvestorsView() {
         >
           {pending ? <LoaderCircleIcon aria-hidden="true" className="animate-spin" /> : <RefreshCwIcon aria-hidden="true" />}
           Load new 13F filings
-        </Button>
-        {jobId !== null ? (
-          <Link href={jobHref(jobId)} className="text-xs text-accent-ink hover:underline" role="status">
-            Loading started. Follow its progress
-          </Link>
-        ) : null}
-        {jobError ? (
-          <span className="text-xs text-loss" role="alert">
-            {jobError}
-          </span>
-        ) : null}
-      </div>
+          </Button>
+        }
+      />
+      {jobId !== null ? (
+        <Link href={jobHref(jobId)} className="text-xs text-accent-ink hover:underline" role="status">
+          Loading started. Follow its progress
+        </Link>
+      ) : null}
+      {jobError ? (
+        <p className="text-xs text-loss" role="alert">
+          {jobError}
+        </p>
+      ) : null}
+
+      <HoldersByHolding />
 
       {state.kind === "error" ? <p className="text-sm text-loss">Could not load managers: {state.detail}</p> : null}
       {state.kind === "loading" ? <p className="text-sm text-text-muted">Loading managers…</p> : null}
@@ -98,21 +95,12 @@ export function InvestorsView() {
         </EmptyState>
       ) : null}
 
-      {bars.length > 0 ? (
-        <section aria-labelledby="change-heading" className="blueprint space-y-2 px-5 py-4">
-          <h2 id="change-heading" className="font-heading text-lg leading-tight font-semibold">
-            Value in your holdings against the previous quarter
-          </h2>
-          <DivergingBar rows={bars} colorMode="direction" label="Change in reported value since the previous quarter, per manager" formatValue={(v) => `${v > 0 ? "+" : v < 0 ? "−" : ""}${Math.abs(v).toFixed(1)}%`} />
-          <p className="text-xs text-text-muted">Reported values move with prices and trading. They are not investment returns.</p>
-        </section>
-      ) : null}
-
       {data && data.length > 0 ? (
         <section aria-labelledby="managers-heading" className="space-y-2">
           <h2 id="managers-heading" className="font-heading text-lg leading-tight font-semibold">
-            Managers
+            Tracked managers
           </h2>
+          <p className="text-sm text-text-muted">Open a manager to see its whole book: largest positions, what it added, trimmed and sold.</p>
           <div className="overflow-x-auto rounded-xl border border-border bg-surface-raised">
             <table className="w-full min-w-[40rem] text-sm">
               <caption className="sr-only">Managers with their latest 13F filing</caption>

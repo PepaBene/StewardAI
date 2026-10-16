@@ -69,6 +69,19 @@ def test_adr_rows_are_matched_by_issuer_name() -> None:
     assert len(data.positions) == n
 
 
+def test_us_listed_ordinaries_replace_the_adr_when_most_filers_report_them() -> None:
+    n = MIN_NAME_MATCH_FILINGS
+    info = [_row(i, i, "G0593M107", "ASTRAZENECA PLC", "ORD SHS") for i in range(n)]
+    info += [
+        _row(0, 100, "046353108", "ASTRAZENECA PLC", "SPONSORED ADR"),
+        # A US company of the same name (a CUSIP, not a CINS, and no ADR) is never taken.
+        _row(1, 101, "046353206", "ASTRAZENECA PLC", "COM"),
+    ]
+    data = parse_dataset(_zip(info, n), set(), None, {"ASTRAZENECA": "AZN_US_EQ"})
+    assert data.name_matched == {"G0593M107": "AZN_US_EQ"}
+    assert {p.cusip for p in data.positions} == {"G0593M107"}
+
+
 def test_too_few_filings_do_not_make_a_name_match() -> None:
     info = [
         _row(i, i, "046353108", "ASTRAZENECA PLC", "SPONSORED ADR")

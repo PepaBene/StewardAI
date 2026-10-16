@@ -8,7 +8,14 @@ from api.auth import Owner
 from api.db import Pool
 from steward.config.jobs import JobsConfig
 from steward.config.store import load_active
-from steward.ownership.investors import ManagerDetail, ManagerSummary, manager_detail, managers
+from steward.ownership.investors import (
+    InvestorsByHolding,
+    ManagerDetail,
+    ManagerSummary,
+    by_holding,
+    manager_detail,
+    managers,
+)
 
 router = APIRouter()
 CIKPath = Annotated[str, Path(pattern=r"^[0-9]{1,10}$")]
@@ -26,6 +33,13 @@ async def _tracked(pool: Pool) -> list[tuple[str, str]]:
 async def get_investors(pool: Pool, _owner: Owner) -> list[ManagerSummary]:
     """Configured managers and their latest stored 13F filing summary."""
     return await managers(pool, await _tracked(pool))
+
+
+@router.get("/investors/by-holding", tags=["investors"], response_model=InvestorsByHolding)
+async def get_investors_by_holding(pool: Pool, _owner: Owner) -> InvestorsByHolding:
+    """Each current holding's 13F holders at the latest quarter end, the move against the
+    earlier comparable quarter, and what the tracked managers did in it."""
+    return await by_holding(pool, await _tracked(pool))
 
 
 @router.get("/investors/{cik}", tags=["investors"], response_model=ManagerDetail)

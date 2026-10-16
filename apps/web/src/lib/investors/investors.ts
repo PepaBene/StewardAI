@@ -99,4 +99,61 @@ export function positionMoves<T extends MovableLike>(positions: readonly T[]) {
   return { bars, opened, sentence };
 }
 
+const MANAGER_NOISE = /,?\s*\b(L\.?P\.?|LLC|Inc\.?|Corp\.?|Ltd\.?|Co\.?|Management|Advisors|Associates|Technologies)\b\.?/gi;
+
+/** "Pershing Square Capital Management, L.P." -> "Pershing Square Capital"; for chips. */
+export function shortManager(name: string): string {
+  return name.replace(MANAGER_NOISE, "").replace(/\s+/g, " ").trim() || name;
+}
+
+/**
+ * A tracked manager's move in one holding, in a few words. Share counts that grew more than
+ * tenfold started from a token position, so the exact multiple is not shown.
+ */
+export function moveWords(change: PositionChange | undefined, pct: number | null | undefined): string {
+  if (change === "new") return "new position";
+  if (change === "sold") return "sold out";
+  if (change === "unchanged") return "unchanged";
+  if ((change === "added" || change === "trimmed") && pct !== null && pct !== undefined) {
+    if (pct >= 9) return "added more than 10×";
+    return `${change} ${Math.abs(Math.round(pct * 100))}%`;
+  }
+  return "no earlier quarter";
+}
+
+export function moveTone(change: PositionChange | undefined): "gain" | "loss" | "muted" {
+  if (change === "new" || change === "added") return "gain";
+  if (change === "sold" || change === "trimmed") return "loss";
+  return "muted";
+}
+
+const MOVE_ORDER: Record<PositionChange, number> = { new: 0, sold: 1, added: 2, trimmed: 2, unchanged: 3, unknown: 4 };
+
+/** New and sold-out first, then the largest share changes, then the unchanged. */
+export function orderMoves<T extends { change: PositionChange; share_change_pct?: number | null }>(moves: readonly T[]): T[] {
+  return [...moves].sort((a, b) => MOVE_ORDER[a.change] - MOVE_ORDER[b.change] || Math.abs(b.share_change_pct ?? 0) - Math.abs(a.share_change_pct ?? 0));
+}
+
+export type HolderCounts = {
+  holders: number;
+  previous_holders?: number | null;
+  new_holders?: number | null;
+  exited_holders?: number | null;
+};
+
+/** Filers that opened a position minus those that closed one; null without an earlier quarter. */
+export function netHolders(h: HolderCounts): number | null {
+  if (h.new_holders == null || h.exited_holders == null) return null;
+  return h.new_holders - h.exited_holders;
+}
+
+/** One sentence over every covered holding: in how many did more filers buy in than sell out. */
+export function breadthSentence(holdings: readonly HolderCounts[]): string | null {
+  const nets = holdings.map(netHolders).filter((n): n is number => n !== null);
+  if (nets.length === 0) return null;
+  const more = nets.filter((n) => n > 0).length;
+  const fewer = nets.filter((n) => n < 0).length;
+  return `More funds opened a position than closed one in ${more} of your ${nets.length} US-listed holdings; more closed than opened in ${fewer}.`;
+}
+
 export { num as toNumber };

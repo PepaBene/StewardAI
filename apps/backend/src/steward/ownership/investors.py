@@ -204,6 +204,179 @@ async def manager_detail(pool: asyncpg.Pool, cik: str, name: str) -> ManagerDeta
     )
 
 
+class HolderMove(BaseModel):
+    cik: str
+    name: str
+    shares: Decimal | None = Field(description="Shares at the latest quarter end; null if sold.")
+    value_usd: Decimal | None = None
+    previous_shares: Decimal | None = None
+    change: PositionChange
+    share_change_pct: float | None = None
+
+
+class HoldingHolders(BaseModel):
+    ticker: str
+    name: str | None = None
+    weight: float | None = Field(default=None, description="Share of the portfolio, 0-1.")
+    holders: int = Field(description="13F filers with a share position at the latest quarter end")
+    previous_holders: int | None = None
+    new_holders: int | None = None
+    exited_holders: int | None = None
+    value_usd: Decimal = Field(description="Value of all 13F filers' positions")
+    shares_change_pct: float | None = Field(
+        default=None, description="All filers' shares now / then - 1."
+    )
+    tracked: list[HolderMove] = Field(
+        default_factory=list,
+        description="Tracked managers holding it now, or holding it at the earlier quarter end.",
+    )
+
+
+class InvestorsByHolding(BaseModel):
+    period: date | None = None
+    previous_period: date | None = None
+    holdings: list[HoldingHolders] = Field(default_factory=list)
+    tracked: list[str] = Field(default_factory=list, description="Names of tracked managers.")
+    uncovered: list[str] = Field(
+        default_factory=list,
+        description="Held tickers with no 13F position on record (non-US listings, UCITS funds).",
+    )
+
+
+# A quarter compares with an earlier one only when that one was read about as fully: a dataset
+# that stored a sliver of its rows would turn most holders into "new".
+_COMPARABLE_SHARE = 0.5
+
+
+async def _comparison_periods(pool: asyncpg.Pool) -> tuple[date | None, date | None]:
+    rows = await pool.fetch(
+        "select f.period, count(*) n from public.form13f_filing f"
+        " join public.institutional_holding h using (accession)"
+        " group by f.period order by f.period desc limit 12"
+    )
+    if not rows:
+        return None, None
+    latest = rows[0]
+    earlier = next((r for r in rows[1:] if r["n"] >= latest["n"] * _COMPARABLE_SHARE), None)
+    return latest["period"], earlier["period"] if earlier else None
+
+
+# Each filer's effective share positions per portfolio ticker at two quarter ends ($1 now,
+# $2 earlier), by the same amendment rules as `EFFECTIVE`, joined so moves can be counted.
+_BY_HOLDING = """
+with f as (
+  select * from public.form13f_filing where period = any(array[$1::date, $2::date])
+), base as (
+  select distinct on (cik, period) accession, cik, period, filed from f
+  where submission_type = '13F-HR' or coalesce(amendment_type, '') <> 'NEW HOLDINGS'
+  order by cik, period, filed desc, accession desc
+), adds as (
+  select a.accession, a.cik, a.period from f a
+  left join base b on b.cik = a.cik and b.period = a.period
+  where a.submission_type = '13F-HR/A' and a.amendment_type = 'NEW HOLDINGS'
+    and (b.accession is null or (a.filed, a.accession) > (b.filed, b.accession))
+), effective as (
+  select accession, cik, period from base union select accession, cik, period from adds
+), pos as (
+  select e.period, h.ticker, e.cik, sum(h.shares) shares, sum(h.value_usd) value
+  from effective e join public.institutional_holding h using (accession)
+  where h.shares_type = 'SH' and h.put_call is null and h.ticker = any($3::text[])
+  group by 1, 2, 3
+), j as (
+  select coalesce(n.ticker, p.ticker) ticker, coalesce(n.cik, p.cik) cik,
+    n.shares, n.value, p.shares pshares
+  from (select * from pos where period = $1) n
+  full join (select * from pos where period = $2) p on p.ticker = n.ticker and p.cik = n.cik
+)
+"""
+
+
+async def by_holding(pool: asyncpg.Pool, tracked: list[tuple[str, str]]) -> InvestorsByHolding:
+    """Who owns each current holding at the latest 13F quarter end, how that moved against the
+    earlier comparable quarter, and which tracked managers hold, added, trimmed or sold it."""
+    period, earlier = await _comparison_periods(pool)
+    names = {cik.zfill(10): name for cik, name in tracked}
+    out = InvestorsByHolding(period=period, previous_period=earlier, tracked=list(names.values()))
+    if period is None:
+        return out
+    held = await pool.fetch(
+        "select p.ticker, p.weight, i.name from public.position_snapshot p"
+        " left join public.instrument i on i.t212_ticker = p.ticker"
+        " where p.snapshot_date = (select max(snapshot_date) from public.position_snapshot)"
+    )
+    tickers = [r["ticker"] for r in held]
+    # Without a comparable earlier quarter the same date stands in, so every "previous" is
+    # the current figure; the counts below are then dropped rather than shown as zero moves.
+    then = earlier or period
+    totals = await pool.fetch(
+        _BY_HOLDING  # noqa: S608 - fixed SQL template; user values are bound below.
+        + " select ticker, count(shares) holders, count(pshares) previous_holders,"
+        " count(*) filter (where shares is not null and pshares is null) new_holders,"
+        " count(*) filter (where shares is null and pshares is not null) exited_holders,"
+        " coalesce(sum(value), 0) value, sum(shares) shares,"
+        " sum(pshares) filter (where shares is not null or pshares is not null) pshares"
+        " from j group by ticker",
+        period,
+        then,
+        tickers,
+    )
+    moves = await pool.fetch(
+        _BY_HOLDING  # noqa: S608 - fixed SQL template; user values are bound below.
+        + " select ticker, cik, shares, value, pshares from j where cik = any($4::text[])",
+        period,
+        then,
+        tickers,
+        list(names),
+    )
+    by_ticker: dict[str, list[HolderMove]] = {}
+    for m in moves:
+        change, pct = classify_change(m["shares"], m["pshares"], has_earlier=earlier is not None)
+        by_ticker.setdefault(m["ticker"], []).append(
+            HolderMove(
+                cik=m["cik"],
+                name=names[m["cik"]],
+                shares=m["shares"],
+                value_usd=m["value"],
+                previous_shares=m["pshares"] if earlier else None,
+                change=change,
+                share_change_pct=pct,
+            )
+        )
+    info = {r["ticker"]: r for r in held}
+    for t in totals:
+        compared = earlier is not None
+        then_shares = t["pshares"]
+        out.holdings.append(
+            HoldingHolders(
+                ticker=t["ticker"],
+                name=info[t["ticker"]]["name"],
+                weight=float(info[t["ticker"]]["weight"])
+                if info[t["ticker"]]["weight"] is not None
+                else None,
+                holders=t["holders"],
+                previous_holders=t["previous_holders"] if compared else None,
+                new_holders=t["new_holders"] if compared else None,
+                exited_holders=t["exited_holders"] if compared else None,
+                value_usd=t["value"],
+                shares_change_pct=float(t["shares"] / then_shares - 1)
+                if compared and t["shares"] and then_shares
+                else None,
+                tracked=sorted(
+                    by_ticker.get(t["ticker"], []),
+                    key=lambda m: -(m.value_usd or 0),
+                ),
+            )
+        )
+    out.holdings.sort(key=lambda h: -(h.weight or 0))
+    covered = {h.ticker for h in out.holdings}
+    out.uncovered = [
+        r["ticker"]
+        for r in sorted(held, key=lambda r: -(r["weight"] or 0))
+        if r["ticker"] not in covered
+    ]
+    return out
+
+
 # Common-stock positions of one manager at one quarter end, one row per CUSIP, largest first.
 _POSITIONS = (
     EFFECTIVE  # noqa: S608 - fixed SQL template; user values are bound by the caller.

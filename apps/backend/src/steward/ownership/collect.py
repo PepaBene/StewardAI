@@ -65,6 +65,7 @@ async def depositary_names(pool: asyncpg.Pool, cusips: dict[str, str]) -> dict[s
     return out
 
 
+NAME_MATCH_RULE = "~name2"
 STORE_BATCH = 10_000
 STORE_TIMEOUT_SECONDS = 300
 
@@ -255,7 +256,9 @@ async def collect(ctx: JobContext, http: httpx.AsyncClient, settings: OwnershipS
         # not yet searched for a holding (bought, or its CUSIP found, since) is loaded again too.
         tickers = await portfolio_cusips(pool)
         names = await depositary_names(pool, tickers)
-        searching = set(tickers.values()) | set(names.values())
+        # A name-matched holding carries the matching rule's mark, so a data set searched by an
+        # older rule is read again (US-listed ordinaries, not only ADRs, since October 2026).
+        searching = set(tickers.values()) | {f"{t}{NAME_MATCH_RULE}" for t in names.values()}
         loaded = {
             r["url"]
             for r in await pool.fetch("select url, rows_kept, tickers from public.form13f_dataset")

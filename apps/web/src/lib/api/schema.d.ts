@@ -7352,6 +7352,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/investors/by-holding": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Investors By Holding
+         * @description Each current holding's 13F holders at the latest quarter end, the move against the
+         *     earlier comparable quarter, and what the tracked managers did in it.
+         */
+        get: operations["get_investors_by_holding"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/investors/{cik}": {
         parameters: {
             query?: never;
@@ -23628,6 +23649,29 @@ export interface components {
              */
             high?: number | string | null;
         };
+        /** HolderMove */
+        HolderMove: {
+            /** Cik */
+            cik: string;
+            /** Name */
+            name: string;
+            /**
+             * Shares
+             * @description Shares at the latest quarter end; null if sold.
+             */
+            shares: number | string | null;
+            /** Value Usd */
+            value_usd?: number | string | null;
+            /** Previous Shares */
+            previous_shares?: number | string | null;
+            /**
+             * Change
+             * @enum {string}
+             */
+            change: "new" | "added" | "trimmed" | "unchanged" | "sold" | "unknown";
+            /** Share Change Pct */
+            share_change_pct?: number | null;
+        };
         /** HolderTypeShare */
         HolderTypeShare: {
             /**
@@ -23996,6 +24040,44 @@ export interface components {
             /** Positions */
             positions: components["schemas"]["FundPosition"][];
             coverage: components["schemas"]["NportCoverage"];
+        };
+        /** HoldingHolders */
+        HoldingHolders: {
+            /** Ticker */
+            ticker: string;
+            /** Name */
+            name?: string | null;
+            /**
+             * Weight
+             * @description Share of the portfolio, 0-1.
+             */
+            weight?: number | null;
+            /**
+             * Holders
+             * @description 13F filers with a share position at the latest quarter end
+             */
+            holders: number;
+            /** Previous Holders */
+            previous_holders?: number | null;
+            /** New Holders */
+            new_holders?: number | null;
+            /** Exited Holders */
+            exited_holders?: number | null;
+            /**
+             * Value Usd
+             * @description Value of all 13F filers' positions
+             */
+            value_usd: number | string;
+            /**
+             * Shares Change Pct
+             * @description All filers' shares now / then - 1.
+             */
+            shares_change_pct?: number | null;
+            /**
+             * Tracked
+             * @description Tracked managers holding it now, or holding it at the earlier quarter end.
+             */
+            tracked?: components["schemas"]["HolderMove"][];
         };
         /** HoldingIdentity */
         HoldingIdentity: {
@@ -26216,6 +26298,25 @@ export interface components {
              * Format: date-time
              */
             fetched_at: string;
+        };
+        /** InvestorsByHolding */
+        InvestorsByHolding: {
+            /** Period */
+            period?: string | null;
+            /** Previous Period */
+            previous_period?: string | null;
+            /** Holdings */
+            holdings?: components["schemas"]["HoldingHolders"][];
+            /**
+             * Tracked
+             * @description Names of tracked managers.
+             */
+            tracked?: string[];
+            /**
+             * Uncovered
+             * @description Held tickers with no 13F position on record (non-US listings, UCITS funds).
+             */
+            uncovered?: string[];
         };
         /** IrConsensusRelease */
         IrConsensusRelease: {
@@ -58398,6 +58499,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ManagerSummary"][];
+                };
+            };
+        };
+    };
+    get_investors_by_holding: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvestorsByHolding"];
                 };
             };
         };

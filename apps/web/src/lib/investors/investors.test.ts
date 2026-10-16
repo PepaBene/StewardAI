@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { changeWords, concentrationTier, issuerKey, positionMoves, overlapWithHoldings, signedPercent, valueChange } from "./investors";
+import { breadthSentence, changeWords, concentrationTier, issuerKey, moveTone, moveWords, netHolders, orderMoves, positionMoves, overlapWithHoldings, shortManager, signedPercent, valueChange } from "./investors";
 
 describe("13F helpers", () => {
   it("tiers concentration by positions", () => {
@@ -50,5 +50,35 @@ describe("13F helpers", () => {
     expect(m.bars.map((b) => b.label)).toEqual(["B", "A"]);
     expect(m.opened.map((p) => p.cusip)).toEqual(["c"]);
     expect(m.sentence).toBe("Among the largest 4 positions the manager added to 1, trimmed 1, opened 1, left 1 unchanged.");
+  });
+
+  it("writes a tracked manager's move in a holding", () => {
+    expect(shortManager("Pershing Square Capital Management, L.P.")).toBe("Pershing Square Capital");
+    expect(shortManager("Bridgewater Associates, LP")).toBe("Bridgewater");
+    expect(shortManager("Berkshire Hathaway Inc")).toBe("Berkshire Hathaway");
+    expect(moveWords("added", 0.452)).toBe("added 45%");
+    expect(moveWords("trimmed", -0.338)).toBe("trimmed 34%");
+    expect(moveWords("added", 2757)).toBe("added more than 10×");
+    expect(moveWords("sold", null)).toBe("sold out");
+    expect(moveTone("trimmed")).toBe("loss");
+    const ordered = orderMoves([
+      { change: "unchanged" as const, share_change_pct: 0 },
+      { change: "added" as const, share_change_pct: 0.05 },
+      { change: "trimmed" as const, share_change_pct: -0.4 },
+      { change: "sold" as const, share_change_pct: null },
+    ]);
+    expect(ordered.map((m) => m.change)).toEqual(["sold", "trimmed", "added", "unchanged"]);
+  });
+
+  it("counts holders who came and went", () => {
+    expect(netHolders({ holders: 10, new_holders: 4, exited_holders: 1 })).toBe(3);
+    expect(netHolders({ holders: 10 })).toBeNull();
+    expect(
+      breadthSentence([
+        { holders: 1, new_holders: 3, exited_holders: 1 },
+        { holders: 1, new_holders: 1, exited_holders: 5 },
+        { holders: 1 },
+      ]),
+    ).toBe("More funds opened a position than closed one in 1 of your 2 US-listed holdings; more closed than opened in 1.");
   });
 });

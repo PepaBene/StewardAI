@@ -22736,6 +22736,33 @@
         ]
       }
     },
+    "/investors/by-holding": {
+      "get": {
+        "tags": [
+          "investors"
+        ],
+        "summary": "Get Investors By Holding",
+        "description": "Each current holding's 13F holders at the latest quarter end, the move against the\nearlier comparable quarter, and what the tracked managers did in it.",
+        "operationId": "get_investors_by_holding",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvestorsByHolding"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/investors/{cik}": {
       "get": {
         "tags": [
@@ -69877,6 +69904,95 @@
         ],
         "title": "HistoryWindow"
       },
+      "HolderMove": {
+        "properties": {
+          "cik": {
+            "type": "string",
+            "title": "Cik"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "shares": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Shares",
+            "description": "Shares at the latest quarter end; null if sold."
+          },
+          "value_usd": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value Usd"
+          },
+          "previous_shares": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Previous Shares"
+          },
+          "change": {
+            "type": "string",
+            "enum": [
+              "new",
+              "added",
+              "trimmed",
+              "unchanged",
+              "sold",
+              "unknown"
+            ],
+            "title": "Change"
+          },
+          "share_change_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Share Change Pct"
+          }
+        },
+        "type": "object",
+        "required": [
+          "cik",
+          "name",
+          "shares",
+          "change"
+        ],
+        "title": "HolderMove"
+      },
       "HolderTypeShare": {
         "properties": {
           "type": {
@@ -71124,6 +71240,115 @@
           "coverage"
         ],
         "title": "HoldingFundPositions"
+      },
+      "HoldingHolders": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "weight": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weight",
+            "description": "Share of the portfolio, 0-1."
+          },
+          "holders": {
+            "type": "integer",
+            "title": "Holders",
+            "description": "13F filers with a share position at the latest quarter end"
+          },
+          "previous_holders": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Previous Holders"
+          },
+          "new_holders": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "New Holders"
+          },
+          "exited_holders": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Exited Holders"
+          },
+          "value_usd": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              }
+            ],
+            "title": "Value Usd",
+            "description": "Value of all 13F filers' positions"
+          },
+          "shares_change_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Shares Change Pct",
+            "description": "All filers' shares now / then - 1."
+          },
+          "tracked": {
+            "items": {
+              "$ref": "#/components/schemas/HolderMove"
+            },
+            "type": "array",
+            "title": "Tracked",
+            "description": "Tracked managers holding it now, or holding it at the earlier quarter end."
+          }
+        },
+        "type": "object",
+        "required": [
+          "ticker",
+          "holders",
+          "value_usd"
+        ],
+        "title": "HoldingHolders"
       },
       "HoldingIdentity": {
         "properties": {
@@ -78169,6 +78394,59 @@
         ],
         "title": "IntradayQuote",
         "description": "The latest stored Yahoo quote of a holding's listing (Yahoo Finance, unofficial)."
+      },
+      "InvestorsByHolding": {
+        "properties": {
+          "period": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Period"
+          },
+          "previous_period": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Previous Period"
+          },
+          "holdings": {
+            "items": {
+              "$ref": "#/components/schemas/HoldingHolders"
+            },
+            "type": "array",
+            "title": "Holdings"
+          },
+          "tracked": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tracked",
+            "description": "Names of tracked managers."
+          },
+          "uncovered": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Uncovered",
+            "description": "Held tickers with no 13F position on record (non-US listings, UCITS funds)."
+          }
+        },
+        "type": "object",
+        "title": "InvestorsByHolding"
       },
       "IrConsensusRelease": {
         "properties": {
