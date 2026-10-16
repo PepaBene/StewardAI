@@ -14,6 +14,12 @@ describe("macroGroup", () => {
     ["us_unemployment", "Growth and labour"],
     ["commodity_copper", "Commodities"],
     ["eurusd", "Currencies"],
+    ["usd_jpy", "Currencies"],
+    ["us_vix", "Credit and money"],
+    ["us_initial_claims", "Growth and labour"],
+    ["czeonia", "Rates"],
+    ["us_curve_10y2y", "Rates"],
+    ["jp_gdp", "Growth and labour"],
     ["something_new", "Other"],
   ])("%s -> %s", (id, group) => {
     expect(macroGroup(id)).toBe(group);

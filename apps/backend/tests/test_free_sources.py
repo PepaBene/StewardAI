@@ -244,3 +244,14 @@ def test_ecb_macro_defaults_cover_rates_credit_and_monetary_aggregates() -> None
     } <= configured.keys()
     assert configured["euro_area_household_loan_rate"].flow_key.startswith("MIR/")
     assert configured["euro_area_corporate_loan_rate"].flow_key.startswith("MIR/")
+    # The Data Portal answers 400 when the key repeats the dataflow ("BSI/BSI.M...").
+    for item in configured.values():
+        flow, key = item.flow_key.split("/", 1)
+        assert not key.startswith(f"{flow}."), item.key
+
+
+def test_fred_macro_defaults_cover_the_us_cycle_markets_and_japan() -> None:
+    keys = {item.key for item in JobsConfig().macro.fred}
+    assert {"us_hy_spread", "us_2y", "us_curve_10y2y", "us_gdp", "us_payrolls", "us_vix"} <= keys
+    assert {"usd_jpy", "jp_10y", "jp_gdp"} <= keys
+    assert len(keys) == len(JobsConfig().macro.fred)

@@ -678,8 +678,9 @@ async def test_events_survive_an_alfred_failure_and_alfred_asks_for_revisions(
     assert "vintage_error" in detail["fred:fed_funds"]
     alfred = [r for r in transport.seen if r.url.params.get("output_type")]  # type: ignore[attr-defined]
     assert {r.url.params["output_type"] for r in alfred} == {"1"}  # not 4 (initial release only)
-    cpi_call = next(r for r in alfred if r.url.params["series_id"] == "CPIAUCSL")
-    assert cpi_call.url.params["units"] == "pc1"
+    # FRED refuses a real-time range for a transformed series: CPI (pc1) is not asked.
+    assert all(r.url.params["series_id"] != "CPIAUCSL" for r in alfred)
+    assert "revision history" in str(detail["fred:us_cpi"]["vintages"])
     # The current-vintage run twice stored each period once.
     assert (
         await backend_pool.fetchval(
@@ -1186,3 +1187,33 @@ async def test_the_rollback_script_restores_the_previous_schema(migrated_db: Any
             await tx.rollback()
     finally:
         await conn.close()
+
+
+def test_alfred_windows_join_a_value_held_across_the_boundary() -> None:
+    from steward.macro.collect import join_vintage_windows
+
+    rows = [
+        {"date": "2020-01-01", "value": "1.5", "realtime_start": "2020-01-02",
+         "realtime_end": "2023-12-31"},
+        {"date": "2020-01-01", "value": "1.5", "realtime_start": "2024-01-01",
+         "realtime_end": "2026-10-16"},
+        {"date": "2020-02-01", "value": "1.6", "realtime_start": "2023-06-01",
+         "realtime_end": "2023-12-31"},
+        {"date": "2020-02-01", "value": "1.7", "realtime_start": "2024-01-01",
+         "realtime_end": "2026-10-16"},
+    ]  # fmt: skip
+    joined = join_vintage_windows(rows)
+    assert [(r["date"], r["value"], r["realtime_start"], r["realtime_end"]) for r in joined] == [
+        ("2020-01-01", "1.5", "2020-01-02", "2026-10-16"),  # one window, not a fake revision
+        ("2020-02-01", "1.6", "2023-06-01", "2023-12-31"),
+        ("2020-02-01", "1.7", "2024-01-01", "2026-10-16"),  # a real revision stays
+    ]
+
+
+async def test_a_transformed_fred_series_asks_for_no_revision_history() -> None:
+    from steward.macro.collect import store_fred_vintages
+
+    cpi = FredSeries(key="us_cpi", label="US CPI", series_id="CPIAUCSL", units="pc1")
+    pool: Any = None
+    http: Any = None
+    assert await store_fred_vintages(pool, http, cpi, "k", dt.date(2026, 10, 16), 10) is None

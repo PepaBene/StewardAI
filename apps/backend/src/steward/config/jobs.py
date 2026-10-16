@@ -1481,6 +1481,33 @@ def _eurostat_defaults() -> list[EurostatSeries]:
     ]
 
 
+# The US cycle, markets and Japan (TSMC's and the yen holdings' backdrop), all from FRED:
+# (key, label, FRED id, FRED units transform, stored unit). Japan's CPI is left out: FRED's
+# OECD copy stopped in 2021.
+US_JAPAN_FRED: list[tuple[str, str, str, Literal["lin", "pch", "pc1", "chg"], str]] = [
+    ("us_2y", "US 2-year Treasury yield", "DGS2", "lin", "%"),
+    ("us_curve_10y2y", "US yield curve, 10-year minus 2-year", "T10Y2Y", "lin", "pp"),
+    ("us_real_10y", "US 10-year real yield (TIPS)", "DFII10", "lin", "%"),
+    ("us_gdp", "US real GDP, change on a year earlier", "GDPC1", "pc1", "%"),
+    ("us_payrolls", "US nonfarm payrolls, monthly change", "PAYEMS", "chg", "thousands"),
+    ("us_initial_claims", "US initial jobless claims, weekly", "ICSA", "lin", "claims"),
+    ("us_industrial_production", "US industrial production, annual change", "INDPRO", "pc1",
+     "%"),
+    ("us_retail_sales", "US retail sales, annual change", "RSAFS", "pc1", "%"),
+    ("us_consumer_sentiment", "US consumer sentiment (University of Michigan)", "UMCSENT",
+     "lin", "index"),
+    ("us_core_pce", "US core PCE inflation, annual rate", "PCEPILFE", "pc1", "%"),
+    ("us_vix", "VIX, US equity volatility", "VIXCLS", "lin", "index"),
+    ("usd_broad_index", "US dollar, broad trade-weighted index", "DTWEXBGS", "lin", "index"),
+    ("eur_usd", "EUR/USD exchange rate", "DEXUSEU", "lin", "USD per EUR"),
+    ("usd_jpy", "USD/JPY exchange rate", "DEXJPUS", "lin", "JPY per USD"),
+    ("jp_10y", "Japan 10-year government bond yield", "IRLTLT01JPM156N", "lin", "%"),
+    ("jp_call_rate", "Japan overnight call rate", "IRSTCI01JPM156N", "lin", "%"),
+    ("jp_gdp", "Japan real GDP, change on a year earlier", "JPNRGDPEXP", "pc1", "%"),
+    ("jp_unemployment", "Japan unemployment rate", "LRUN64TTJPM156S", "lin", "%"),
+]  # fmt: skip
+
+
 class MacroSettings(ConfigModel):
     """Macro series collected into `macro_series` (numbers in digests come only from here)."""
 
@@ -1520,6 +1547,10 @@ class MacroSettings(ConfigModel):
                 series_id="DGS10",
             ),
             *(
+                FredSeries(key=k, label=label, series_id=s, units=u, unit=unit)
+                for k, label, s, u, unit in US_JAPAN_FRED
+            ),
+            *(
                 FredSeries(key=key, label=label, series_id=series_id, unit=unit)
                 for key, label, series_id, unit, _words in COMMODITY_FRED
             ),
@@ -1535,9 +1566,15 @@ class MacroSettings(ConfigModel):
             ),
             EcbSeries(
                 key="euro_area_private_credit",
-                label="Euro-area MFI loans to euro-area residents",
-                flow_key="BSI/M.U2.N.A.A20.A.1.U2.2300.Z01.E",
-                unit="EUR millions",
+                label="Euro-area bank loans to companies, annual growth (adjusted)",
+                flow_key="BSI/M.U2.Y.U.A20T.A.I.U2.2240.Z01.A",
+                unit="%",
+            ),
+            EcbSeries(
+                key="euro_area_household_credit",
+                label="Euro-area bank loans to households, annual growth (adjusted)",
+                flow_key="BSI/M.U2.Y.U.A20T.A.I.U2.2250.Z01.A",
+                unit="%",
             ),
             EcbSeries(
                 key="euro_area_10y_yield",
@@ -1548,13 +1585,13 @@ class MacroSettings(ConfigModel):
             EcbSeries(
                 key="euro_area_m3_growth",
                 label="Euro-area M3 annual growth rate",
-                flow_key="BSI/BSI.M.U2.Y.V.M30.A.I.U2.0000.Z01.A",
+                flow_key="BSI/M.U2.Y.V.M30.X.I.U2.2300.Z01.A",
                 unit="%",
             ),
             EcbSeries(
                 key="euro_area_household_loan_rate",
                 label="Euro-area cost of borrowing for household house purchase",
-                flow_key="MIR/MIR.M.U2.B.A2C.AM.R.A.2250.EUR.N",
+                flow_key="MIR/M.U2.B.A2C.AM.R.A.2250.EUR.N",
                 unit="% p.a.",
             ),
             EcbSeries(
@@ -1578,7 +1615,7 @@ class MacroSettings(ConfigModel):
             EcbSeries(
                 key="ea_bls_enterprise_credit_standards",
                 label="Euro-area bank lending survey: enterprise credit standards",
-                flow_key="BLS/BLS.Q.U2.ALL.O.E.Z.B3.ST.S.WFNET",
+                flow_key="BLS/Q.U2.ALL.O.E.Z.B3.ST.S.WFNET",
                 unit="net % balance",
             ),
         ]

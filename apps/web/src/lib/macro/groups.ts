@@ -11,9 +11,9 @@ const RULES: readonly [MacroGroup, RegExp][] = [
   ["Commodities", /commodit|copper|alumin|nickel|oil|brent|wti|gold|silver|gas\b|wheat/],
   ["Currencies", /\bfx\b|fx_|_fx|eur_?usd|usd_?|exchange|currency/],
   ["Inflation", /cpi|hicp|inflation|ppi|pce/],
-  ["Credit and money", /spread|credit|m3|m2|loan/],
-  ["Rates", /rate|yield|10y|2y|bond|funds|treasury|bund/],
-  ["Growth and labour", /gdp|unemploy|payroll|employment|pmi|retail|industrial|production|confidence|sentiment|housing/],
+  ["Credit and money", /spread|credit|m3|m2|loan|vix|volatil/],
+  ["Rates", /rate|yield|10y|2y|bond|funds|treasury|bund|czeonia|repo/],
+  ["Growth and labour", /gdp|unemploy|payroll|employment|claims|pmi|retail|industrial|production|confidence|sentiment|housing/],
 ];
 
 /** The group a series id belongs to; unmatched ids fall into "Other". */

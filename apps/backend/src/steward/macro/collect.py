@@ -311,6 +311,34 @@ async def fetch_fred(
         params["offset"] = str(offset)
 
 
+# Under FRED's 2,000 vintage dates for a daily series (about 260 a year).
+ALFRED_WINDOW_YEARS = 4
+
+
+def join_vintage_windows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """One real-time window per observation and value. FRED clips each window's rows to the
+    requested range, so a value that held across two requests comes back as two rows meeting
+    at the boundary; joined, it is not mistaken for a revision on the boundary day."""
+    out: list[dict[str, Any]] = []
+    last: dict[str, dict[str, Any]] = {}
+    for row in sorted(rows, key=lambda r: (r.get("date", ""), r.get("realtime_start", ""))):
+        prev = last.get(row.get("date", ""))
+        if (
+            prev is not None
+            and prev.get("value") == row.get("value")
+            and prev.get("realtime_end")
+            and row.get("realtime_start")
+            and dt.date.fromisoformat(prev["realtime_end"]) + dt.timedelta(days=1)
+            == dt.date.fromisoformat(row["realtime_start"])
+        ):
+            prev["realtime_end"] = row.get("realtime_end")
+            continue
+        joined = dict(row)
+        out.append(joined)
+        last[row.get("date", "")] = joined
+    return out
+
+
 async def store_fred_vintages(
     pool: asyncpg.Pool,
     http: httpx.AsyncClient,
@@ -318,33 +346,54 @@ async def store_fred_vintages(
     api_key: str,
     today: dt.date,
     history_years: int,
-) -> int:
+) -> int | None:
     """Append actual ALFRED real-time windows; never rewrite an earlier vintage.
 
     `output_type=1` returns one row per observation and real-time window (value, start, end),
     which is what holds revisions; `output_type=4` is *initial release only* and would never
-    show one. The same `units` as the current-vintage request is sent, so a transformed series
-    (`us_cpi`, `pc1`) is not stored as index levels under a `%` unit."""
+    show one. FRED refuses a real-time range for a transformed series (`us_cpi`, `pc1`), so
+    those keep no revision history (None) rather than index levels under a `%` unit. A daily
+    series has more than FRED's 2,000 vintage dates in ten years; it is read in shorter windows."""
+    if series.units != "lin":
+        return None
     start = dt.date(today.year - history_years, 1, 1)
-    response = await http.get(
-        FRED_URL,
-        params={
-            "series_id": series.series_id,
-            "api_key": api_key,
-            "file_type": "json",
-            "output_type": "1",
-            "units": series.units,
-            "observation_start": start.isoformat(),
-            "realtime_start": start.isoformat(),
-            "realtime_end": today.isoformat(),
-            "limit": str(FRED_MAX_LIMIT),
-        },
-    )
-    if response.status_code != 200:
+
+    async def window(lo: dt.date, hi: dt.date) -> httpx.Response:
+        return await http.get(
+            FRED_URL,
+            params={
+                "series_id": series.series_id,
+                "api_key": api_key,
+                "file_type": "json",
+                "output_type": "1",
+                "units": series.units,
+                "observation_start": start.isoformat(),
+                "realtime_start": lo.isoformat(),
+                "realtime_end": hi.isoformat(),
+                "limit": str(FRED_MAX_LIMIT),
+            },
+        )
+
+    response = await window(start, today)
+    rows: list[dict[str, Any]]
+    if response.status_code == 400 and "vintage dates" in response.text:
+        rows = []
+        lo = start
+        while lo <= today:
+            hi = min(dt.date(lo.year + ALFRED_WINDOW_YEARS, lo.month, lo.day), today)
+            part = await window(lo, hi)
+            if part.status_code != 200:
+                raise MacroError(f"ALFRED {series.series_id} returned HTTP {part.status_code}")
+            rows += part.json().get("observations") or []
+            lo = hi + dt.timedelta(days=1)
+        rows = join_vintage_windows(rows)
+    elif response.status_code != 200:
         raise MacroError(f"ALFRED {series.series_id} returned HTTP {response.status_code}")
+    else:
+        rows = response.json().get("observations") or []
     skipped: list[str] = []
     points = parse_fred_vintages(
-        response.json(),
+        {"observations": rows},
         series_id=series.key,
         unit=series.unit,
         source_url=FRED_PAGE.format(series_id=series.series_id),
@@ -867,8 +916,13 @@ async def run_macro_collect(ctx: JobContext, deps: MacroDeps) -> None:
             await raise_now(found)
             step.detail.update(observations=len(obs), new=count, surprises=len(found))
             try:
-                step.detail["vintages"] = await store_fred_vintages(
+                kept = await store_fred_vintages(
                     pool, deps.http, fred, deps.fred_key, today, settings.history_years
+                )
+                step.detail["vintages"] = (
+                    kept
+                    if kept is not None
+                    else "none: FRED keeps no revision history of a change series"
                 )
             except (
                 MacroError,
