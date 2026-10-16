@@ -374,9 +374,10 @@ function HeadlineCharts({ view, units }: { view: StatementsView; units: number }
       <div className="grid gap-x-6 gap-y-5 sm:grid-cols-2 xl:grid-cols-4">
         {series.map((s) => (
           <figure key={s.key} className="min-w-0 space-y-1">
-            <figcaption className="flex items-baseline justify-between gap-2 text-sm">
-              <span className="font-medium">{s.label}</span>
-              {s.margin !== null ? <span className="num text-xs text-text-muted">{`${(s.margin * 100).toFixed(1)}% of revenue`}</span> : null}
+            {/* The second line is kept even when empty so the four charts share a baseline. */}
+            <figcaption className="flex flex-col text-sm">
+              <span className="truncate font-medium">{s.label}</span>
+              <span className="num min-h-4 text-xs text-text-muted">{s.margin !== null ? `${(s.margin * 100).toFixed(1)}% of revenue, latest` : ""}</span>
             </figcaption>
             <BarChart
               data={s.points.map((p) => ({ label: shortColumn(p.label), value: p.value === null ? null : (p.value * units) / divisor }))}
