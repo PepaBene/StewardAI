@@ -23,6 +23,8 @@ function weekday(iso: string): string {
 function itemsMeta(r: ReportSummary): ReactNode {
   if (r.nothing_material) return "Nothing material";
   const parts: string[] = [];
+  // The written lead is the title, so the counted headline ("27 material stories…") moves here.
+  if (r.lead && r.headline) parts.push(r.headline.replace(/\.$/, ""));
   if (typeof r.story_count === "number") parts.push(`${r.story_count} ${r.story_count === 1 ? "item" : "items"}`);
   if (typeof r.citation_count === "number") parts.push(`${r.citation_count} ${r.citation_count === 1 ? "citation" : "citations"}`);
   return <span className="num">{parts.join(" · ") || "—"}</span>;
@@ -35,7 +37,7 @@ export function digestItems(reports: readonly ReportSummary[], period: DigestPer
     kind: period === "weekly" ? "Weekly" : "Daily",
     dateLabel: `${weekday(r.created_at)} ${shortDay(new Date(r.created_at))}`,
     at: r.created_at,
-    title: r.headline || r.title,
+    title: r.lead || r.headline || r.title,
     meta: itemsMeta(r),
     chips: <DeliveryChips delivery={r.delivery} />,
     quiet: !!r.nothing_material,

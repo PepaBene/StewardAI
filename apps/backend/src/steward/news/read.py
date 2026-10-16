@@ -273,6 +273,11 @@ class ReportSummary(BaseModel):
     period: str | None
     title: str
     headline: str | None
+    lead: str | None = Field(
+        default=None,
+        description="Digests: the first written sentence, the summary's or else the first "
+        "holding's, to show what happened rather than how much. Null when none survived.",
+    )
     nothing_material: bool | None
     created_at: dt.datetime
     delivery: dict[str, dict[str, str]]
@@ -347,6 +352,10 @@ async def list_reports(
 ) -> list[ReportSummary]:
     rows = await pool.fetch(
         "select id, type, period, title, created_at, delivery, body ->> 'headline' as headline,"  # noqa: S608
+        " case when type = 'digest' then coalesce(body -> 'overview' -> 0 ->> 'text',"
+        " (select sec -> 'summary' -> 0 ->> 'text' from jsonb_array_elements("
+        "coalesce(body -> 'sections', '[]'::jsonb)) with ordinality s(sec, n)"
+        " where sec -> 'summary' -> 0 ->> 'text' is not null order by n limit 1)) end as lead,"
         " (body ->> 'nothing_material')::boolean as nothing_material,"
         f" {_DIGEST_STORY_COUNT} as story_count,"
         f" {_DIGEST_CITATION_COUNT} as citation_count"

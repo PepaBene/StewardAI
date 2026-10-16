@@ -432,6 +432,11 @@ class ClaimCheckSummary(BaseModel):
     unchecked: int = 0
     removed: int = Field(default=0, description="Unsupported sentences removed (strip mode).")
     note: str | None = None
+    removed_sentences: list[str] = Field(
+        default_factory=list,
+        description="Each removed sentence with why, 'sentence (reason)', so a thin report can "
+        "be traced to the check that thinned it.",
+    )
 
 
 async def check_claims(

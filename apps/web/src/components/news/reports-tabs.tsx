@@ -18,7 +18,7 @@ export type ReportsTab = (typeof TABS)[number]["id"];
  */
 export function ReportsTabs({ active, className }: { active: ReportsTab; className?: string }) {
   return (
-    <nav aria-label="Report type" className={cn("flex overflow-x-auto border-b border-border", className)}>
+    <nav aria-label="Report type" className={cn("flex overflow-x-auto overflow-y-hidden border-b border-border [scrollbar-width:none]", className)}>
       {TABS.map((tab) => (
         <Link
           key={tab.id}
@@ -26,7 +26,7 @@ export function ReportsTabs({ active, className }: { active: ReportsTab; classNa
           title={tab.title}
           aria-current={tab.id === active ? "page" : undefined}
           className={cn(
-            "-mb-px flex-1 border-b-2 px-2.5 py-3 text-center text-[13px] whitespace-nowrap",
+            "flex-1 border-b-2 px-2 py-3 text-center text-[13px] whitespace-nowrap",
             tab.id === active ? "border-accent font-semibold text-text" : "border-transparent text-text-muted hover:text-text",
           )}
         >

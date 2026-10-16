@@ -15095,6 +15095,11 @@ export interface components {
             removed: number;
             /** Note */
             note?: string | null;
+            /**
+             * Removed Sentences
+             * @description Each removed sentence with why, 'sentence (reason)', so a thin report can be traced to the check that thinned it.
+             */
+            removed_sentences?: string[];
         };
         /** ClaimLedger */
         ClaimLedger: {
@@ -36103,6 +36108,11 @@ export interface components {
             title: string;
             /** Headline */
             headline: string | null;
+            /**
+             * Lead
+             * @description Digests: the first written sentence, the summary's or else the first holding's, to show what happened rather than how much. Null when none survived.
+             */
+            lead?: string | null;
             /** Nothing Material */
             nothing_material: boolean | null;
             /**

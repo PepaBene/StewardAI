@@ -45172,6 +45172,14 @@
               }
             ],
             "title": "Note"
+          },
+          "removed_sentences": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Removed Sentences",
+            "description": "Each removed sentence with why, 'sentence (reason)', so a thin report can be traced to the check that thinned it."
           }
         },
         "type": "object",
@@ -106143,6 +106151,18 @@
               }
             ],
             "title": "Headline"
+          },
+          "lead": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lead",
+            "description": "Digests: the first written sentence, the summary's or else the first holding's, to show what happened rather than how much. Null when none survived."
           },
           "nothing_material": {
             "anyOf": [

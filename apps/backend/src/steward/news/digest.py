@@ -432,10 +432,18 @@ async def gather(
         max(1, min_listed),
     )
     ids = [s["id"] for s in stories]
+    # The English translation where one is stored: the writer then cites, and the claim
+    # verifier checks figures against, text in the digest's own language ("452,3 Milliarden"
+    # never matched "452.3 billion", so such sentences were stripped).
     items = await pool.fetch(
-        "select id, cluster_id, url, outlet, tier, headline, summary, published_at"
-        " from public.news_item where cluster_id = any($1::bigint[])"
-        " order by tier, published_at, id",
+        "select i.id, i.cluster_id, i.url, i.outlet, i.tier,"
+        " coalesce(a.title_en, i.headline) as headline,"
+        " coalesce(a.summary_en, i.summary) as summary, i.published_at"
+        " from public.news_item i left join lateral (select t.title_en, t.summary_en"
+        "   from public.news_article t where t.news_item_id = i.id and t.title_en is not null"
+        "   order by t.id limit 1) a on true"
+        " where i.cluster_id = any($1::bigint[])"
+        " order by i.tier, i.published_at, i.id",
         ids,
     )
     verdicts = await pool.fetch(
@@ -905,14 +913,15 @@ async def verify_digest_claims(
         for i, (_, sentence) in enumerate(placed)
     ]
     outcome = await check_claims(claims, settings, verifier, today)
-    removed = 0
+    removed: list[str] = []
     for i, (lst, sentence) in enumerate(placed):
         result = outcome.results[i]
         sentence.check, sentence.check_reason = result.status, result.reason
         if result.status == "unsupported" and settings.mode == "strip":
             lst.remove(sentence)
-            removed += 1
-    body.claims = outcome.summary(settings.mode, removed)
+            removed.append(f"{sentence.text} ({result.reason})")
+    body.claims = outcome.summary(settings.mode, len(removed))
+    body.claims.removed_sentences = removed
     return outcome
 
 

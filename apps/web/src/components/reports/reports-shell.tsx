@@ -152,7 +152,7 @@ export function ReportsShell({
             <span className="font-medium text-text-muted">{item.kind}</span>
             <span className="num text-text-muted">{item.dateLabel}</span>
           </span>
-          <span className={cn("mt-1 block text-[15px] leading-snug", item.quiet ? "text-text-muted" : "font-medium text-text")}>
+          <span className={cn("mt-1 line-clamp-3 block text-[15px] leading-snug", item.quiet ? "text-text-muted" : "font-medium text-text")}>
             {item.title}
           </span>
           <span className="mt-1 flex items-end justify-between gap-3">
