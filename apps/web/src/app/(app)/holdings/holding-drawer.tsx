@@ -10,6 +10,7 @@ import { StepSparkline } from "@/components/insight/step-line";
 import { BandBadge } from "@/components/portfolio/band-badge";
 import { Button } from "@/components/ui/button";
 import { getBrowserApiClient, type Holding, type NewsItemOut } from "@/lib/api/client";
+import { formatNumber } from "@/lib/charts/format";
 import { formatDate, formatDateTime, formatMoney, formatPercent, formatPp, formatPrice, formatQuantity, gainLossTone } from "@/lib/format";
 import { AXIS_LABEL, MARK_AXES, petalsFromMap } from "@/lib/insight/insight";
 import { toNum, type HoldingInsight, type HoldingNote } from "@/lib/portfolio/holding-columns";
@@ -36,13 +37,89 @@ function Fact({ label, children, sub }: { label: string; children: React.ReactNo
   );
 }
 
-function Overview({ h, row }: { h: Holding; row: HoldingInsight | undefined }) {
+/**
+ * A year of daily closes against the thesis: the bear-to-bull range as a band, the base case as
+ * a dashed line. Drawn only when the scenarios are in the price's own currency.
+ */
+function PriceAgainstThesis({ h, row }: { h: Holding; row: HoldingInsight | undefined }) {
+  const [closes, setCloses] = useState<{ date: string; close: number }[] | null>(null);
+  useEffect(() => {
+    let live = true;
+    getBrowserApiClient()
+      .GET("/holdings/{ticker}/prices", { params: { path: { ticker: h.ticker }, query: { days: 365 } } })
+      .then(({ data }) => live && setCloses(data ? data.bars.map((b) => ({ date: b.date, close: b.close })) : []))
+      .catch(() => live && setCloses([]));
+    return () => {
+      live = false;
+    };
+  }, [h.ticker]);
+  const s = row?.scenarios;
+  const sameCcy = s && row?.scenario_currency === h.instrument_currency;
+  if (closes === null) return <p className="h-[132px] text-sm text-text-muted">Loading prices…</p>;
+  if (closes.length < 2) return <p className="text-sm text-text-muted">No daily prices stored for this holding.</p>;
+  const W = 400;
+  const H = 120;
+  const values = closes.map((c) => c.close);
+  const lo = Math.min(...values, ...(sameCcy && s ? [s.bear] : []));
+  const hi = Math.max(...values, ...(sameCcy && s ? [s.bull] : []));
+  const pad = (hi - lo) * 0.06 || 1;
+  const y = (v: number) => H - ((v - (lo - pad)) / (hi - lo + 2 * pad)) * H;
+  const x = (i: number) => (i / (closes.length - 1)) * (W - 52);
+  const path = closes.map((c, i) => `${i ? "L" : "M"}${x(i).toFixed(1)},${y(c.close).toFixed(1)}`).join("");
+  const last = closes[closes.length - 1];
+  const first = closes[0];
+  const fmt = (v: number) => formatPrice(v, h.instrument_currency);
+  return (
+    <figure className="space-y-1">
+      <svg viewBox={`0 0 ${W} ${H}`} className="h-[120px] w-full" role="img" aria-label={`${displayTicker(h.ticker)} over a year, ${fmt(first.close)} to ${fmt(last.close)}${sameCcy && s ? `, against thesis bear ${fmt(s.bear)}, base ${fmt(s.base)}, bull ${fmt(s.bull)}` : ""}`}>
+        {sameCcy && s ? (
+          <>
+            <rect x={0} width={W - 52} y={y(s.bull)} height={Math.max(1, y(s.bear) - y(s.bull))} className="fill-accent/10" />
+            <line x1={0} x2={W - 52} y1={y(s.base)} y2={y(s.base)} className="stroke-accent" strokeDasharray="4 3" strokeWidth={1.25} />
+            {(["bull", "base", "bear"] as const).map((k) => (
+              <text key={k} x={W - 48} y={y(s[k]) + 3.5} className="fill-text-muted text-[10px]">
+                {k} {formatNumber(s[k], s[k] >= 100 ? 0 : 1)}
+              </text>
+            ))}
+          </>
+        ) : null}
+        <path d={path} fill="none" className="stroke-text" strokeWidth={1.5} strokeLinejoin="round" />
+        <circle cx={x(closes.length - 1)} cy={y(last.close)} r={2.5} className="fill-text" />
+      </svg>
+      <figcaption className="text-xs text-text-muted">
+        {`${formatDate(first.date)} to ${formatDate(last.date)}, last ${fmt(last.close)}`}
+        {sameCcy && s ? ". Shaded: the thesis's bear-to-bull range; dashed: its base case." : s ? ". The thesis values are in another currency, so they are not drawn." : ". No thesis scenarios to draw against."}
+      </figcaption>
+    </figure>
+  );
+}
+
+function Overview({ h, row, baseCcy }: { h: Holding; row: HoldingInsight | undefined; baseCcy: string }) {
   const upside = toNum(row?.fair_upside);
   const fair = toNum(row?.fair_value);
   const history = (row?.fair_history ?? []).map((p) => ({ date: p.as_of, value: null, fair: toNum(p.value) }));
   const petals = petalsFromMap(row?.mark);
+  const today = new Date().toISOString().slice(0, 10);
   return (
     <div className="space-y-5">
+      <dl className="num grid grid-cols-3 gap-3 text-sm">
+        <div>
+          <dt className="text-xs text-text-muted">Value</dt>
+          <dd className="font-semibold">{formatMoney(h.value_base, baseCcy, { decimals: 0 })}</dd>
+          <dd className="text-xs text-text-muted">{`${formatPercent(h.weight)} of portfolio`}</dd>
+        </div>
+        <div>
+          <dt className="text-xs text-text-muted">Unrealised</dt>
+          <dd className={cn("font-semibold", TONE[gainLossTone(h.ppl)])}>{formatPercent(h.ppl_pct, { signed: true })}</dd>
+          <dd className="text-xs text-text-muted">{formatMoney(h.ppl, h.account_currency, { decimals: 0, signed: true })}</dd>
+        </div>
+        <div>
+          <dt className="text-xs text-text-muted">Next results</dt>
+          <dd className="font-semibold">{row?.next_report_date ? formatDate(row.next_report_date) : "Not known"}</dd>
+          {row?.review_date ? <dd className={cn("text-xs", row.review_date < today ? "text-loss" : "text-text-muted")}>{`thesis review ${formatDate(row.review_date)}`}</dd> : null}
+        </div>
+      </dl>
+      <PriceAgainstThesis h={h} row={row} />
       <section aria-labelledby="dr-thesis">
         <h3 id="dr-thesis" className="text-sm font-semibold">
           Why you own it
@@ -410,7 +487,7 @@ export function HoldingDrawer({
       tab={tab}
       onTab={(k) => onTab(k as DrawerTabKey)}
       tabs={[
-        { key: "overview", label: "Overview", content: <Overview h={holding} row={row} /> },
+        { key: "overview", label: "Overview", content: <Overview h={holding} row={row} baseCcy={baseCcy} /> },
         { key: "position", label: "Position", content: <Position h={holding} row={row} baseCcy={baseCcy} /> },
         { key: "updates", label: "Updates", content: <Updates ticker={holding.ticker} row={row} /> },
         { key: "notes", label: `Notes${row?.notes ? ` (${row.notes})` : ""}`, content: <Notes ticker={holding.ticker} onCount={countNotes} /> },

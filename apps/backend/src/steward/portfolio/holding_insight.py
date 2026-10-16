@@ -86,6 +86,18 @@ class HoldingInsight(BaseModel):
     thesis: str | None = Field(
         default=None, description="First sentence of why the holding is owned."
     )
+    scenarios: dict[str, float] | None = Field(
+        default=None,
+        description="The thesis's bear, base and bull value per share (keys bear/base/bull), "
+        "in `scenario_currency`; null without scenarios.",
+    )
+    scenario_currency: str | None = None
+    review_date: dt.date | None = Field(
+        default=None, description="When the thesis is due a review."
+    )
+    next_report_date: dt.date | None = Field(
+        default=None, description="The company's next results date, when one is known."
+    )
     yield_on_price: Decimal | None = None
     yield_on_cost: Decimal | None = None
     income_12m: Decimal | None = None
@@ -204,7 +216,21 @@ async def holdings_insight(
     theses = await load_active(pool, "theses", ThesesConfig)
     for th in theses.body.theses if theses else []:
         if th.ticker in out:
-            out[th.ticker].thesis = first_sentence(th.why_owned)
+            o = out[th.ticker]
+            o.thesis = first_sentence(th.why_owned)
+            o.review_date = th.review_date
+            target = th.price_target
+            if target is not None and target.scenarios is not None:
+                s = target.scenarios
+                o.scenarios = {"bear": s.bear, "base": s.base, "bull": s.bull}
+                o.scenario_currency = target.currency
+    for r in await pool.fetch(
+        "select t212_ticker, next_report_date from public.instrument"
+        " where t212_ticker = any($1::text[]) and next_report_date >= $2",
+        tickers,
+        today,
+    ):
+        out[r["t212_ticker"]].next_report_date = r["next_report_date"]
 
     div = await portfolio_dividends(pool, owner_id)
     for d in div.holdings:

@@ -24223,6 +24223,25 @@ export interface components {
              * @description First sentence of why the holding is owned.
              */
             thesis?: string | null;
+            /**
+             * Scenarios
+             * @description The thesis's bear, base and bull value per share (keys bear/base/bull), in `scenario_currency`; null without scenarios.
+             */
+            scenarios?: {
+                [key: string]: number;
+            } | null;
+            /** Scenario Currency */
+            scenario_currency?: string | null;
+            /**
+             * Review Date
+             * @description When the thesis is due a review.
+             */
+            review_date?: string | null;
+            /**
+             * Next Report Date
+             * @description The company's next results date, when one is known.
+             */
+            next_report_date?: string | null;
             /** Yield On Price */
             yield_on_price?: number | string | null;
             /** Yield On Cost */

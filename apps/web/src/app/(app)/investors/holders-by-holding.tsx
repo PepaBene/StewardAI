@@ -65,7 +65,7 @@ export function HoldersByHolding() {
           <div aria-hidden="true" className="hidden grid-cols-[minmax(9rem,13rem)_9rem_minmax(8rem,12rem)_1fr] gap-x-5 border-b border-border pb-1.5 text-xs text-text-muted md:grid">
             <span>Holding</span>
             <span className="text-right">Funds holding it</span>
-            <span className="text-center">Closed · opened</span>
+            <span className="text-center">Funds that closed, opened</span>
             <span>Tracked managers this quarter</span>
           </div>
           <ul className="divide-y divide-border">

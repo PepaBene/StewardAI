@@ -71937,6 +71937,58 @@
             "title": "Thesis",
             "description": "First sentence of why the holding is owned."
           },
+          "scenarios": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "number"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scenarios",
+            "description": "The thesis's bear, base and bull value per share (keys bear/base/bull), in `scenario_currency`; null without scenarios."
+          },
+          "scenario_currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scenario Currency"
+          },
+          "review_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Review Date",
+            "description": "When the thesis is due a review."
+          },
+          "next_report_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Report Date",
+            "description": "The company's next results date, when one is known."
+          },
           "yield_on_price": {
             "anyOf": [
               {
