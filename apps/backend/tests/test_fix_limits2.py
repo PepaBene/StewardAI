@@ -130,11 +130,29 @@ async def test_efts_cap_is_reported_not_silent() -> None:
 async def test_collect_edgar_fts_uses_the_configured_cap() -> None:
     calls: list[int] = []
     http = client(efts_handler(150, calls))
-    holding = HoldingFeedInfo("A_US_EQ", (), None, None, topics=("widget",))
+    holding = HoldingFeedInfo("A_US_EQ", ("Acme Corp",), None, None, topics=("widget",))
     result = await collect_edgar_fts(
         http, {}, "fts", [holding], dt.date(2026, 1, 1), dt.date(2026, 3, 31), max_hits=150
     )
     assert len(result.topic_hits) == 150 and not result.errors
+
+
+async def test_a_topic_hit_must_name_the_holding() -> None:
+    # "tariffs" alone matched every filer that mentions tariffs, and each became an update
+    # for the holding; the search now asks for the topic and the holding's name together.
+    queries: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        queries.append(request.url.params["q"])
+        return httpx.Response(200, json={"hits": {"total": {"value": 0}, "hits": []}})
+
+    named = HoldingFeedInfo("A_US_EQ", ("Acme Corp",), None, None, topics=("tariffs",))
+    unnamed = HoldingFeedInfo("B_US_EQ", (), None, None, topics=("tariffs",))
+    await collect_edgar_fts(
+        client(handler), {}, "fts", [named, unnamed], dt.date(2026, 1, 1), dt.date(2026, 3, 31)
+    )
+    assert '"tariffs" "Acme Corp"' in queries
+    assert '"tariffs"' not in queries
     assert JobsConfig().news.edgar_fts_max_hits == 100
 
 

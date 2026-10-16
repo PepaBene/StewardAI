@@ -109,6 +109,9 @@ def feed_where(filters: FeedFilters) -> tuple[str, list[Any]]:
 
     if filters.ticker:
         add("i.tickers @> array[?::text]", filters.ticker)
+        # One holding's updates: an item the classifier judged irrelevant (another filer's 8-K
+        # that merely mentions a watch topic) is not an update for it.
+        clauses.append("i.relevant is not false")
     if filters.severities:
         add("c.severity = any(?::smallint[])", filters.severities)
     if filters.confidences:

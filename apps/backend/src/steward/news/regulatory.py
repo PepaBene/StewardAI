@@ -370,12 +370,16 @@ async def collect_edgar_fts(
 ) -> FtsResult:
     result = FtsResult()
     for holding in holdings:
-        for topic in holding.topics:
+        topic_name = holding.names[0] if holding.names else None
+        for topic in holding.topics if topic_name and len(topic_name) >= 4 else ():
+            # The topic alone matched every filer that says "tariffs" (Travelers and Truist
+            # 8-Ks under Apple): a hit counts only when the filing is the holding's own or
+            # names the holding.
             try:
                 hits = await efts_search(
                     http,
                     headers,
-                    f'"{topic}"',
+                    f'"{topic}" "{topic_name}"',
                     TOPIC_FORMS,
                     since,
                     today,
