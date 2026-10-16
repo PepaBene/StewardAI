@@ -34,6 +34,32 @@ METHOD_VERSIONS: dict[str, str] = {
     "segments": "1.0.0",
     "company_report": "1.0.0",
     "backtest": "1.0.0",
+    # Insight plan (I0-I6).
+    "dividend_income": "1.0.0",
+    "fair_value_snapshot": "1.0.0",
+    "consensus_snapshot": "1.0.0",
+    "insight_coverage": "1.0.0",
+    "checks": "1.0.0",
+    "portfolio_scorecard": "1.0.0",
+    "portfolio_fair_value": "1.0.0",
+    "multiple_path": "1.0.0",
+    # Insight plan (I7-I10).
+    "valuation_pictures": "1.0.0",
+    "fair_multiple": "1.0.0",
+    "consensus_view": "1.0.0",
+    "screen_parse": "1.0.0",
+    "holdings_insight": "1.0.0",
+    # Insight plan (I11-I14).
+    "attribution_split": "1.0.0",
+    "positions": "1.0.0",
+    "diversification": "1.0.0",
+    "risk_score": "1.0.0",
+    "verdict_phrases": "1.0.0",
+    "updates_feed": "1.0.0",
+    "ownership_mix": "1.0.0",
+    "pay_and_tenure": "1.0.0",
+    "earnings_summary": "1.0.0",
+    "clock_retrospective": "1.0.0",
 }
 
 

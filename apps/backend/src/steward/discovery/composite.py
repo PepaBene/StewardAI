@@ -189,6 +189,28 @@ def red_flags(rec: Record) -> list[Flag]:
     return flags
 
 
+# Thin adapter between a red flag and a four-state check (insight plan I3.1): the idea pipeline
+# and Discover keep reading `Flag`; the company checks read the same rules as `Check`.
+FLAG_OF_STATE = {"fail": "flag", "pass": "clear", "na": "clear", "unknown": "unchecked"}
+STATE_OF_FLAG = {"flag": "fail", "clear": "pass", "unchecked": "unknown"}
+
+
+def flag_from_check(check: object) -> Flag:
+    """A risk check as a red flag (fail = flag, pass or not applicable = clear)."""
+    state = str(getattr(check, "state", "unknown"))
+    return Flag(
+        str(getattr(check, "id", "")),
+        str(getattr(check, "label", "")),
+        FLAG_OF_STATE.get(state, "unchecked"),
+        str(getattr(check, "sentence", "")),
+    )
+
+
+def check_state_of(flag: Flag) -> str:
+    """The four-state value of a red flag (an unchecked flag is `unknown`, never a pass)."""
+    return STATE_OF_FLAG.get(flag.state, "unknown")
+
+
 @dataclass(frozen=True)
 class IdeaVerdict:
     key: str

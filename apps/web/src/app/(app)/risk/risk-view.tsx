@@ -11,6 +11,8 @@ import { getBrowserApiClient } from "@/lib/api/client";
 import { usePageSelection } from "@/lib/chat/page-selection-store";
 import { formatDate, formatPercent } from "@/lib/format";
 import { useApiResource } from "@/lib/hooks/use-api-resource";
+
+import { RiskScorePanel } from "./risk-score-panel";
 import { isRatio, STAT_GROUPS, statLabel, type AnalyticsFigure, type RiskReport } from "@/lib/risk/risk";
 
 import { Notes, Warnings } from "../xray/shared";
@@ -22,9 +24,12 @@ const fetchReport = () => getBrowserApiClient().GET("/portfolio/risk/report", { 
 export function RiskView() {
   const { state } = useApiResource(fetchReport);
   return (
-    <ResourceGate state={state} label="the risk report">
-      {(report) => <Report report={report} />}
-    </ResourceGate>
+    <div className="flex flex-col gap-5">
+      <RiskScorePanel />
+      <ResourceGate state={state} label="the risk report">
+        {(report) => <Report report={report} />}
+      </ResourceGate>
+    </div>
   );
 }
 

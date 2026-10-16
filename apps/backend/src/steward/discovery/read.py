@@ -20,6 +20,24 @@ from steward.peer_metrics import financial_peer_metrics
 from steward.reference.price_series import SOURCE_ORDER, yahoo_from_stooq
 
 ASSET_CONCEPTS = ("assets",)
+# Cash-flow lines for the insight I10.5 metrics (as mapped in sources/xbrl_concepts.py).
+DIVIDENDS_PAID_CONCEPTS = (
+    "paymentsofdividends",
+    "paymentsofdividendscommonstock",
+    "dividendspaidclassifiedasfinancingactivities",
+)
+BUYBACK_CONCEPTS = (
+    "paymentsforrepurchaseofcommonstock",
+    "paymentstoacquireorredeementitysshares",
+    "purchaseoftreasuryshares",
+)
+DEPRECIATION_CONCEPTS = (
+    "depreciationdepletionandamortization",
+    "depreciationandamortization",
+    "depreciationamortizationandaccretionnet",
+    "depreciationandamortisationexpense",
+    "depreciationamortisationandimpairmentlossreversalofimpairmentlossrecognisedinprofitorloss",
+)
 SHARE_CONCEPTS = (
     "weightedaveragenumberofdilutedsharesoutstanding",
     "weightedaveragenumberofsharesoutstandingbasicanddiluted",
@@ -293,6 +311,14 @@ async def load_stock_inputs(
         if t in out:
             out[t].shares = series
             out[t].restated_shares = series
+    for attr, concepts in (
+        ("dividends_paid", DIVIDENDS_PAID_CONCEPTS),
+        ("buybacks_paid", BUYBACK_CONCEPTS),
+        ("depreciation", DEPRECIATION_CONCEPTS),
+    ):
+        for t, series in _annual_series(facts, concepts).items():
+            if t in out:
+                setattr(out[t], attr, series)
     if cutoff is not None:
         # Filings after the cutoff restate earlier years for a split; only the share counts are
         # read past it, and only to put the filed count on the basis of today's adjusted closes.
@@ -319,31 +345,42 @@ async def load_stock_inputs(
             list(by_listing),
         ):
             out[by_listing[r["listing_id"]]].splits.append((r["ex_date"], r["ratio"]))
+        # Six trailing years: the last 12 months give the yield, the earlier years the growth.
         rows = await pool.fetch(
             """select listing_id, currency, ex_date, cash_amount from public.corporate_action
                where listing_id=any($1::bigint[]) and action_type='cash_dividend' and status='confirmed'
                  and cash_amount is not null and ex_date > $2 and ex_date <= $3
                  and ($4::timestamptz is null or known_at<=$4)""",
             list(by_listing),
-            as_of - dt.timedelta(days=365),
+            as_of - dt.timedelta(days=6 * 365),
             as_of,
             cutoff,
         )
         seen: dict[str, set[str | None]] = defaultdict(set)
+        seen_all: dict[str, set[str | None]] = defaultdict(set)
         for r in rows:
             t = by_listing[r["listing_id"]]
-            seen[t].add(r["currency"])
             # Declared per share as it stood on the ex-date; the close is split-adjusted, so the
             # amount is divided by every split after the ex-date.
             factor = Decimal(1)
             for ex, ratio in out[t].splits:
                 if ex > r["ex_date"]:
                     factor *= ratio
-            out[t].dividends_ttm = (out[t].dividends_ttm or Decimal(0)) + r["cash_amount"] / factor
-            out[t].dividend_currency = r["currency"]
+            amount = r["cash_amount"] / factor
+            year = min(5, (as_of - r["ex_date"]).days // 365)
+            seen_all[t].add(r["currency"])
+            out[t].dividends_by_year[year] = out[t].dividends_by_year.get(year, Decimal(0)) + amount
+            if year == 0:
+                seen[t].add(r["currency"])
+                out[t].dividends_ttm = (out[t].dividends_ttm or Decimal(0)) + amount
+                out[t].dividend_currency = r["currency"]
         for t, ccys in seen.items():
             if len(ccys) > 1:
                 out[t].dividends_ttm, out[t].dividend_currency = None, None
+        for t, ccys in seen_all.items():
+            if len(ccys) > 1:
+                # Growth across currencies would mix units; it stays unknown.
+                out[t].dividends_by_year = {}
     isins = sorted({m.isin for m in members if m.isin})
     if isins:
         rows = await pool.fetch(
@@ -396,8 +433,47 @@ async def load_stock_inputs(
             as_of,
         )
     }
+    sells = await pool.fetch(
+        """select f.ticker, count(distinct t.reporting_owner_cik) as sellers
+           from public.insider_filing f join public.insider_transaction t using (accession)
+           where f.ticker=any($1::text[]) and t.economic_class='open_market_sell'
+             and not exists (select 1 from public.insider_filing s
+                             where s.accession=f.superseded_by_accession and s.filed <= $3)
+             and not t.derivative and coalesce(t.rule_10b5_1_plan,false)=false and t.shares > 0
+             and coalesce(t.transaction_date, f.filed) between $2 and $3 and f.filed <= $3
+           group by f.ticker""",
+        tickers,
+        as_of - dt.timedelta(days=90),
+        as_of,
+    )
+    sold = {r["ticker"]: int(r["sellers"]) for r in sells}
     for t in has_filings:
         out[t].insider_buyers_90d = covered.get(t, 0)
+        out[t].insider_sellers_90d = sold.get(t, 0)
+    # Latest cached company checks as of the screen date (computed for holdings and watchlist
+    # names, and for any company whose checks page was opened).
+    checks = await pool.fetch(
+        """select distinct on (ticker) ticker, scores from public.company_check_snapshot
+           where ticker=any($1::text[]) and ($2::timestamptz is null or computed_at<=$2)
+           order by ticker, computed_at desc""",
+        tickers,
+        cutoff,
+    )
+    for r in checks:
+        sc = r["scores"]
+        sc = json.loads(sc) if isinstance(sc, str) else (sc or {})
+        out[r["ticker"]].check_scores = {
+            a: (
+                Decimal(str(sc[a]["score"]))
+                if isinstance(sc.get(a), dict) and sc[a].get("score") is not None
+                else None
+            )
+            for a in ("value", "future", "past", "health", "dividend")
+        }
+        risk = sc.get("risk")
+        out[r["ticker"]].check_risk_flags = (
+            int(risk["flags"]) if isinstance(risk, dict) and "flags" in risk else None
+        )
     if access.get(("fmp", "analyst_estimates")) == "available":
         est = await pool.fetch(
             """select distinct on (ticker) ticker, value, currency from public.forward_observation

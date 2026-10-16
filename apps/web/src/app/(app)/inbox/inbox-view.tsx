@@ -42,6 +42,7 @@ import {
   type NoteVersion,
   type RouteStat,
 } from "@/lib/inbox";
+import { UpdatesFeedPanel } from "@/components/insight/updates-feed";
 import { cn } from "@/lib/utils";
 
 type Load =
@@ -91,6 +92,14 @@ export function InboxView() {
       cancelled = true;
     };
   }, [tab, reloadKey]);
+
+  // A link from the updates feed names one item (`?item=`): scroll it into view once loaded.
+  const focusItem = params.get("item");
+  const loaded = load.kind === "ok";
+  useEffect(() => {
+    if (!loaded || !focusItem) return;
+    document.getElementById(`inbox-item-${focusItem}`)?.scrollIntoView({ block: "center" });
+  }, [loaded, focusItem]);
 
   const onUpdated = useCallback(
     (updated: InboxItem) =>
@@ -214,6 +223,7 @@ export function InboxView() {
                   item={item}
                   now={now}
                   onUpdated={onUpdated}
+                  focused={String(item.id) === focusItem}
                 />
               ))}
             </ul>
@@ -221,6 +231,7 @@ export function InboxView() {
         </Blueprint>
 
         <div className="flex flex-col gap-5">
+          <UpdatesFeedPanel title="Everything else that changed" kicker="News, what changed and dividends, with the inbox" limit={15} />
           <NotesPanel />
           <RoutesPanel reloadKey={reloadKey} />
         </div>
@@ -233,9 +244,11 @@ function ItemRow({
   item,
   now,
   onUpdated,
+  focused = false,
 }: {
   item: InboxItem;
   now: Date;
+  focused?: boolean;
   onUpdated: (u: InboxItem) => void;
 }) {
   const state = actionState(item);
@@ -273,7 +286,10 @@ function ItemRow({
   const busy = pending !== null;
 
   return (
-    <li className="border-b border-border-soft last:border-0">
+    <li
+      id={`inbox-item-${item.id}`}
+      className={cn("scroll-mt-24 border-b border-border-soft last:border-0", focused && "bg-accent-soft")}
+    >
       <div className="grid grid-cols-[4px_minmax(0,1fr)] gap-x-4 px-5 py-4">
         <span
           aria-hidden="true"

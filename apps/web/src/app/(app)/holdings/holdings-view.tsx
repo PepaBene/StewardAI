@@ -1,9 +1,6 @@
 "use client";
 
 import {
-  ArrowDownIcon,
-  ArrowUpDownIcon,
-  ArrowUpIcon,
   CandlestickChartIcon,
   LayoutGridIcon,
   LoaderCircleIcon,
@@ -12,57 +9,39 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import Link from "next/link";
-import { Fragment, useCallback, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import { AlertMessage } from "@/components/alert-message";
-import { HBar, Heatmap, SparkArea, Sparkline } from "@/components/charts";
+import { Heatmap, SparkArea } from "@/components/charts";
 import { EmptyState } from "@/components/empty-state";
 import { PageHeader } from "@/components/page-header";
-import { BandBadge } from "@/components/portfolio/band-badge";
 import { FreshnessLabel } from "@/components/portfolio/freshness-label";
-import { FundExpandButton, FundLookThroughRow } from "@/components/portfolio/fund-look-through-row";
 import { HoldingsTabs } from "@/components/portfolio/holdings-tabs";
-import { useLookThrough } from "@/components/portfolio/look-through-exposure";
 import { PortfolioTreemap, TreemapModeSwitch } from "@/components/portfolio/portfolio-treemap";
 import { Blueprint, PanelHeading } from "@/components/ui/blueprint";
 import { Button } from "@/components/ui/button";
 import { getBrowserApiClient, type Holding, type HoldingsResponse, type PortfolioHistory } from "@/lib/api/client";
-import {
-  formatDate,
-  formatMoney,
-  formatPercent,
-  formatPp,
-  formatPrice,
-  formatQuantity,
-  gainLossTone,
-} from "@/lib/format";
+import { formatDate, formatPercent, formatPrice, gainLossTone } from "@/lib/format";
 import { useApiResource } from "@/lib/hooks/use-api-resource";
-import {
-  DEFAULT_HOLDINGS_SORT,
-  nextSort,
-  sortHoldings,
-  type HoldingsSort,
-  type HoldingsSortKey,
-} from "@/lib/portfolio/holdings-sort";
+import { PRESETS, presetColumns, type ColumnId, type HoldingInsight, type PresetKey } from "@/lib/portfolio/holding-columns";
 import {
   compactMoney,
   dailyMoveGrid,
   dayExtremes,
   displayTicker,
-  investedShare,
   periodChange,
   portfolioDayMove,
   positionMixLabel,
   priceIndex,
-  securityClass,
   unrealisedTotal,
-  weightScale,
   type HoldingPrices,
 } from "@/lib/portfolio/holdings-view";
-import { fundsByTicker } from "@/lib/portfolio/look-through";
 import { TREEMAP_MODES, type TreemapMode } from "@/lib/portfolio/treemap";
 import { dayMove } from "@/lib/prices/intraday";
 import { cn } from "@/lib/utils";
+
+import { HoldingDrawer, type DrawerTabKey } from "./holding-drawer";
+import { Change, ColumnEditor, PresetPicker, PresetTable } from "./preset-table";
 
 const fetchHoldings = () => getBrowserApiClient().GET("/portfolio/holdings");
 const fetchPrices = () => getBrowserApiClient().GET("/portfolio/holdings/prices", { params: { query: { days: 30 } } });
@@ -76,19 +55,6 @@ const VIEWS: { key: HoldingsViewKind; label: string; Icon: LucideIcon }[] = [
   { key: "charts", label: "Charts", Icon: CandlestickChartIcon },
 ];
 type HoldingsViewKind = "table" | "heatmap" | "charts";
-
-/** "▲ +0.28%": a signed change with an arrow, so direction never rests on colour alone. */
-function Change({ value, digits = 2, suffix }: { value: number | null | undefined; digits?: number; suffix?: ReactNode }) {
-  if (typeof value !== "number" || !Number.isFinite(value)) return <span className="text-text-muted">—</span>;
-  const tone = gainLossTone(value);
-  return (
-    <span className={cn("num", TONE_CLASS[tone])}>
-      {tone === "gain" ? "▲ " : tone === "loss" ? "▼ " : ""}
-      {formatPercent(value, { decimals: digits, signed: true })}
-      {suffix}
-    </span>
-  );
-}
 
 export function HoldingsView() {
   const { state, reload } = useApiResource(fetchHoldings);
@@ -220,7 +186,7 @@ function HoldingsContent({
           {view === "heatmap" ? (
             <DailyMovesPanel prices={prices} />
           ) : (
-            <HoldingsTable data={data} priceMap={priceMap} dayChange={dayChange} />
+            <HoldingsPresets data={data} priceMap={priceMap} dayChange={dayChange} />
           )}
         </>
       )}
@@ -464,19 +430,15 @@ function ChartsGrid({
   );
 }
 
-const COLUMNS: { key: HoldingsSortKey | null; label: string; align: "left" | "right" | "center"; className?: string }[] = [
-  { key: "name", label: "Holding", align: "left" },
-  { key: null, label: "Qty", align: "right" },
-  { key: null, label: "Avg price", align: "right" },
-  { key: "day", label: "Price", align: "right" },
-  { key: null, label: "30 days", align: "center" },
-  { key: "value", label: "Value", align: "right" },
-  { key: "weight", label: "Weight vs target", align: "left" },
-  { key: "drift", label: "Drift", align: "right" },
-  { key: "ppl", label: "Unrealised P/L", align: "right" },
-];
+const fetchInsight = () => getBrowserApiClient().GET("/portfolio/holdings/insight");
+const fetchViews = () => getBrowserApiClient().GET("/config/holdings-views");
 
-function HoldingsTable({
+/*
+ * Holdings presets (insight plan I9): the table shows one of the fixed presets or the owner's
+ * custom columns, read from one batched insight request; the choice is saved as the
+ * `holdings_views` config. A row opens the holding drawer.
+ */
+function HoldingsPresets({
   data,
   priceMap,
   dayChange,
@@ -485,226 +447,101 @@ function HoldingsTable({
   priceMap: Map<string, HoldingPrices>;
   dayChange: (t: string) => number | null;
 }) {
-  const [sort, setSort] = useState<HoldingsSort>(DEFAULT_HOLDINGS_SORT);
-  const rows = useMemo(() => sortHoldings(data.holdings, sort, { dayChange }), [data.holdings, sort, dayChange]);
-  const baseCcy = data.base_currency ?? "";
-  const scale = weightScale(data.holdings);
-  const totalValue = data.holdings.reduce((s, h) => s + h.value_base, 0);
-  const invested = investedShare(data.holdings);
-  const pnl = unrealisedTotal(data.holdings);
-  const sortLabel = COLUMNS.find((c) => c.key === sort.key)?.label ?? sort.key;
-  const lookThrough = useLookThrough();
-  const funds = useMemo(() => fundsByTicker(lookThrough.report), [lookThrough.report]);
-  const [open, setOpen] = useState<ReadonlySet<string>>(() => new Set());
-  const toggle = (ticker: string) =>
-    setOpen((prev) => {
-      const next = new Set(prev);
-      if (!next.delete(ticker)) next.add(ticker);
-      return next;
-    });
+  const insight = useApiResource(fetchInsight);
+  const views = useApiResource(fetchViews).state;
+  const [local, setLocal] = useState<{ selected: PresetKey; custom: ColumnId[] } | null>(null);
+  const [editing, setEditing] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [drawer, setDrawer] = useState<{ ticker: string; tab: DrawerTabKey } | null>(null);
+  const [noteCounts, setNoteCounts] = useState<Record<string, number>>({});
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // `?drawer=TICKER&tab=notes` (the chat cites notes with this link) opens the drawer once.
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search);
+    const t = q.get("drawer");
+    const tab = q.get("tab");
+    if (t)
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- reads the URL once on mount
+      setDrawer({
+        ticker: t,
+        tab: tab === "position" || tab === "updates" || tab === "notes" ? tab : "overview",
+      });
+  }, []);
+
+  const saved = views.kind === "ok" ? views.data.body : null;
+  const selected: PresetKey = local?.selected ?? (saved?.selected as PresetKey | undefined) ?? "holding";
+  const custom = local?.custom ?? presetColumns("custom", saved?.custom_columns);
+  const columns = selected === "custom" ? custom : presetColumns(selected, null);
+
+  const persist = useCallback((next: { selected: PresetKey; custom: ColumnId[] }) => {
+    setLocal(next);
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(async () => {
+      const { error } = await getBrowserApiClient().PUT("/config/holdings-views", {
+        body: { schema_version: 1, selected: next.selected, custom_columns: next.custom, basis: "dcf_default" },
+      });
+      setSaveError(error ? "Your column choice could not be saved; it applies until you leave the page." : null);
+    }, 700);
+  }, []);
+  useEffect(() => () => {
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+  }, []);
+
+  const rows = useMemo(() => (insight.state.kind === "ok" ? insight.state.data.holdings : []), [insight.state]);
+  const byTicker = useMemo(() => {
+    const m = new Map<string, HoldingInsight>();
+    for (const r of rows) m.set(r.ticker, noteCounts[r.ticker] !== undefined ? { ...r, notes: noteCounts[r.ticker] } : r);
+    return m;
+  }, [rows, noteCounts]);
+  const note =
+    insight.state.kind === "loading"
+      ? "Loading fair values, scores and fundamentals…"
+      : insight.state.kind === "error"
+        ? "Fair values, scores and fundamentals could not be loaded; those columns show a dash."
+        : null;
+  const onNotes = useCallback((ticker: string, n: number) => setNoteCounts((c) => (c[ticker] === n ? c : { ...c, [ticker]: n })), []);
+  const description = PRESETS.find((p) => p.key === selected)?.description;
 
   return (
-    <Blueprint className="overflow-visible">
-      <div className="relative overflow-x-auto">
-        <table className="w-full min-w-[72rem] text-sm">
-          <caption className="sr-only">
-            Open positions, sorted by {sortLabel} {sort.direction === "asc" ? "ascending" : "descending"}
-          </caption>
-          <thead className="bg-surface-muted">
-            <tr className="border-b border-border text-[11px] tracking-[0.08em] text-text-muted uppercase">
-              {COLUMNS.map((column) => {
-                const active = column.key !== null && sort.key === column.key;
-                const ariaSort = active ? (sort.direction === "asc" ? "ascending" : "descending") : undefined;
-                const SortIcon = !active ? ArrowUpDownIcon : sort.direction === "asc" ? ArrowUpIcon : ArrowDownIcon;
-                const label = column.key === "value" ? `${column.label} (${baseCcy})` : column.label;
-                return (
-                  <th
-                    key={column.label}
-                    scope="col"
-                    aria-sort={ariaSort}
-                    className={cn(
-                      "px-3 py-2.5 font-medium first:pl-5 last:pr-5",
-                      column.align === "right" && "text-right",
-                      column.align === "center" && "text-center",
-                      column.align === "left" && "text-left",
-                    )}
-                  >
-                    {column.key ? (
-                      <button
-                        type="button"
-                        onClick={() => setSort((s) => nextSort(s, column.key!))}
-                        className={cn(
-                          "inline-flex items-center gap-1 uppercase hover:text-text",
-                          active && "text-text",
-                          column.align === "right" && "flex-row-reverse",
-                        )}
-                      >
-                        <SortIcon aria-hidden="true" className="size-3" />
-                        {label}
-                        {column.key === "day" ? <span className="sr-only"> (sorts by today&rsquo;s move)</span> : null}
-                      </button>
-                    ) : (
-                      label
-                    )}
-                  </th>
-                );
-              })}
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((h) => {
-              const expandable = securityClass(h.security_type) === "ETF" || funds.has(h.ticker);
-              const rowId = `look-through-${h.ticker}`;
-              return (
-                <Fragment key={h.ticker}>
-                  <HoldingRow
-                    h={h}
-                    baseCcy={baseCcy}
-                    scale={scale}
-                    prices={priceMap.get(h.ticker)}
-                    expand={expandable ? { open: open.has(h.ticker), onToggle: () => toggle(h.ticker), controls: rowId } : undefined}
-                  />
-                  {expandable && open.has(h.ticker) ? (
-                    <FundLookThroughRow
-                      id={rowId}
-                      fund={funds.get(h.ticker) ?? null}
-                      loading={lookThrough.loading}
-                      error={lookThrough.error}
-                      colSpan={COLUMNS.length}
-                      currency={baseCcy}
-                    />
-                  ) : null}
-                </Fragment>
-              );
-            })}
-          </tbody>
-          <tfoot>
-            <tr className="font-semibold">
-              <th scope="row" className="py-3 pr-3 pl-5 text-left">
-                Total · {data.holdings.length} position{data.holdings.length === 1 ? "" : "s"}
-              </th>
-              <td colSpan={4} />
-              <td className="num px-3 py-3 text-right">{formatMoney(totalValue, baseCcy, { decimals: 0 })}</td>
-              <td className="num px-3 py-3">{invested !== null ? `${formatPercent(invested)} invested` : null}</td>
-              <td />
-              <td className={cn("num py-3 pr-5 pl-3 text-right", pnl ? TONE_CLASS[gainLossTone(pnl.ppl)] : "")}>
-                {pnl ? formatMoney(pnl.ppl, pnl.currency, { decimals: 0, signed: true }) : "—"}
-                {pnl ? <span className="block text-xs font-normal">{formatPercent(pnl.pct, { signed: true })}</span> : null}
-              </td>
-            </tr>
-          </tfoot>
-        </table>
-      </div>
-    </Blueprint>
-  );
-}
-
-function HoldingRow({
-  h,
-  baseCcy,
-  scale,
-  prices,
-  expand,
-}: {
-  h: Holding;
-  baseCcy: string;
-  scale: number;
-  prices: HoldingPrices | undefined;
-  /** ETF rows: the disclosure for its underlying holdings (look-through). */
-  expand?: { open: boolean; onToggle: () => void; controls: string };
-}) {
-  const tone = gainLossTone(h.ppl);
-  const short = displayTicker(h.ticker);
-  const cls = securityClass(h.security_type);
-  const move = dayMove(prices, (d) => formatDate(d));
-  const day = move.value;
-  const bars = prices?.bars ?? [];
-  return (
-    <tr className="border-b border-border-soft align-middle hover:bg-border-soft">
-      <th scope="row" className="py-2.5 pr-3 pl-5 text-left font-normal">
-        <div className="flex items-center justify-between gap-2">
-        <Link href={`/holdings/${encodeURIComponent(h.ticker)}`} className="group flex min-w-0 items-center gap-2.5">
-          <span
-            aria-hidden="true"
-            className="grid size-[34px] shrink-0 place-items-center border border-border font-mono text-[10px] font-medium"
-          >
-            {short.slice(0, 4)}
-          </span>
-          <span className="min-w-0">
-            <span className="block max-w-[16rem] truncate font-semibold text-text group-hover:text-accent-ink group-hover:underline">
-              {h.name ?? h.ticker}
-            </span>
-            <span className="block font-mono text-[11px] text-text-muted" title={h.ticker}>
-              {short}
-              {cls ? ` · ${cls}` : ""}
-            </span>
-          </span>
-        </Link>
-        {expand ? <FundExpandButton open={expand.open} onToggle={expand.onToggle} controls={expand.controls} name={h.name ?? h.ticker} /> : null}
-        </div>
-      </th>
-      <td className="num px-3 py-2.5 text-right">{formatQuantity(h.quantity)}</td>
-      <td className="num px-3 py-2.5 text-right text-text-muted">{formatPrice(h.avg_price, h.instrument_currency)}</td>
-      <td className="num px-3 py-2.5 text-right">
-        {formatPrice(h.current_price, h.instrument_currency)}
-        <span className="block text-[11px]" title={move.title}>
-          {day === null ? <span className="text-text-muted">—</span> : <Change value={day} />}
-          {move.kind === "intraday" && move.stamp ? (
-            <span className="ml-1 font-mono text-[10px] text-text-faint">
-              <span className="sr-only">intraday, </span>
-              {move.stamp}
-            </span>
-          ) : null}
-        </span>
-      </td>
-      <td className="w-32 px-3 py-2.5">
-        {bars.length > 1 ? (
-          <Sparkline
-            values={bars.map((b) => b.close)}
-            area
-            width={100}
-            height={30}
-            className="h-[30px] w-full"
-            label={`${short}, ${bars.length} closes`}
-          />
-        ) : (
-          <span className="block text-center text-xs text-text-muted">—</span>
-        )}
-      </td>
-      <td className="num px-3 py-2.5 text-right font-semibold">
-        {formatMoney(h.value_base, baseCcy, { decimals: 0 })}
-        {h.account_currency !== baseCcy || h.instrument_currency !== baseCcy ? (
-          <span className="block text-xs font-normal text-text-muted" title="Trading212's own conversion">
-            T212 {formatMoney(h.value_account, h.account_currency)}
-          </span>
-        ) : null}
-      </td>
-      <td className="w-44 px-3 py-2.5">
-        <div className="num mb-1 flex justify-between gap-2 text-xs">
-          <span>{formatPercent(h.weight)}</span>
-          <span className="text-text-muted">
-            {h.target_weight !== null ? `target ${formatPercent(h.target_weight)}` : "no target"}
-          </span>
-        </div>
-        <HBar
-          value={h.weight}
-          max={scale}
-          target={h.target_weight}
-          size="sm"
-          label={`${short} weight`}
-          className="h-1.5"
+    <section aria-label="Holdings table" className="space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <PresetPicker
+          value={selected}
+          onChange={(k) => {
+            persist({ selected: k, custom });
+            setEditing(k === "custom" && editing);
+          }}
+          onEdit={() => setEditing((e) => !e)}
+          editing={editing}
         />
-      </td>
-      <td className="px-3 py-2.5 text-right">
-        <span className="inline-flex flex-col items-end gap-1">
-          {h.drift_status !== "no_target" ? <span className="num text-[13px]">{formatPp(h.drift)}</span> : null}
-          <BandBadge status={h.drift_status} />
-        </span>
-      </td>
-      <td className={cn("num py-2.5 pr-5 pl-3 text-right", TONE_CLASS[tone])}>
-        <span className="font-semibold">{formatMoney(h.ppl, h.account_currency, { decimals: 0, signed: true })}</span>
-        <span className="block text-xs">{formatPercent(h.ppl_pct, { signed: true })}</span>
-      </td>
-    </tr>
+        <p className="text-xs text-text-muted">{description}</p>
+      </div>
+      {saveError ? (
+        <p role="alert" className="text-sm text-loss">
+          {saveError}
+        </p>
+      ) : null}
+      {editing && selected === "custom" ? <ColumnEditor columns={custom} onChange={(c) => persist({ selected, custom: c })} /> : null}
+      <PresetTable
+        data={data}
+        columns={columns}
+        insight={byTicker}
+        insightNote={note}
+        priceMap={priceMap}
+        dayChange={dayChange}
+        onOpen={(ticker, tab) => setDrawer({ ticker, tab: tab ?? "overview" })}
+      />
+      <HoldingDrawer
+        holding={drawer ? (data.holdings.find((h) => h.ticker === drawer.ticker) ?? null) : null}
+        row={drawer ? byTicker.get(drawer.ticker) : undefined}
+        baseCcy={data.base_currency ?? ""}
+        tab={drawer?.tab ?? "overview"}
+        onTab={(tab) => setDrawer((d) => (d ? { ...d, tab } : d))}
+        onClose={() => setDrawer(null)}
+        onNotes={onNotes}
+      />
+    </section>
   );
 }
+

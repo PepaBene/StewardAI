@@ -51,7 +51,24 @@ SOURCE_JOBS = [
     "control_stakes",
     "nport_holdings",
 ]
-CATCH_UP_SEQUENCE = [SOURCE_AUDIT, *DATA_SEQUENCE, *SOURCE_JOBS, "fact_reconcile"]
+# The insight snapshots read what the jobs above collected, so they come last: the access probe
+# first (the consensus snapshot only calls endpoints that passed it), the checks after the fair
+# values they score.
+INSIGHT_JOBS = [
+    "insight_access_probe",
+    "consensus_snapshot",
+    "dividend_forecast",
+    "fair_value_snapshot",
+    "checks_refresh",
+]
+CATCH_UP_SEQUENCE = [
+    SOURCE_AUDIT,
+    *DATA_SEQUENCE,
+    *SOURCE_JOBS,
+    "sec_fsds_backfill",
+    "fact_reconcile",
+    *INSIGHT_JOBS,
+]
 CATCH_UP_PARAMS: dict[str, Any] = {"catch_up": True}
 # How far back a job's latest slot is looked for: the rarest default schedules are
 # half-yearly (holidays) and quarterly (the full earnings calendar).

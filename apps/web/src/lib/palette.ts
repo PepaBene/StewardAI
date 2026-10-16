@@ -88,6 +88,7 @@ export const CONFIG_PAGES = [
   { href: "/config/verification", label: "Verification", keywords: "sanity bounds tolerance corroboration trust penalty reward demote claim verifier strip mark numeric check" },
   { href: "/config/research-profiles", label: "Research profiles", keywords: "research sections depth model effort searches tiers peers valuation language quick standard" },
   { href: "/config/prompts", label: "Prompts", keywords: "system prompts ai instructions tone override customize reset default evals" },
+  { href: "/config/checks", label: "Checks", keywords: "checklist limits payout roe roce interest coverage debt to equity dilution analyst floor dividend tiers fair value stale drift band" },
 ] as const;
 
 /** Pages that are not a section or a config editor. */
@@ -95,6 +96,8 @@ export const OTHER_PAGES = [
   { href: "/theses", label: "Thesis board", keywords: "theses kpi verdicts pass breach unknown status holdings overview" },
   { href: "/review", label: "Review queue", keywords: "held quarantined figures facts accept correct reject override validator reconciliation" },
   { href: "/performance", label: "Performance", keywords: "returns twr xirr benchmark contribution attribution lots holding period exemption core stocks ledger" },
+  { href: "/portfolio/income", label: "Dividend income", keywords: "dividends income forecast calendar ex-dividend payment yield on cost quality tiers contributors next 12 months" },
+  { href: "/portfolio/valuation", label: "Portfolio valuation", keywords: "fair value overvalued undervalued stale dcf scenario thesis target multiple consensus basis upside" },
   { href: "/xray", label: "X-Ray", keywords: "xray look-through exposure sector country currency issuer overlap intersection concentration hhi fundamentals fee benchmark what if proposed portfolio" },
   { href: "/risk", label: "Risk and decisions", keywords: "var expected shortfall volatility drawdown tracking error correlation stress test shock themes what if rebalance pre-trade before a trade switch" },
   { href: "/journal", label: "Decision journal", keywords: "decisions thesis hypothesis buy sell pass review scorecard conviction catalysts disconfirming export report" },

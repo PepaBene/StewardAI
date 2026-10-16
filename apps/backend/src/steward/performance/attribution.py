@@ -96,6 +96,13 @@ class HoldingContribution:
     income: Decimal = ZERO
     fees: Decimal = ZERO  # negative
     attributed: bool = True
+    # The part of `price` earned on units sold in the window (insight I11.2); the rest of `price`
+    # is unrealised, on units still held at the end of their interval.
+    realised: Decimal = ZERO
+
+    @property
+    def unrealised(self) -> Decimal:
+        return self.price - self.realised
 
     @property
     def total(self) -> Decimal:
@@ -147,6 +154,11 @@ class AttributionReport:
     net_trading: Decimal  # buys minus sales at fill value: money moved into holdings, not a gain
     unattributed_tickers: list[str] = field(default_factory=list)
     intervals: int = 0
+    realised: Decimal = ZERO  # part of the price component earned on units sold
+
+    @property
+    def unrealised(self) -> Decimal:
+        return self.bridge.components.get("price", ZERO) - self.realised
 
 
 def attribute(
@@ -172,7 +184,7 @@ def attribute(
     income_list, cost_list = list(income), list(costs)
     contributions: dict[str, HoldingContribution] = {}
     unattributed: set[str] = set()
-    price_total = fx_total = income_total = fee_total = net_trading = ZERO
+    price_total = fx_total = income_total = fee_total = net_trading = realised_total = ZERO
 
     def holding(ticker: str) -> HoldingContribution:
         return contributions.setdefault(ticker, HoldingContribution(ticker))
@@ -209,8 +221,31 @@ def attribute(
             fill_local = sum((t.quantity * t.price for t in fills), ZERO)
             price_effect = (local_close - local_open - fill_local) * fx1
             fx_effect = local_open * (fx1 - fx0)
+            # Realised part: with q0 units at p0, sales of q at p and buys b at pb, the price effect
+            # is q1*(p1 - p0) - b*(pb - p0) + q*(p - p0); the last term is earned on the units
+            # sold. Units sold beyond the opening units were bought in the interval, so their
+            # reference is the interval's average buy price.
+            buys = [t for t in fills if t.quantity > 0]
+            bought = sum((t.quantity for t in buys), ZERO)
+            avg_buy = sum((t.quantity * t.price for t in buys), ZERO) / bought if bought else None
+            realised = ZERO
+            left_open = q0 if p0 else ZERO
+            for t in fills:
+                if t.quantity >= 0:
+                    continue
+                sold = -t.quantity
+                from_open = min(sold, max(left_open, ZERO))
+                left_open -= from_open
+                if from_open and p0:
+                    realised += from_open * (t.price - p0.price)
+                rest = sold - from_open
+                if rest and avg_buy is not None:
+                    realised += rest * (t.price - avg_buy)
+            realised *= fx1
             c = holding(ticker)
             c.price += price_effect
+            c.realised += realised
+            realised_total += realised
             c.fx += fx_effect
             price_total += price_effect
             fx_total += fx_effect
@@ -250,6 +285,7 @@ def attribute(
         net_trading=net_trading,
         unattributed_tickers=sorted(unattributed),
         intervals=len(days) - 1,
+        realised=realised_total,
     )
 
 

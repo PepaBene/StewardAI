@@ -19,6 +19,7 @@ export type ConfigNavKey =
   | "budget"
   | "prompts"
   | "verification"
+  | "checks"
   | "calendar"
   | "history";
 
@@ -36,6 +37,7 @@ export const CONFIG_NAV: readonly ConfigNavItem[] = [
   { key: "budget", href: "/config/budget", label: "Budget" },
   { key: "prompts", href: "/config/prompts", label: "Prompts" },
   { key: "verification", href: "/config/verification", label: "Verification" },
+  { key: "checks", href: "/config/checks", label: "Checks" },
   { key: "calendar", href: "/config/calendar", label: "Calendar" },
   { key: "history", href: "/config/history", label: "History & export" },
 ];

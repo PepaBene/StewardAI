@@ -14,6 +14,7 @@ import { fetchExport } from "@/lib/performance/export";
 import { holdingProgress, monthsRemainingLabel, type LotsData } from "@/lib/performance/performance";
 import { cn } from "@/lib/utils";
 
+import { ClosedPositions } from "./closed-positions";
 import { Formula, Money, PriceAge, TD, TH, TH_LEFT } from "./shared";
 
 const fetchLots = () => getBrowserApiClient().GET("/portfolio/performance/lots");
@@ -201,6 +202,7 @@ export function LotsView() {
               <LotsTable data={data} />
             </Blueprint>
             <Realized data={data} />
+            <ClosedPositions />
             <Formula lines={data.explain.formula} version={data.explain.formula_version} />
           </div>
         )

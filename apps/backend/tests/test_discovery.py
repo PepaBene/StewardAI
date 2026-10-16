@@ -312,6 +312,52 @@ def test_stock_record_computes_valuation_in_matching_currency_and_explains_gaps(
     assert r.values["sector"].value is None and "profile" in (r.values["sector"].reason or "")
 
 
+def test_parity_metrics_from_cash_flow_dividends_and_insiders() -> None:
+    member = m("X", country="US", currency="USD", status="active", has_statements=True)
+    end = dt.date(2025, 12, 31)
+    data = StockInputs(
+        periods=[period()],
+        closes=closes(400, "50", "0.05"),
+        shares=[(dt.date(2024, 12, 31), D(105)), (end, D(100))],
+        dividends_paid=[(end, D(-60))],
+        buybacks_paid=[(end, D(-40))],
+        depreciation=[(end, D(50))],
+        dividends_by_year={0: D("1.1"), 1: D("1.0"), 5: D("0.5")},
+        insider_buyers_90d=3,
+        insider_sellers_90d=1,
+        forward_eps=D("1.8"),
+        forward_currency="USD",
+    )
+    r = stock_record(member, data, TODAY)
+    cap = r.values["market_cap"].value
+    assert isinstance(cap, Decimal)
+    assert r.values["buyback_yield"].value == D(40) / cap
+    assert r.values["shareholder_yield"].value == D(100) / cap
+    assert r.values["payout_ratio"].value == D(60) / D(150)
+    assert r.values["payout_ratio_fcf"].value == D(60) / D(160)
+    assert r.values["net_debt_to_ebitda"].value == D(200) / D(250)
+    assert r.values["dividend_growth_1y"].value == D("1.1") / D("1.0") - 1
+    assert r.values["dividend_growth_5y"].value == pytest.approx(D("0.1708"), abs=D("0.0001"))
+    assert r.values["insider_buy_ratio_90d"].value == D("0.75")
+    assert r.values["forward_eps_growth"].value == pytest.approx(D("1.8") / D("1.5") - 1)
+
+    bare = stock_record(
+        member,
+        StockInputs(periods=[period()], closes=closes(400, "50", "0.05"), shares=[(end, D(100))]),
+        TODAY,
+    )
+    for mid, why in (
+        ("buyback_yield", "share repurchases paid not filed"),
+        ("payout_ratio", "dividends paid not filed"),
+        ("dividend_growth_5y", "no dividend history"),
+        ("insider_buy_ratio_90d", "no insider filings"),
+        ("net_debt_to_ebitda", "depreciation"),
+    ):
+        assert bare.values[mid].value is None and why in (bare.values[mid].reason or ""), mid
+    for mid in ("buyback_yield", "payout_ratio", "dividend_growth_5y", "insider_buy_ratio_90d"):
+        assert STOCK_CATALOGUE[mid].formula and STOCK_CATALOGUE[mid].ticks
+
+
 def test_currency_mismatch_blocks_market_cap_and_gbx_is_converted() -> None:
     eur_filer = stock_record(
         m("Y", currency="USD"),

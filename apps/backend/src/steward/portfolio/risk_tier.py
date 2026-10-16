@@ -245,7 +245,7 @@ async def _loss_years(pool: asyncpg.Pool, tickers: Sequence[str]) -> dict[str, i
             " and concept in ('us-gaap:NetIncomeLoss', 'us-gaap:ProfitLoss',"
             " 'ifrs-full:ProfitLoss')"
             " and period_start is not null and period_end - period_start between 350 and 380"
-            " and (dimensions is null or dimensions = '{}'::jsonb)"
+            " and coalesce(dimensions->'members', '[]'::jsonb) = '[]'::jsonb"
             " order by ticker, period_end, known_at desc) t",
             list(tickers),
         )

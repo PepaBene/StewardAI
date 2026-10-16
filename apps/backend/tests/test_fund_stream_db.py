@@ -19,7 +19,7 @@ from api.auth import AuthenticatedUser, require_owner
 from api.db import get_pool, get_pool_or_error
 from api.main import create_app
 from steward.config.holding_profiles import HoldingProfile
-from steward.config.jobs import ValuationSettings
+from steward.config.jobs import FsdsSettings, ValuationSettings
 from steward.fundamentals import collect as fundamentals_collect
 from steward.fundamentals import fsds
 from steward.fundamentals import ir as ir_module
@@ -1107,6 +1107,63 @@ async def test_fsds_backfill_job_stores_reconciled_facts_with_lineage_and_is_ide
         "select count(*) from public.financial_statement_fact where source='sec_fsds'"
         " and accession='0000000001-26-000001'"
     )
+
+
+async def test_scheduled_fsds_backfill_reads_planned_sets_and_remembers_them(
+    backend_pool: asyncpg.Pool, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    await seed_instrument(backend_pool)
+    monkeypatch.setattr(
+        fsds, "get_settings", lambda: type("S", (), {"sec_user_agent": "Test test@example.com"})
+    )
+    requested: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        name = request.url.path.rsplit("/", 1)[-1]
+        requested.append(name)
+        if name == "2026_09_notes.zip":
+            return httpx.Response(200, content=fsds_zip())
+        return httpx.Response(404)
+
+    async def run(settings: Any) -> str:
+        async def job(ctx: JobContext) -> None:
+            async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as http:
+                await fsds.run_fsds_backfill(
+                    ctx, http, settings=settings, today=dt.date(2026, 10, 16)
+                )
+
+        return await run_job(backend_pool, "sec_fsds_backfill", job, trigger="schedule")
+
+    settings = FsdsSettings(history_months=12, datasets_per_run=1)
+    assert await run(settings) == "succeeded"
+    assert requested == ["2026_09_notes.zip"]
+    assert await backend_pool.fetchval(
+        "select count(*) from public.financial_statement_fact where source='sec_fsds'"
+    )
+    loaded, missing = await fsds.load_state(backend_pool)
+    assert loaded == {"2026_09": {CIK}} and missing == {}
+
+    # The next run passes the set it read; the older months answer 404 here, so each is noted
+    # and the run stops after four misses (the next run tries their quarters instead).
+    requested.clear()
+    assert await run(FsdsSettings(history_months=12, datasets_per_run=1)) == "succeeded"
+    assert "2026_09_notes.zip" not in requested
+    assert requested[:2] == ["2026_08_notes.zip", "2026_07_notes.zip"]
+    assert len(requested) == fsds.MAX_MISSES_PER_RUN
+    _, missing = await fsds.load_state(backend_pool)
+    assert missing["2026_08"] == dt.date(2026, 10, 16)
+    summary = await backend_pool.fetchval(
+        "select s.detail from public.job_step s join public.job j on j.id = s.job_id"
+        " where j.job_type = 'sec_fsds_backfill' and s.name = 'summary'"
+        " order by s.id desc limit 1"
+    )
+    detail = json.loads(summary) if isinstance(summary, str) else summary
+    assert detail["read"] == [] and len(detail["not_published"]) == fsds.MAX_MISSES_PER_RUN
+
+    # Switched off: nothing is fetched.
+    requested.clear()
+    assert await run(FsdsSettings(enabled=False)) == "succeeded"
+    assert requested == []
 
 
 # -------------------------------------------------------------- F17: indexes, jsonb audit

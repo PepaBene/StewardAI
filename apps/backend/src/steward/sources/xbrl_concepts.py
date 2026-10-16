@@ -801,8 +801,21 @@ EQUITY_INCLUDING_NCI: frozenset[str] = frozenset(
 _CURRENCY = re.compile(r"^([A-Z]{3})(?:/[A-Za-z]+)?$")
 
 
+# Pay versus performance (SEC Item 402(v), tagged in proxy statements with the `ecd` taxonomy):
+# the principal executive officer's summary-table pay and pay actually paid, and the other named
+# executives' averages (insight I13.4). Kept as notes; non-dimensional rows only (one PEO).
+ECD_CONCEPTS: dict[str, str] = {
+    "ecd:PeoTotalCompAmt": "peo_total_comp",
+    "ecd:PeoActuallyPaidCompAmt": "peo_actually_paid_comp",
+    "ecd:NonPeoNeoAvgTotalCompAmt": "neo_avg_total_comp",
+    "ecd:NonPeoNeoAvgCompActuallyPaidAmt": "neo_avg_actually_paid_comp",
+}
+
+
 def classify(concept: str, *, dimensional: bool = False) -> tuple[Statement, str | None]:
     """(statement, line_item) of a concept; dimensional facts are `segment`."""
+    if concept in ECD_CONCEPTS:
+        return ("segment" if dimensional else "note"), ECD_CONCEPTS[concept]
     statement, line_item = STATEMENT_ITEMS.get(concept, ("note", None))
     if concept.startswith("dei:") and concept != "dei:EntityCommonStockSharesOutstanding":
         statement, line_item = "note", f"cover_{concept.split(':', 1)[1]}"

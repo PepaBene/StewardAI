@@ -36,6 +36,13 @@ STORES: dict[str, str] = {
     "fund facts": "fund_factsheet",
     "macro series": "macro_observation",
     "graph": "entity_relationship",
+    "corporate actions": "corporate_action",
+    "dividend forecasts": "dividend_forecast_snapshot",
+    "check snapshots": "company_check_snapshot",
+    "fair-value history": "fair_value_point",
+    "consensus snapshots": "consensus_snapshot",
+    "insider filings": "insider_filing",
+    "news stories": "story_cluster",
 }
 
 
@@ -100,6 +107,36 @@ FEATURES: tuple[Feature, ...] = (
     Feature(
         "patents", "Patent research", "M2", required=(("epo_ops", "published_data"),),
         limit="Bibliographic data only.",
+    ),
+    # Insight features (insight plan I14.4): each needs three matched figures on two holdings.
+    Feature(
+        "dividend_income", "Forward dividend income", "I1",
+        needs=("corporate actions", "dividend forecasts"),
+        limit="Forecasts from declared and past events only; no analyst dividend estimates.",
+    ),
+    Feature(
+        "checks", "Company checks and portfolio scorecard", "I4",
+        needs=("fundamentals", "check snapshots"),
+        limit="Peer checks need enough measured peers; a check without inputs is unknown.",
+    ),
+    Feature(
+        "fair_value", "Fair-value history and multiple path", "I3",
+        needs=("fair-value history", "prices"),
+        optional=(("fmp", "analyst_estimates"),),
+        limit="History starts when snapshots began; the multiple path needs estimates.",
+    ),
+    Feature(
+        "consensus", "Analyst price-target consensus", "I2", needs=("consensus snapshots",),
+        limit="Snapshots only from the day collection started; hit rate after 12 months.",
+    ),
+    Feature(
+        "risk_score", "Risk score and diversification", "I12", needs=("holdings", "prices"),
+        limit="Needs a year of prices per holding; look-through only for covered funds.",
+    ),
+    Feature(
+        "updates", "Typed updates feed and company insight blocks", "I13",
+        needs=("news stories", "insider filings"),
+        limit="Pay and tenure for SEC registrants only; AI notes need a configured model.",
     ),
 )  # fmt: skip
 

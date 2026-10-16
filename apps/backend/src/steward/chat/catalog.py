@@ -144,8 +144,15 @@ DATASETS: tuple[Dataset, ...] = (
     Dataset(
         "theses",
         "Per-holding theses, KPIs, verdicts and the reports written about them",
-        ("config_version", "verdict", "report", "thesis_memo", "portfolio_review"),
-        ("thesis_and_reports", "holding", "search_reports", "thesis_memos", "portfolio_review"),
+        ("config_version", "verdict", "report", "thesis_memo", "portfolio_review", "holding_note"),
+        (
+            "thesis_and_reports",
+            "holding",
+            "search_reports",
+            "thesis_memos",
+            "portfolio_review",
+            "holding_notes",
+        ),
         "owner edits; verdicts on each earnings check",
         research_pipeline="thesis section",
     ),
@@ -267,6 +274,7 @@ TOOLS: dict[str, ToolInfo] = {
     "transactions": ToolInfo(("transactions",), "portfolio.transactions.list_transactions", "50 per page, cursor", "owner", "scope and totals over all matches"),
     "risk_history": ToolInfo(("risk",), "SQL on risk_report_snapshot", "30 snapshots", "owner", "snapshot id and method version"),
     "thesis_and_reports": ToolInfo(("theses",), "config.load_active, verdict, report", "last 2 reports", "owner", "config version, verdict and report ids"),
+    "holding_notes": ToolInfo(("theses",), "SQL full-text on holding_note", "20 notes", "owner", "note id and edit date"),
     "data_freshness": ToolInfo(("freshness",), "SQL max() probes, coverage_status", "8 datasets", "global", "latest record date per dataset"),
 }  # fmt: skip
 

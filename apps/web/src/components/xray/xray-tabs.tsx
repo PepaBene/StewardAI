@@ -12,6 +12,7 @@ const TABS = [
   { href: "/xray", label: "Exposure" },
   { href: "/xray/overlap", label: "Overlap" },
   { href: "/xray/concentration", label: "Concentration" },
+  { href: "/xray/diversification", label: "Diversification" },
   { href: "/xray/fundamentals", label: "Fundamentals" },
   { href: "/xray/benchmark", label: "Against a benchmark" },
   { href: "/xray/supply-chain", label: "Supply chain" },
@@ -20,7 +21,7 @@ const TABS = [
 ] as const;
 
 /** Tabs that work on today's holdings or on what you typed, so the date picker does not apply. */
-const NO_DATE = ["/xray/proposed", "/xray/inputs"];
+const NO_DATE = ["/xray/proposed", "/xray/inputs", "/xray/diversification"];
 
 export function XrayTabs() {
   const pathname = usePathname();

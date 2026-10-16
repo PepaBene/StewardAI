@@ -5435,6 +5435,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/discover/parse": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Parse Screen Request
+         * @description Turn a plain-English request into a screen draft: filters on catalogue metrics, markets,
+         *     industries, a sort and the phrases that could not be mapped. One budgeted model call (the
+         *     chat model), cached per request and logged. It never runs the screen.
+         */
+        post: operations["parse_screen_request"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/discover/stocks": {
         parameters: {
             query?: never;
@@ -5641,6 +5663,646 @@ export interface paths {
         post?: never;
         /** Delete Column Set */
         delete: operations["delete_column_set"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/discover/templates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Screen Templates
+         * @description The curated starter screens with how many covered stocks pass each today and the mean
+         *     score mark of those matches. Reads only; nothing is saved.
+         */
+        get: operations["screen_templates"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/config/checks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Checks Config
+         * @description The saved check limits, dividend rules and fair-value rules. 404 means the defaults apply.
+         */
+        get: operations["get_checks_config"];
+        /**
+         * Save Checks Config
+         * @description Save a new version of the rules. Cached check results carry the rules in their input
+         *     hash, so the next read recomputes them under the new limits.
+         */
+        put: operations["save_checks_config"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/config/checks/validate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Validate Checks
+         * @description Validate the rules without saving. 422 lists every error.
+         */
+        post: operations["validate_checks"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/config/checks/defaults": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Checks Defaults
+         * @description The built-in rules, for "reset to default".
+         */
+        get: operations["checks_defaults"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/companies/{ticker}/checks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Company Checks
+         * @description Five scored axes (value, future, past, health, dividend; six checks each) and the risk
+         *     list. Each check is pass, fail, not applicable or unknown with its sentence and basis; a score
+         *     counts passes over applicable checks only. Cached by input hash; no LLM.
+         */
+        get: operations["get_company_checks"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portfolio/scorecard": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Portfolio Scorecard
+         * @description Per axis: the value-weighted mean of the holdings' cached axis scores, with coverage and
+         *     the five holdings lifting and holding back the score. Method `portfolio_scorecard` v1.
+         */
+        get: operations["portfolio_scorecard"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portfolio/strips": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Portfolio Strips
+         * @description Ranked dot strips (insight I4.5): every holding on one scale per metric, with the
+         *     portfolio's value-weighted mean as the reference line. Read from cached checks, stored fair
+         *     values and the dividend forecast; a holding without a value is listed, never placed at zero.
+         */
+        get: operations["get_portfolio_strips"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/checks/marks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Check Marks
+         * @description The cached five-axis mark of each listed ticker (no recomputation) and their mean, for
+         *     holdings rows, Discover results and saved screens. A ticker never checked has no mark.
+         */
+        post: operations["check_marks"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portfolio/dividends": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Portfolio Dividends
+         * @description Answer-strip figures (next 12 months declared + estimated, last 12 months received, yield,
+         *     yield on cost), 36 months of received income and 12 of forecast, contributors, quality tiers,
+         *     coverage. Estimated rows are flagged; nothing is shown as zero when it is unknown.
+         */
+        get: operations["portfolio_dividends"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portfolio/dividends/calendar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Dividend Calendar
+         * @description Ex-dividend and payment dates of one month (declared, estimated and unconfirmed variants)
+         *     and the holdings' earnings dates as a separate kind.
+         */
+        get: operations["dividend_calendar"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/companies/{ticker}/dividends": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Company Dividends
+         * @description Payment history, forward schedule, received payments with their declared counterpart,
+         *     the six dividend checks, yield against peers and payout on earnings and cash.
+         */
+        get: operations["company_dividends"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/companies/{ticker}/dividends/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Confirm Dividends
+         * @description Bulk-confirm suggested dividend events of one holding, each with an evidence row (the
+         *     matched payment, or the provider's stored record). Already decided events are skipped.
+         */
+        post: operations["confirm_dividends"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portfolio/fair-value": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Portfolio Fair Value
+         * @description Per holding: price, fair value on the chosen basis, premium or discount, age of the inputs
+         *     and the stale flag; portfolio totals over covered holdings, and the history from the stored
+         *     fair values joined to portfolio value by date (it starts at the first recorded value).
+         */
+        get: operations["get_portfolio_fair_value"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/watchlist/fair-value": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Watchlist Fair Value
+         * @description Every recorded basis per watchlist name with its upside against the latest close; the
+         *     default is your latest saved scenario, then the thesis target, then the app's default DCF.
+         */
+        get: operations["watchlist_fair_value"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/quality/insight-coverage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Insight Coverage
+         * @description Per holding and planned feature (dividends, statement inputs, estimates, consensus, peers,
+         *     fair value): ready, partial or unavailable with the reason, from the stored rows.
+         */
+        get: operations["get_insight_coverage"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/quality/insight-clocks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Insight Clocks
+         * @description The 3-, 6- and 12-month retrospective of the insight clocks: dividend forecast accuracy,
+         *     consensus hit rate and the share of holdings with a usable fair-value history.
+         */
+        get: operations["get_insight_clocks"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sources/insight-access": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Insight Access
+         * @description The access verdict, with its date, of each endpoint the insight features depend on.
+         */
+        get: operations["insight_access"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/companies/{ticker}/consensus": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Company Consensus
+         * @description Latest analyst target with spread and agreement, the stored history, the chart data once
+         *     enough snapshots exist, and the track record once snapshots are 12 months old (insight I8).
+         *     A holding with no reachable source says so; nothing is synthesised.
+         */
+        get: operations["get_company_consensus"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portfolio/consensus": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Portfolio Consensus
+         * @description Per holding: consensus coverage (complete, partial, unavailable) with the source and reason,
+         *     and the latest mean target, upside and agreement where one exists.
+         */
+        get: operations["get_portfolio_consensus"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portfolio/holdings/insight": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Holdings Insight
+         * @description Every field the holdings presets show, in one request: last event, fair value and its step
+         *     history, thesis line, income, score mark, fundamentals and value metrics, and note counts.
+         */
+        get: operations["get_holdings_insight"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/config/holdings-views": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Holdings Views
+         * @description The selected holdings preset and the custom column order (the defaults until first saved).
+         */
+        get: operations["get_holdings_views"];
+        /**
+         * Save Holdings Views
+         * @description Save the preset choice and custom columns as a new version (422 on an unknown column).
+         */
+        put: operations["save_holdings_views"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/holdings/{ticker}/notes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Holding Notes */
+        get: operations["list_holding_notes"];
+        put?: never;
+        /**
+         * Add Holding Note
+         * @description Store a note exactly as written; notes are never rewritten by AI.
+         */
+        post: operations["add_holding_note"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/holdings/{ticker}/notes/{note_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Update Holding Note */
+        put: operations["update_holding_note"];
+        post?: never;
+        /** Delete Holding Note */
+        delete: operations["delete_holding_note"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/config/screen-templates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Screen Templates */
+        get: operations["get_screen_templates"];
+        /**
+         * Save Screen Templates
+         * @description Save the templates as a new version; 422 names an unknown metric or a wrong operator.
+         */
+        put: operations["save_screen_templates"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/config/screen-templates/defaults": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Screen Template Defaults
+         * @description The built-in starter screens, for "reset to default".
+         */
+        get: operations["screen_template_defaults"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/updates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Updates
+         * @description Inbox items, news stories, what-changed items and dividend events of the last `days`, as
+         *     typed cards with the holding's latest close and one-day move. Counts per type (with unread)
+         *     are taken before the type filter.
+         */
+        get: operations["get_updates"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/updates/read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Mark Updates Read
+         * @description Mark updates read; an inbox item's status becomes `read`.
+         */
+        post: operations["mark_updates_read"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/companies/{ticker}/ownership-mix": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Ownership Mix
+         * @description Institutions (13F), insiders (Form 4) and the rest as shares of shares outstanding, with
+         *     the top 25 institutional holders and what each figure covers.
+         */
+        get: operations["get_ownership_mix"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/companies/{ticker}/pay-tenure": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Pay Tenure
+         * @description The CEO's pay (proxy statement), tenure and holding, and the management and board
+         *     average tenure from Form 4; `unavailable` with the reason outside SEC registrants.
+         */
+        get: operations["get_pay_tenure"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/companies/{ticker}/earnings-summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Earnings Summary
+         * @description The latest cited note on the stored earnings release, and whether a newer release is
+         *     stored than the one it was written from.
+         */
+        get: operations["get_earnings_summary"];
+        put?: never;
+        /**
+         * Create Earnings Summary
+         * @description Write a cited note on the latest stored earnings release: summary sentences and three to
+         *     five questions, each with its verbatim quote. One budgeted model call, cached per release.
+         */
+        post: operations["create_earnings_summary"];
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -6004,6 +6666,111 @@ export interface paths {
          * @description Saves an immutable version of the scenario set with the method version it was valued under.
          */
         post: operations["save_scenarios"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/companies/{ticker}/valuation/multiple/defaults": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Multiple Defaults
+         * @description Bear/base/bull starting inputs seeded from the company's history and its peers.
+         */
+        get: operations["multiple_defaults"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/companies/{ticker}/valuation/multiple": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run Multiple
+         * @description Revenue x margin x exit P/E, discounted: per-year path, calculation chain and the reverse
+         *     solve (exit P/E and growth that give today's price). Empty `scenarios` uses the defaults.
+         */
+        post: operations["run_multiple"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/companies/{ticker}/valuation/multiple/saved": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Saved Multiple */
+        get: operations["list_saved_multiple"];
+        put?: never;
+        /**
+         * Save Multiple
+         * @description Saves an immutable version of the multiple-path set with the figures it produced.
+         */
+        post: operations["save_multiple"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/companies/{ticker}/valuation/multiple/drift": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Multiple Drift
+         * @description Whether the latest saved multiple-path set is stale (age) or drifting (last four quarters
+         *     against the assumed first-year growth and margin). Null when nothing is saved.
+         */
+        get: operations["multiple_drift"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/companies/{ticker}/valuation/pictures": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Valuation Pictures
+         * @description The key multiple beside peers, inside the sector of the covered universe, against the
+         *     company's own history and a peer regression (insight I7). Each picture is absent with the
+         *     reason when the data is too thin.
+         */
+        get: operations["valuation_pictures"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -6816,6 +7583,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/portfolio/performance/positions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Positions
+         * @description Open and closed positions per ticker with their transactions (buys, sells, dividends,
+         *     fees and entered splits), realised and unrealised gain and the annualised return.
+         */
+        get: operations["get_positions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/portfolio/performance/attribution": {
         parameters: {
             query?: never;
@@ -7045,6 +7833,27 @@ export interface paths {
          *     with benchmark-relative over- and underweights where the classification is like-for-like.
          */
         get: operations["get_concentration"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portfolio/xray/diversification": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Diversification
+         * @description Sector to industry to holding flows, revenue by country with its coverage, and the
+         *     concentration verdict (three largest issuers, effective holdings, the largest name).
+         */
+        get: operations["get_diversification"];
         put?: never;
         post?: never;
         delete?: never;
@@ -7461,6 +8270,29 @@ export interface paths {
          *     withheld below the minimum.
          */
         get: operations["get_risk_report"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portfolio/risk/score": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Risk Score
+         * @description The headline risk score (method `risk_score`) with each input, its market reference and
+         *     sub-score; metric tiles with a verdict line; per-holding volatility, drawdown and beta; and
+         *     the holdings that move most and least together. Unknown, with the reason, when an input is
+         *     missing.
+         */
+        get: operations["get_risk_score"];
         put?: never;
         post?: never;
         delete?: never;
@@ -9862,6 +10694,21 @@ export interface components {
             /** Accepted */
             accepted: number;
         };
+        /** AccessVerdict */
+        AccessVerdict: {
+            /** Provider */
+            provider: string;
+            /** Endpoint */
+            endpoint: string;
+            /** State */
+            state: string;
+            /** Tested At */
+            tested_at: string | null;
+            /** Detail */
+            detail: string | null;
+            /** Status Code */
+            status_code: number | null;
+        };
         /** AccountTotals */
         AccountTotals: {
             /** Account Currency */
@@ -9881,6 +10728,25 @@ export interface components {
             unrealized_ppl: number;
             /** Realized Ppl */
             realized_ppl: number;
+        };
+        /** AccuracyOut */
+        AccuracyOut: {
+            /** Available */
+            available: boolean;
+            /** Available From */
+            available_from: string | null;
+            /** Snapshot As Of */
+            snapshot_as_of: string | null;
+            /** Rows */
+            rows: number;
+            /** Hits */
+            hits: number;
+            /** Hit Rate */
+            hit_rate: number | string | null;
+            /** Mean Error */
+            mean_error: number | string | null;
+            /** Note */
+            note: string | null;
         };
         /** ActionCoverageConfirmedResponse */
         ActionCoverageConfirmedResponse: {
@@ -11218,6 +12084,13 @@ export interface components {
             /** Event Type */
             event_type: ("guidance_change" | "m_and_a" | "dividend_cut" | "earnings_release" | "management_change" | "regulatory_legal" | "capital_allocation" | "credit_rating" | "central_bank" | "macro_surprise" | "insider_transaction" | "product_business" | "sector_competitor" | "index_change" | "analyst_rating" | "delisting" | "entity_status" | "credit_stress" | "trade_exposure" | "patent_status" | "other") | "classify";
         };
+        /** AnnualDps */
+        AnnualDps: {
+            /** Year */
+            year: number;
+            /** Per Share */
+            per_share: number | string;
+        };
         /** AnswerEvidenceOut */
         AnswerEvidenceOut: {
             /** Kind */
@@ -11303,6 +12176,25 @@ export interface components {
             compared: number;
             /** Note */
             note?: string | null;
+        };
+        /** AreaSummary */
+        AreaSummary: {
+            /** Area */
+            area: string;
+            /** Label */
+            label: string;
+            /**
+             * Kind
+             * @default input
+             * @enum {string}
+             */
+            kind: "input" | "feature";
+            /** Ready */
+            ready: number;
+            /** Partial */
+            partial: number;
+            /** Unavailable */
+            unavailable: number;
         };
         /** Aspect */
         Aspect: {
@@ -11820,6 +12712,68 @@ export interface components {
             /** Published */
             published: string | null;
         };
+        /** AxisAggregate */
+        AxisAggregate: {
+            /** Axis */
+            axis: string;
+            /** Label */
+            label: string;
+            /**
+             * Score
+             * @description Value-weighted mean of the covered holdings' 0-6 scores.
+             */
+            score: number | string | null;
+            /** Holdings Covered */
+            holdings_covered: number;
+            /** Holdings Total */
+            holdings_total: number;
+            /**
+             * Value Covered
+             * @description Share of the stock value the covered holdings make up.
+             */
+            value_covered: number | string | null;
+            /** Coverage Text */
+            coverage_text: string;
+            /** Explanation */
+            explanation: string;
+            /** Lifting */
+            lifting: components["schemas"]["ScoreLine"][];
+            /** Holding Back */
+            holding_back: components["schemas"]["ScoreLine"][];
+        };
+        /** AxisScore */
+        AxisScore: {
+            /**
+             * Axis
+             * @enum {string}
+             */
+            axis: "value" | "future" | "past" | "health" | "dividend" | "risk";
+            /** Label */
+            label: string;
+            /** Passes */
+            passes: number;
+            /** Applicable */
+            applicable: number;
+            /** Unknown */
+            unknown: number;
+            /** Na */
+            na: number;
+            /**
+             * Max
+             * @default 6
+             */
+            max: number;
+            /**
+             * Score
+             * @description Passes over applicable checks scaled to 0-6; null when none applies.
+             */
+            score: number | string | null;
+            /**
+             * Coverage
+             * @description Checks with a result over checks that apply (unknown lowers it).
+             */
+            coverage: number | string | null;
+        };
         /** BacktestName */
         BacktestName: {
             /** Ticker */
@@ -12041,6 +12995,28 @@ export interface components {
             };
             /** Excluded */
             excluded: components["schemas"]["Excluded"][];
+        };
+        /** BasisValue */
+        BasisValue: {
+            /** Basis */
+            basis: string;
+            /** Label */
+            label: string;
+            /** Value */
+            value: number | string | null;
+            /** Currency */
+            currency: string | null;
+            /** Upside */
+            upside: number | string | null;
+            /**
+             * As Of
+             * Format: date
+             */
+            as_of: string;
+            /** Detail */
+            detail: {
+                [key: string]: unknown;
+            };
         };
         /** BenchmarkBucket */
         BenchmarkBucket: {
@@ -12482,6 +13458,18 @@ export interface components {
             residual: number;
             /** Unattributed Tickers */
             unattributed_tickers: string[];
+            /**
+             * Price Realised
+             * @description Part of the price component earned on units sold in the window.
+             * @default 0
+             */
+            price_realised: number;
+            /**
+             * Price Unrealised
+             * @description Part of the price component on units still held.
+             * @default 0
+             */
+            price_unrealised: number;
         };
         /** BriefBody */
         BriefBody: {
@@ -12677,7 +13665,7 @@ export interface components {
              * Critical Job Types
              * @description Job types that run normally at the monthly cap.
              */
-            critical_job_types?: ("portfolio_sync" | "earnings_check" | "thesis_verdicts" | "earnings_calendar" | "earnings_calendar_full" | "earnings_due" | "fact_reconcile" | "reference_data" | "price_history" | "intraday_prices" | "holiday_refresh" | "macro_collect" | "public_data_collect" | "source_audit" | "event_escalation" | "monitor" | "news_ingest" | "daily_digest" | "weekly_digest" | "research" | "ownership_13f" | "insider_trades" | "etf_look_through" | "monthly_review" | "chat" | "sec_xbrl" | "valuation_refresh" | "control_stakes" | "nport_holdings" | "fund_probes" | "fund_characteristics_audit" | "fund_issuer_facts" | "free_source_alerts" | "change_alerts" | "shadow_snapshot" | "shadow_report" | "raw_retention" | "research_trace_retention" | "zero_cost_gate" | "returns_refresh" | "exchange_probes" | "ir_releases" | "sec_fsds_backfill" | "pdmr_uk" | "graph_review" | "fmp_company" | "alpha_vantage_statements" | "epo_patents" | "companies_house_filings" | "edinet_filings" | "twelve_data_corporate_actions" | "ai_approvals" | "autopilot" | "autopilot_calibration" | "watchdog" | "ir_discovery" | "news_ai_search" | "news_triage" | "news_analysis" | "news_brief" | "gap_research" | "exposure_build" | "document_index" | "inbox_scan" | "inbox_agent" | "factor_returns" | "disclosure_sources" | "disclosure_ingest" | "disclosure_identifiers" | "disclosure_deals" | "disclosure_esef" | "disclosure_estimates" | "disclosure_alerts" | "thesis" | "portfolio_review")[];
+            critical_job_types?: ("portfolio_sync" | "earnings_check" | "thesis_verdicts" | "earnings_calendar" | "earnings_calendar_full" | "earnings_due" | "fact_reconcile" | "reference_data" | "price_history" | "intraday_prices" | "holiday_refresh" | "macro_collect" | "public_data_collect" | "source_audit" | "event_escalation" | "monitor" | "news_ingest" | "daily_digest" | "weekly_digest" | "research" | "ownership_13f" | "insider_trades" | "etf_look_through" | "monthly_review" | "chat" | "sec_xbrl" | "valuation_refresh" | "control_stakes" | "nport_holdings" | "fund_probes" | "fund_characteristics_audit" | "fund_issuer_facts" | "free_source_alerts" | "change_alerts" | "shadow_snapshot" | "shadow_report" | "raw_retention" | "research_trace_retention" | "zero_cost_gate" | "returns_refresh" | "exchange_probes" | "ir_releases" | "sec_fsds_backfill" | "pdmr_uk" | "graph_review" | "fmp_company" | "alpha_vantage_statements" | "epo_patents" | "companies_house_filings" | "edinet_filings" | "twelve_data_corporate_actions" | "ai_approvals" | "autopilot" | "autopilot_calibration" | "watchdog" | "ir_discovery" | "news_ai_search" | "news_triage" | "news_analysis" | "news_brief" | "gap_research" | "exposure_build" | "document_index" | "inbox_scan" | "inbox_agent" | "factor_returns" | "disclosure_sources" | "disclosure_ingest" | "disclosure_identifiers" | "disclosure_deals" | "disclosure_esef" | "disclosure_estimates" | "disclosure_alerts" | "thesis" | "portfolio_review" | "dividend_forecast" | "yahoo_dividends" | "consensus_snapshot" | "insight_access_probe" | "fair_value_snapshot" | "checks_refresh" | "screen_parse" | "earnings_summary")[];
             /**
              * Per Job Cap Usd
              * @description Most AI spend of one run of a job type, in USD. A run over it fails.
@@ -12710,6 +13698,45 @@ export interface components {
             /** Note */
             note: string | null;
             body: components["schemas"]["BudgetConfig"];
+        };
+        /** CalcStep */
+        CalcStep: {
+            /** Label */
+            label: string;
+            /** Expression */
+            expression: string;
+            /** Value */
+            value: number | string | null;
+            /** Unit */
+            unit: string;
+        };
+        /** CalendarEvent */
+        CalendarEvent: {
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            /** Ticker */
+            ticker: string;
+            /** Name */
+            name: string | null;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "ex_dividend" | "payment" | "estimated_ex_dividend" | "estimated_payment" | "unconfirmed_ex_dividend" | "unconfirmed_payment" | "earnings";
+            /**
+             * Amount
+             * @description Account currency, for payments.
+             */
+            amount: number | string | null;
+            /** Per Share */
+            per_share?: number | string | null;
+            /** Currency */
+            currency?: string | null;
+            /** Note */
+            note?: string | null;
         };
         /**
          * CalendarSettings
@@ -13455,6 +14482,146 @@ export interface components {
                 [key: string]: number;
             };
         };
+        /**
+         * CheckLimits
+         * @description Numeric limits of the five-axis checks and the risk checks (defaults from plan §9).
+         */
+        CheckLimits: {
+            /**
+             * Payout Limit Earnings
+             * @description Dividends paid / net income at or below this passes.
+             * @default 0.75
+             */
+            payout_limit_earnings: number;
+            /**
+             * Payout Limit Cash
+             * @description Dividends paid / free cash flow at or below this.
+             * @default 0.75
+             */
+            payout_limit_cash: number;
+            /**
+             * Roe Floor
+             * @description Return on equity floor.
+             * @default 0.15
+             */
+            roe_floor: number;
+            /**
+             * Roce Floor
+             * @description Return on capital employed floor.
+             * @default 0.15
+             */
+            roce_floor: number;
+            /**
+             * Forecast Roe Floor
+             * @default 0.15
+             */
+            forecast_roe_floor: number;
+            /**
+             * Interest Coverage Min
+             * @description EBIT / interest, times.
+             * @default 5
+             */
+            interest_coverage_min: number;
+            /**
+             * Debt To Equity Max
+             * @default 0.4
+             */
+            debt_to_equity_max: number;
+            /**
+             * Net Debt To Ebitda Max
+             * @default 3
+             */
+            net_debt_to_ebitda_max: number;
+            /**
+             * Cfo To Debt Min
+             * @description Operating cash flow / total debt at or above this.
+             * @default 0.2
+             */
+            cfo_to_debt_min: number;
+            /**
+             * Dilution Max
+             * @description Share count change a year.
+             * @default 0.05
+             */
+            dilution_max: number;
+            /**
+             * Accruals Max
+             * @default 0.1
+             */
+            accruals_max: number;
+            /**
+             * Peg Max
+             * @default 1.5
+             */
+            peg_max: number;
+            /**
+             * Fcf Yield Margin
+             * @description Free cash flow yield must beat the scenario risk-free rate by this margin.
+             * @default 0.01
+             */
+            fcf_yield_margin: number;
+            /**
+             * Analyst Count Min
+             * @default 5
+             */
+            analyst_count_min: number;
+            /**
+             * Dividend Yield Floor
+             * @description Below this yield the 'yield versus peers' check does not apply.
+             * @default 0.01
+             */
+            dividend_yield_floor: number;
+            /**
+             * Dividend Growth Years
+             * @default 10
+             */
+            dividend_growth_years: number;
+            /**
+             * No Cut Years Min
+             * @default 10
+             */
+            no_cut_years_min: number;
+            /**
+             * Small Cap Max
+             * @description Market cap (listing currency) below this is small.
+             * @default 2000000000
+             */
+            small_cap_max: number;
+            /**
+             * Liquidity Floor
+             * @description Average daily turnover (listing currency) below this is illiquid.
+             * @default 1000000
+             */
+            liquidity_floor: number;
+            /**
+             * Volatility Vs Benchmark Max
+             * @description Stock volatility / benchmark volatility above this fails.
+             * @default 1.5
+             */
+            volatility_vs_benchmark_max: number;
+            /**
+             * Benchmark Volatility
+             * @description Annual benchmark volatility the ratio is taken against.
+             * @default 0.16
+             */
+            benchmark_volatility: number;
+            /**
+             * Debt Maturity Share Max
+             * @description Debt due within a year / total debt above this fails.
+             * @default 0.25
+             */
+            debt_maturity_share_max: number;
+            /**
+             * Earnings Window Days
+             * @default 14
+             */
+            earnings_window_days: number;
+            /**
+             * Insider Window Days
+             * @default 90
+             */
+            insider_window_days: number;
+        };
         /** CheckOut */
         CheckOut: {
             /** Name */
@@ -13512,12 +14679,98 @@ export interface components {
              */
             method_version: string;
         };
+        /** Checkpoint */
+        Checkpoint: {
+            /** Horizon Months */
+            horizon_months: number;
+            /** Reached */
+            reached: boolean;
+            /**
+             * Available From
+             * @description When the slowest clock reaches this checkpoint.
+             */
+            available_from: string | null;
+            /**
+             * Dividend Rows
+             * @default 0
+             */
+            dividend_rows: number;
+            /** Dividend Hit Rate */
+            dividend_hit_rate?: number | null;
+            /** Dividend Mean Error */
+            dividend_mean_error?: number | null;
+            /** Dividend Note */
+            dividend_note?: string | null;
+            /**
+             * Consensus Judged
+             * @default 0
+             */
+            consensus_judged: number;
+            /** Consensus Hit Rate */
+            consensus_hit_rate?: number | null;
+            /** Consensus Note */
+            consensus_note?: string | null;
+            /**
+             * Fair Value Holdings
+             * @default 0
+             */
+            fair_value_holdings: number;
+            /**
+             * Fair Value Usable
+             * @default 0
+             */
+            fair_value_usable: number;
+            /** Fair Value Share */
+            fair_value_share?: number | null;
+            /** Fair Value Note */
+            fair_value_note?: string | null;
+        };
+        /**
+         * ChecksConfig
+         * @description Every limit the checks, the dividend engine and the fair-value recorder apply.
+         */
+        ChecksConfig: {
+            /**
+             * Schema Version
+             * @default 1
+             * @constant
+             */
+            schema_version: 1;
+            limits?: components["schemas"]["CheckLimits"];
+            dividends?: components["schemas"]["DividendRules"];
+            fair_value?: components["schemas"]["FairValueRules"];
+        };
+        /** ChecksConfigVersion */
+        ChecksConfigVersion: {
+            /** Id */
+            id: number;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Note */
+            note: string | null;
+            body: components["schemas"]["ChecksConfig"];
+        };
         /** Citation */
         Citation: {
             /** Url */
             url: string;
             /** Passage */
             passage?: string | null;
+        };
+        /** CitedLine */
+        CitedLine: {
+            /** Text */
+            text: string;
+            /** Quote */
+            quote: string;
+            /**
+             * Quote Url
+             * @description The source page scrolled to the quote (a text fragment link), when the source is a web page.
+             */
+            quote_url: string | null;
         };
         /** CitedSentence */
         CitedSentence: {
@@ -13745,6 +14998,29 @@ export interface components {
             /** Claims */
             claims: components["schemas"]["CheckedClaim"][];
         };
+        /** ClockRetrospective */
+        ClockRetrospective: {
+            /**
+             * As Of
+             * Format: date
+             */
+            as_of: string;
+            /** Clocks */
+            clocks: components["schemas"]["ClockStart"][];
+            /** Checkpoints */
+            checkpoints: components["schemas"]["Checkpoint"][];
+            /** Method Version */
+            method_version: string;
+        };
+        /** ClockStart */
+        ClockStart: {
+            /** Clock */
+            clock: string;
+            /** Label */
+            label: string;
+            /** Started */
+            started: string | null;
+        };
         /** ClosedThesis */
         ClosedThesis: {
             /** Ticker */
@@ -13898,6 +15174,116 @@ export interface components {
             name: string;
             /** Columns */
             columns: string[];
+        };
+        /** CompanyChecks */
+        CompanyChecks: {
+            /** Ticker */
+            ticker: string;
+            /** Name */
+            name: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "complete" | "partial" | "unavailable";
+            /**
+             * Computed At
+             * Format: date-time
+             */
+            computed_at: string;
+            /** Method Version */
+            method_version: string;
+            /** Sentences Version */
+            sentences_version: string;
+            /** Rules Version */
+            rules_version: number | null;
+            /** Input Hash */
+            input_hash: string;
+            /** Axes */
+            axes: components["schemas"]["AxisScore"][];
+            /** Checks */
+            checks: components["schemas"]["steward__checks__contract__Check"][];
+            /** Risks */
+            risks: components["schemas"]["steward__checks__contract__Check"][];
+            /** Verdict */
+            verdict: string;
+            /** Rewards */
+            rewards: components["schemas"]["steward__checks__contract__Check"][];
+            /** Risk Highlights */
+            risk_highlights: components["schemas"]["steward__checks__contract__Check"][];
+            /** Coverage */
+            coverage: number | string | null;
+            /** Reason */
+            reason?: string | null;
+        };
+        /** CompanyDividends */
+        CompanyDividends: {
+            /** Ticker */
+            ticker: string;
+            /** Name */
+            name: string | null;
+            /** Held */
+            held: boolean;
+            /** Quantity */
+            quantity: number | string | null;
+            /** Account Currency */
+            account_currency: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "complete" | "partial" | "unavailable";
+            /** Reason */
+            reason: string | null;
+            /** Frequency */
+            frequency: string;
+            /** History */
+            history: components["schemas"]["DividendPoint"][];
+            /** Annual */
+            annual: components["schemas"]["AnnualDps"][];
+            /** Annual Problem */
+            annual_problem: string | null;
+            /** Growth 5Y */
+            growth_5y: number | string | null;
+            /** Growth 10Y */
+            growth_10y: number | string | null;
+            /** Years Without Cut */
+            years_without_cut: number | null;
+            /** Schedule */
+            schedule: components["schemas"]["PaymentLine"][];
+            /** Specials */
+            specials: components["schemas"]["DividendPoint"][];
+            /** Received */
+            received: components["schemas"]["ReceivedLine"][];
+            /** Events */
+            events: components["schemas"]["EventLine"][];
+            /** Unmatched Events */
+            unmatched_events: components["schemas"]["EventLine"][];
+            /** Disagreements */
+            disagreements: string[];
+            /**
+             * Buy Before
+             * @description 'Buy before <ex-date>' for the next declared or estimated ex-date.
+             */
+            buy_before: string | null;
+            /** Sources */
+            sources: string[];
+            /** Method Version */
+            method_version: string;
+            explain: components["schemas"]["Explain"];
+            /**
+             * Checks
+             * @description The six dividend checks.
+             */
+            checks?: components["schemas"]["steward__checks__contract__Check"][];
+            dividend_axis?: components["schemas"]["AxisScore"] | null;
+            yield_vs_peers?: components["schemas"]["YieldVsPeers"] | null;
+            payout?: components["schemas"]["Payout"] | null;
+            /**
+             * Filed Dps Check
+             * @description Cross-check of the event history against the filed dividends per share.
+             */
+            filed_dps_check?: string | null;
         };
         /** CompanyEdgeInput */
         CompanyEdgeInput: {
@@ -14432,6 +15818,33 @@ export interface components {
             /** Reason */
             reason?: string | null;
         };
+        /** ConcentrationVerdict */
+        ConcentrationVerdict: {
+            /** Sentence */
+            sentence: string;
+            /**
+             * Band
+             * @enum {string}
+             */
+            band: "concentrated" | "moderate" | "broad" | "unknown";
+            /**
+             * Top3 Share
+             * @description Three largest issuers, share of total value.
+             */
+            top3_share: number | null;
+            /** Effective N */
+            effective_n: number | null;
+            /** Hhi */
+            hhi: number | null;
+            /** Largest */
+            largest: string | null;
+            /** Largest Weight */
+            largest_weight: number | null;
+            /** Holdings */
+            holdings: number;
+            /** Basis */
+            basis: string;
+        };
         /** ConfigDiff */
         ConfigDiff: {
             /** Domain */
@@ -14535,6 +15948,13 @@ export interface components {
              */
             second: boolean;
         };
+        /** ConfirmOut */
+        ConfirmOut: {
+            /** Confirmed */
+            confirmed: number[];
+            /** Skipped */
+            skipped: number[];
+        };
         /** ConfirmedListingResponse */
         ConfirmedListingResponse: {
             /** Ticker */
@@ -14570,6 +15990,75 @@ export interface components {
              * @default Public analyst consensus as published, one row per vintage. Provider earnings-calendar estimates are a different kind and are not shown here.
              */
             note: string;
+        };
+        /** ConsensusFooter */
+        ConsensusFooter: {
+            /**
+             * As Of
+             * Format: date
+             */
+            as_of: string;
+            /** Source */
+            source: string;
+            /** Basis */
+            basis: string;
+        };
+        /** ConsensusLatest */
+        ConsensusLatest: {
+            point: components["schemas"]["ConsensusPoint"];
+            /**
+             * Upside
+             * @description Mean target / price at the snapshot - 1.
+             */
+            upside: number | string | null;
+            /**
+             * Dispersion
+             * @description (High - low) / mean.
+             */
+            dispersion: number | string | null;
+            /**
+             * Sd
+             * @description Standard deviation of targets when the source gives one; null otherwise.
+             */
+            sd?: number | string | null;
+            /** Agreement */
+            agreement: ("close" | "moderate" | "wide") | null;
+            /** Agreement Text */
+            agreement_text: string;
+        };
+        /** ConsensusPoint */
+        ConsensusPoint: {
+            /**
+             * As Of
+             * Format: date
+             */
+            as_of: string;
+            /** Source */
+            source: string;
+            /** Mean */
+            mean: number | string | null;
+            /** Median */
+            median: number | string | null;
+            /** High */
+            high: number | string | null;
+            /** Low */
+            low: number | string | null;
+            /** Count */
+            count: number | null;
+            /** Currency */
+            currency: string | null;
+            /** Price */
+            price: number | string | null;
+        };
+        /** ConsensusPrice */
+        ConsensusPrice: {
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            /** Close */
+            close: number | string;
         };
         /** ConsensusSeries */
         ConsensusSeries: {
@@ -14621,6 +16110,39 @@ export interface components {
             selected_metrics_only: boolean;
             /** Selected Brokers Only */
             selected_brokers_only: boolean;
+        };
+        /** ConsensusView */
+        ConsensusView: {
+            /** Ticker */
+            ticker: string;
+            /**
+             * Coverage
+             * @enum {string}
+             */
+            coverage: "complete" | "partial" | "unavailable";
+            /** Coverage Reason */
+            coverage_reason: string;
+            /** Sources */
+            sources: components["schemas"]["SourceState"][];
+            latest: components["schemas"]["ConsensusLatest"] | null;
+            /** History */
+            history: components["schemas"]["ConsensusPoint"][];
+            /** Chart Available */
+            chart_available: boolean;
+            /** Chart Reason */
+            chart_reason: string | null;
+            /** Snapshots */
+            snapshots: number;
+            /** Min Snapshots */
+            min_snapshots: number;
+            /** Prices */
+            prices: components["schemas"]["ConsensusPrice"][];
+            /** Price Currency */
+            price_currency: string | null;
+            track: components["schemas"]["TrackRecord"];
+            /** Method Version */
+            method_version: string;
+            footer: components["schemas"]["ConsensusFooter"];
         };
         /** ConsensusVintage */
         ConsensusVintage: {
@@ -14733,6 +16255,12 @@ export interface components {
             /** Attributed */
             attributed: boolean;
             /**
+             * Realised
+             * @description Price effect earned on units sold.
+             * @default 0
+             */
+            realised: number;
+            /**
              * Benchmark Equivalent
              * @description What this holding's opening value would have gained in the benchmark.
              */
@@ -14769,6 +16297,17 @@ export interface components {
              * @description Why there is no contribution report, when there is none.
              */
             gap: string | null;
+        };
+        /** ContributorLine */
+        ContributorLine: {
+            /** Ticker */
+            ticker: string;
+            /** Name */
+            name: string | null;
+            /** Amount */
+            amount: number | string;
+            /** Share */
+            share: number | string | null;
         };
         /** ControlChannel */
         ControlChannel: {
@@ -15071,6 +16610,18 @@ export interface components {
             window_start: string | null;
             /** Note */
             note: string;
+        };
+        /** CoverageCell */
+        CoverageCell: {
+            /** Area */
+            area: string;
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "ready" | "partial" | "unavailable";
+            /** Reason */
+            reason: string;
         };
         /** CoverageGapOut */
         CoverageGapOut: {
@@ -16701,6 +18252,140 @@ export interface components {
             /** Summary */
             summary: string;
         };
+        /** Diversification */
+        Diversification: {
+            /** As Of */
+            as_of: string;
+            /** Nodes */
+            nodes: components["schemas"]["SankeyNode"][];
+            /** Links */
+            links: components["schemas"]["SankeyLink"][];
+            /**
+             * Residual Weight
+             * @description Cash, funds not looked through and unknown fund weight: outside the sankey.
+             */
+            residual_weight: number;
+            /** Residual */
+            residual: components["schemas"]["SankeyNode"][];
+            geography: components["schemas"]["Geography"];
+            concentration: components["schemas"]["ConcentrationVerdict"];
+            /** Method Version */
+            method_version: string;
+            /** Notes */
+            notes: string[];
+        };
+        /** DividendCalendar */
+        DividendCalendar: {
+            /** Month */
+            month: string;
+            /**
+             * First Day
+             * Format: date
+             */
+            first_day: string;
+            /**
+             * Last Day
+             * Format: date
+             */
+            last_day: string;
+            /** Currency */
+            currency: string | null;
+            /** Events */
+            events: components["schemas"]["CalendarEvent"][];
+            /** Total Payments */
+            total_payments: number | string;
+            /** Legend */
+            legend: {
+                [key: string]: string;
+            };
+        };
+        /** DividendConfirmIn */
+        DividendConfirmIn: {
+            /**
+             * Event Ids
+             * @description Suggested events to confirm; null confirms every one a Trading212 payment matches.
+             */
+            event_ids?: number[] | null;
+        };
+        /** DividendPoint */
+        DividendPoint: {
+            /**
+             * Pay Date
+             * Format: date
+             */
+            pay_date: string;
+            /** Ex Date */
+            ex_date: string | null;
+            /** Per Share */
+            per_share: number | string;
+            /** Currency */
+            currency: string | null;
+            /**
+             * Origin
+             * @enum {string}
+             */
+            origin: "event" | "receipt" | "single_source";
+            /** Special */
+            special: boolean;
+            /** Ref */
+            ref: string;
+        };
+        /** DividendRules */
+        DividendRules: {
+            /**
+             * Auto Confirm
+             * @description Confirm a suggested dividend event automatically when a Trading212 payment for the same holding falls in its pay-date window and the amounts agree.
+             * @default true
+             */
+            auto_confirm: boolean;
+            /**
+             * Auto Confirm Tolerance
+             * @description Largest gap between the declared gross and the received amount (net of withholding) as a share of the declared amount that still counts as agreeing.
+             * @default 0.35
+             */
+            auto_confirm_tolerance: number;
+            /**
+             * Match Window Days
+             * @description Days around the pay date (or ex-date) a payment may land.
+             * @default 21
+             */
+            match_window_days: number;
+            /**
+             * Assume Growth
+             * @description Grow estimated payments by the holding's 5-year dividend growth. Off: the last amount is repeated.
+             * @default false
+             */
+            assume_growth: boolean;
+            /**
+             * Min Payments For Estimate
+             * @default 4
+             */
+            min_payments_for_estimate: number;
+            /**
+             * Single Source History
+             * @description Count suggested dividend events that only one source reports (Yahoo, while Twelve Data's dividends are not on the plan) as payment history for cadence, estimates and growth. Each is labelled single-source; none counts as declared until confirmed. Off: history needs a confirmed event, a Trading212 receipt or two sources agreeing.
+             * @default true
+             */
+            single_source_history: boolean;
+            /**
+             * Tier Cuts
+             * @description Quality tier boundaries as shares of the applicable dividend score: below the first is low, below the second medium, otherwise high.
+             */
+            tier_cuts?: number[];
+        };
+        /** DividendScore */
+        DividendScore: {
+            /** Passes */
+            passes: number;
+            /** Applicable */
+            applicable: number;
+            /** Unknown */
+            unknown: number;
+            /** Tier */
+            tier: ("low" | "medium" | "high") | null;
+            /** Sentence */
+            sentence: string;
+        };
         /**
          * DocumentIndexSettings
          * @description The passage index that `search_documents` reads: filings and results releases, your
@@ -16919,6 +18604,33 @@ export interface components {
             /** Excess Kurtosis */
             excess_kurtosis: number;
         };
+        /** DraftFilter */
+        DraftFilter: {
+            /** Metric Id */
+            metric_id: string;
+            /**
+             * Op
+             * @enum {string}
+             */
+            op: "gte" | "lte" | "in";
+            /** Value */
+            value: number | string | string[];
+            /**
+             * Note
+             * @description How the value was read, when it was converted.
+             */
+            note?: string | null;
+        };
+        /** DraftSort */
+        DraftSort: {
+            /** Metric Id */
+            metric_id: string;
+            /**
+             * Descending
+             * @default true
+             */
+            descending: boolean;
+        };
         /** DrawdownOdds */
         DrawdownOdds: {
             /** Years */
@@ -16958,6 +18670,21 @@ export interface components {
              * @default 4
              */
             fan_step_weeks: number;
+        };
+        /** Drift */
+        Drift: {
+            /** Stale */
+            stale: boolean;
+            /** Drifting */
+            drifting: boolean;
+            /** Reasons */
+            reasons: string[];
+            /** Age Days */
+            age_days: number | null;
+            /** Ttm Revenue Growth */
+            ttm_revenue_growth: number | string | null;
+            /** Ttm Net Margin */
+            ttm_net_margin: number | string | null;
         };
         /** DriftReport */
         DriftReport: {
@@ -17128,6 +18855,53 @@ export interface components {
              * Format: date
              */
             largest_date: string;
+        };
+        /** EarningsNote */
+        EarningsNote: {
+            /** Id */
+            id: number | null;
+            /** Ticker */
+            ticker: string;
+            /** Period */
+            period: string | null;
+            /** Source Url */
+            source_url: string | null;
+            /** Evidence Sha256 */
+            evidence_sha256: string;
+            /** Summary */
+            summary: components["schemas"]["CitedLine"][];
+            /** Questions */
+            questions: components["schemas"]["CitedLine"][];
+            /**
+             * Dropped
+             * @description Sentences and questions dropped because their quote is not in the release.
+             */
+            dropped: number;
+            /** Model */
+            model: string | null;
+            /** Created At */
+            created_at: string | null;
+            /** Method Version */
+            method_version: string;
+            /**
+             * Note
+             * @default AI summary of the stored earnings release; each line shows the passage it rests on. No call transcript is read.
+             */
+            note: string;
+        };
+        /** EarningsSummaryView */
+        EarningsSummaryView: {
+            /** Ticker */
+            ticker: string;
+            latest_release: components["schemas"]["ReleaseDoc"] | null;
+            note: components["schemas"]["EarningsNote"] | null;
+            /**
+             * Stale
+             * @description A newer release is stored than the one the note was written from.
+             */
+            stale: boolean;
+            /** Reason */
+            reason: string | null;
         };
         /** EcbSeries */
         EcbSeries: {
@@ -17848,6 +19622,32 @@ export interface components {
              * @default A path follows confirmed supply-chain links from the company in the event. The confidence of a path is its weakest link: a link is high when it is a stated fact (owner-entered or a confirmed filing disclosure) with a stated revenue share and a date within three years, medium when it has no stated share, and low when it is older than three years. Severity is high only for a confirmed event on a path of high links that reaches at least 2% of the portfolio. A revenue share is shown only for a single customer link that states one.
              */
             method: string;
+        };
+        /** EventLine */
+        EventLine: {
+            /** Id */
+            id: number;
+            /**
+             * Ex Date
+             * Format: date
+             */
+            ex_date: string;
+            /** Payment Date */
+            payment_date: string | null;
+            /** Per Share */
+            per_share: number | string;
+            /** Currency */
+            currency: string | null;
+            /** Status */
+            status: string;
+            /** Source */
+            source: string;
+            /** Source Url */
+            source_url: string;
+            /** Alternatives */
+            alternatives: string[];
+            /** Special */
+            special: boolean;
         };
         /** EventPath */
         EventPath: {
@@ -19181,6 +20981,101 @@ export interface components {
             /** Detail */
             detail: string;
         };
+        /** FairMultiple */
+        FairMultiple: {
+            /** Available */
+            available: boolean;
+            /** Reason */
+            reason?: string | null;
+            /**
+             * Label
+             * @default Indicative
+             */
+            label: string;
+            /**
+             * N
+             * @default 0
+             */
+            n: number;
+            /** R Squared */
+            r_squared?: number | string | null;
+            /** Min R Squared */
+            min_r_squared: number | string;
+            /** Intercept */
+            intercept?: number | string | null;
+            /** Growth Coef */
+            growth_coef?: number | string | null;
+            /** Margin Coef */
+            margin_coef?: number | string | null;
+            /** Company Growth */
+            company_growth?: number | string | null;
+            /** Company Margin */
+            company_margin?: number | string | null;
+            /** Company Pe */
+            company_pe?: number | string | null;
+            /** Fair Pe */
+            fair_pe?: number | string | null;
+            /** Implied Price */
+            implied_price?: number | string | null;
+            /** Price */
+            price?: number | string | null;
+            /** Currency */
+            currency?: string | null;
+            /** Points */
+            points?: components["schemas"]["RegressionPoint"][];
+            /**
+             * Formula
+             * @default P/E = a + b x revenue growth (3-year CAGR) + c x net margin, least squares over peers
+             */
+            formula: string;
+            /** Method Version */
+            method_version?: string;
+            footer: components["schemas"]["PictureFooter"];
+        };
+        /** FairValueRules */
+        FairValueRules: {
+            /**
+             * Stale After Days
+             * @default 90
+             */
+            stale_after_days: number;
+            /**
+             * Move Alert
+             * @description Alert when refreshed fundamentals move the scenario value by more than this share.
+             * @default 0.1
+             */
+            move_alert: number;
+            /**
+             * Drift Band
+             * @description A multiple-path scenario drifts when the last four quarters' revenue growth or net margin departs from the assumed path by more than this (absolute).
+             * @default 0.05
+             */
+            drift_band: number;
+            /**
+             * Fair Multiple Min R2
+             * @description The fair-multiple regression of peer P/E on growth and margin is shown only when its R squared reaches this.
+             * @default 0.3
+             */
+            fair_multiple_min_r2: number;
+            /**
+             * Agreement Close
+             * @description Analysts agree closely when (high target - low target) / mean target is below this.
+             * @default 0.25
+             */
+            agreement_close: number;
+            /**
+             * Agreement Wide
+             * @description Analysts disagree widely when the target spread over the mean reaches this.
+             * @default 0.5
+             */
+            agreement_wide: number;
+            /**
+             * Consensus Chart Min Snapshots
+             * @description Stored consensus snapshots needed before the target chart is drawn.
+             * @default 8
+             */
+            consensus_chart_min_snapshots: number;
+        };
         /** FeatureReadiness */
         FeatureReadiness: {
             /** Id */
@@ -19565,6 +21460,24 @@ export interface components {
             coverage: components["schemas"]["SectionCoverage"];
             /** Notes */
             notes: components["schemas"]["FiledNote"][];
+        };
+        /** FiledYear */
+        FiledYear: {
+            /** Year */
+            year: number;
+            /**
+             * End
+             * Format: date
+             */
+            end: string;
+            /** Revenue */
+            revenue: number | string | null;
+            /** Net Income */
+            net_income: number | string | null;
+            /** Net Margin */
+            net_margin: number | string | null;
+            /** Eps */
+            eps: number | string | null;
         };
         /** FilingResultOut */
         FilingResultOut: {
@@ -19951,6 +21864,30 @@ export interface components {
             stale: boolean;
             /** Stale After Days */
             stale_after_days: number;
+        };
+        /**
+         * FsdsSettings
+         * @description SEC Financial Statement and Notes data sets: the statement history before what the live
+         *     XBRL job reads (its latest 10-K and 10-Q only, so about three fiscal years).
+         */
+        FsdsSettings: {
+            /**
+             * Enabled
+             * @default true
+             */
+            enabled: boolean;
+            /**
+             * History Months
+             * @description How far back data sets are read. Each 10-K carries three years of comparatives, so 60 months give about seven fiscal years of statements.
+             * @default 60
+             */
+            history_months: number;
+            /**
+             * Datasets Per Run
+             * @description Data sets read per run (a quarter's set is 450-650 MB, a month's about 50 MB). The first full backfill takes about two weeks at two a day.
+             * @default 2
+             */
+            datasets_per_run: number;
         };
         /** FundAsOf */
         FundAsOf: {
@@ -20821,6 +22758,50 @@ export interface components {
              */
             n: number;
         };
+        /** Geography */
+        Geography: {
+            /** Rows */
+            rows: components["schemas"]["GeographyRow"][];
+            /**
+             * Known Weight
+             * @description Equity weight whose revenue geography is known.
+             */
+            known_weight: number;
+            /** Equity Weight */
+            equity_weight: number;
+            /**
+             * Coverage
+             * @description known_weight / equity_weight.
+             */
+            coverage: number | null;
+            /** Coverage Text */
+            coverage_text: string;
+            /** Countries */
+            countries: number;
+            /**
+             * Map Allowed
+             * @description At least 6 countries are known.
+             */
+            map_allowed: boolean;
+        };
+        /** GeographyRow */
+        GeographyRow: {
+            /** Country */
+            country: string;
+            /** Label */
+            label: string;
+            /**
+             * Weight
+             * @description Share of total portfolio value earned in this country.
+             */
+            weight: number;
+            /** Share Of Known */
+            share_of_known: number;
+            /** Basis */
+            basis: {
+                [key: string]: number;
+            };
+        };
         /** GoldenAccuracy */
         GoldenAccuracy: {
             /**
@@ -21094,6 +23075,30 @@ export interface components {
             /** Version */
             version: string;
         };
+        /** HistBin */
+        HistBin: {
+            /** Lo */
+            lo: number | string;
+            /** Hi */
+            hi: number | string;
+            /** Count */
+            count: number;
+            /**
+             * Open Low
+             * @default false
+             */
+            open_low: boolean;
+            /**
+             * Open High
+             * @default false
+             */
+            open_high: boolean;
+            /**
+             * Has Company
+             * @default false
+             */
+            has_company: boolean;
+        };
         /** HistoryEntry */
         HistoryEntry: {
             /**
@@ -21109,6 +23114,22 @@ export interface components {
             reason?: string | null;
             /** Decided By */
             decided_by?: string | null;
+        };
+        /** HistoryPoint */
+        HistoryPoint: {
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            /** Price */
+            price: number | string;
+            /** Eps */
+            eps: number | string | null;
+            /** Pe */
+            pe: number | string | null;
+            /** Eps Period End */
+            eps_period_end: string | null;
         };
         /** HistoryPointOut */
         HistoryPointOut: {
@@ -21140,6 +23161,69 @@ export interface components {
             original_value: string | null;
             /** Fact Id */
             fact_id?: number | null;
+        };
+        /** HistoryRow */
+        HistoryRow: {
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            /** Portfolio Value */
+            portfolio_value: number | string;
+            /** Covered Value */
+            covered_value: number | string;
+            /** Fair Value */
+            fair_value: number | string;
+        };
+        /** HistoryWindow */
+        HistoryWindow: {
+            /** Years */
+            years: number;
+            /** Available */
+            available: boolean;
+            /** Reason */
+            reason?: string | null;
+            /**
+             * Points
+             * @default 0
+             */
+            points: number;
+            /** Median */
+            median?: number | string | null;
+            /** Sd */
+            sd?: number | string | null;
+            /**
+             * Low
+             * @description Median minus one standard deviation.
+             */
+            low?: number | string | null;
+            /**
+             * High
+             * @description Median plus one standard deviation.
+             */
+            high?: number | string | null;
+        };
+        /** HolderTypeShare */
+        HolderTypeShare: {
+            /**
+             * Type
+             * @enum {string}
+             */
+            type: "institutions" | "insiders" | "public_other";
+            /** Label */
+            label: string;
+            /**
+             * Share
+             * @description Fraction of shares outstanding.
+             */
+            share: number | null;
+            /** Shares */
+            shares: number | null;
+            /** Basis */
+            basis: string;
+            /** Holders */
+            holders?: number | null;
         };
         /** Holding */
         Holding: {
@@ -21200,6 +23284,32 @@ export interface components {
              * @enum {string}
              */
             drift_status: "in_band" | "above_band" | "below_band" | "above_hard_limit" | "no_target";
+        };
+        /** HoldingConsensus */
+        HoldingConsensus: {
+            /** Ticker */
+            ticker: string;
+            /** Name */
+            name: string | null;
+            /**
+             * Coverage
+             * @enum {string}
+             */
+            coverage: "complete" | "partial" | "unavailable";
+            /** Reason */
+            reason: string;
+            /** Source */
+            source: string | null;
+            /** As Of */
+            as_of: string | null;
+            /** Mean */
+            mean: number | string | null;
+            /** Count */
+            count: number | null;
+            /** Upside */
+            upside: number | string | null;
+            /** Agreement */
+            agreement: ("close" | "moderate" | "wide") | null;
         };
         /** HoldingContribution */
         HoldingContribution: {
@@ -21379,6 +23489,66 @@ export interface components {
              */
             dimension: string;
         };
+        /** HoldingFairValue */
+        HoldingFairValue: {
+            /** Ticker */
+            ticker: string;
+            /** Name */
+            name: string | null;
+            /** Quantity */
+            quantity: number | string;
+            /** Price */
+            price: number | string | null;
+            /** Price Currency */
+            price_currency: string | null;
+            /** Value Account */
+            value_account: number | string | null;
+            /**
+             * Fair Value
+             * @description In the price's currency and unit.
+             */
+            fair_value: number | string | null;
+            /** Fair Value Native */
+            fair_value_native: number | string | null;
+            /** Native Currency */
+            native_currency: string | null;
+            /** Fair Value Account */
+            fair_value_account: number | string | null;
+            /**
+             * Upside
+             * @description Fair value / price - 1.
+             */
+            upside: number | string | null;
+            /** Basis */
+            basis: string;
+            /** Basis Label */
+            basis_label: string;
+            /** Method Version */
+            method_version: string | null;
+            /** Scenario Version */
+            scenario_version: number | null;
+            /** As Of */
+            as_of: string | null;
+            /** Inputs As Of */
+            inputs_as_of: string | null;
+            /** Age Days */
+            age_days: number | null;
+            /** Stale */
+            stale: boolean;
+            /** Stale Reasons */
+            stale_reasons: string[];
+            /**
+             * Reason
+             * @description Why there is no fair value, when there is none.
+             */
+            reason: string | null;
+            /** History */
+            history: components["schemas"]["StepPoint"][];
+            /** Last Event */
+            last_event?: string | null;
+            /** Return Pct */
+            return_pct?: number | string | null;
+        };
         /** HoldingFundPositions */
         HoldingFundPositions: {
             /** Ticker */
@@ -21476,6 +23646,121 @@ export interface components {
             /** @description Tier 3: community-edited. */
             wikidata: components["schemas"]["WikidataSummary"] | null;
         };
+        /** HoldingIncome */
+        HoldingIncome: {
+            /** Ticker */
+            ticker: string;
+            /** Name */
+            name: string | null;
+            /** Frequency */
+            frequency: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "complete" | "partial" | "unavailable";
+            /** Reason */
+            reason: string | null;
+            /** Pays */
+            pays: boolean;
+            /** Trailing 12M */
+            trailing_12m: number | string;
+            /** Next 12M */
+            next_12m: number | string | null;
+            /** Next 12M Declared */
+            next_12m_declared: number | string;
+            /** Next 12M Estimated */
+            next_12m_estimated: number | string;
+            /** Unconfirmed */
+            unconfirmed: number;
+            /** Yield On Price */
+            yield_on_price: number | string | null;
+            /** Yield On Cost */
+            yield_on_cost: number | string | null;
+            next_payment: components["schemas"]["NextPayment"] | null;
+            /** Growth 5Y */
+            growth_5y: number | string | null;
+            /** Growth 5Y Reason */
+            growth_5y_reason: string | null;
+            /** Growth 10Y */
+            growth_10y: number | string | null;
+            /** Years Without Cut */
+            years_without_cut: number | null;
+            /** Withholding Share */
+            withholding_share: number | string | null;
+            score: components["schemas"]["DividendScore"] | null;
+        };
+        /** HoldingInsight */
+        HoldingInsight: {
+            /** Ticker */
+            ticker: string;
+            /** Name */
+            name: string | null;
+            last_event?: components["schemas"]["LastEvent"] | null;
+            /** Fair Value */
+            fair_value?: number | string | null;
+            /** Fair Upside */
+            fair_upside?: number | string | null;
+            /** Fair Basis */
+            fair_basis?: string | null;
+            /**
+             * Fair Stale
+             * @default false
+             */
+            fair_stale: boolean;
+            /** Fair Reason */
+            fair_reason?: string | null;
+            /** Fair History */
+            fair_history?: components["schemas"]["StepValue"][];
+            /**
+             * Thesis
+             * @description First sentence of why the holding is owned.
+             */
+            thesis?: string | null;
+            /** Yield On Price */
+            yield_on_price?: number | string | null;
+            /** Yield On Cost */
+            yield_on_cost?: number | string | null;
+            /** Income 12M */
+            income_12m?: number | string | null;
+            /** Income Currency */
+            income_currency?: string | null;
+            next_payment?: components["schemas"]["NextPay"] | null;
+            /** Pays Dividend */
+            pays_dividend?: boolean | null;
+            /** Dividend Passes */
+            dividend_passes?: number | null;
+            /** Dividend Applicable */
+            dividend_applicable?: number | null;
+            /** Dividend Tier */
+            dividend_tier?: string | null;
+            /** Mark */
+            mark?: {
+                [key: string]: number | string | null;
+            };
+            /** Metrics */
+            metrics?: {
+                [key: string]: number | string | null;
+            };
+            /** Metric Reasons */
+            metric_reasons?: {
+                [key: string]: string;
+            };
+            /**
+             * Notes
+             * @default 0
+             */
+            notes: number;
+        };
+        /** HoldingInsightCoverage */
+        HoldingInsightCoverage: {
+            /** Ticker */
+            ticker: string;
+            /** Name */
+            name: string | null;
+            /** Cells */
+            cells: components["schemas"]["CoverageCell"][];
+        };
         /** HoldingIntraday */
         HoldingIntraday: {
             /** Ticker */
@@ -21556,6 +23841,42 @@ export interface components {
             note: string | null;
             /** @description The latest stored daily close. */
             daily: components["schemas"]["DailyFallback"] | null;
+        };
+        /** HoldingMark */
+        HoldingMark: {
+            /** Ticker */
+            ticker: string;
+            /** Name */
+            name: string | null;
+            /** Weight */
+            weight: number | string;
+            /** Axes */
+            axes: {
+                [key: string]: number | string | null;
+            };
+            /** Risk Flags */
+            risk_flags: number;
+            /** Checked At */
+            checked_at: string | null;
+        };
+        /** HoldingNote */
+        HoldingNote: {
+            /** Id */
+            id: number;
+            /** Ticker */
+            ticker: string;
+            /** Body */
+            body: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
         };
         /** HoldingOwnership */
         HoldingOwnership: {
@@ -21911,6 +24232,27 @@ export interface components {
         } & {
             [key: string]: unknown;
         };
+        /** HoldingRisk */
+        HoldingRisk: {
+            /** Ticker */
+            ticker: string;
+            /**
+             * Weight
+             * @description Share of invested value, latest day.
+             */
+            weight: number;
+            /** Volatility */
+            volatility: number | null;
+            /**
+             * Max Drawdown
+             * @description Positive size of the worst fall.
+             */
+            max_drawdown: number | null;
+            /** Beta */
+            beta: number | null;
+            /** Observations */
+            observations: number;
+        };
         /** HoldingSegments */
         HoldingSegments: {
             /** Ticker */
@@ -22018,6 +24360,20 @@ export interface components {
             /** Method */
             method: string;
         };
+        /** HoldingsInsight */
+        HoldingsInsight: {
+            /**
+             * As Of
+             * Format: date
+             */
+            as_of: string;
+            /** Basis */
+            basis: string;
+            /** Holdings */
+            holdings: components["schemas"]["HoldingInsight"][];
+            /** Method Version */
+            method_version: string;
+        };
         /** HoldingsPrices */
         HoldingsPrices: {
             /** Days */
@@ -22091,6 +24447,40 @@ export interface components {
             method_version: string;
             /** Input Hash */
             input_hash?: string | null;
+        };
+        /** HoldingsViewsConfig */
+        HoldingsViewsConfig: {
+            /**
+             * Schema Version
+             * @default 1
+             * @constant
+             */
+            schema_version: 1;
+            /**
+             * Selected
+             * @default holding
+             * @enum {string}
+             */
+            selected: "check_in" | "holding" | "income" | "growth" | "value" | "score" | "fundamentals" | "custom";
+            /** Custom Columns */
+            custom_columns?: string[];
+            /**
+             * Basis
+             * @description Fair-value basis the value columns use.
+             * @default dcf_default
+             */
+            basis: string;
+        };
+        /** HoldingsViewsVersion */
+        HoldingsViewsVersion: {
+            /**
+             * Id
+             * @description Saved version id; null while the defaults apply.
+             */
+            id: number | null;
+            /** Created At */
+            created_at: string | null;
+            body: components["schemas"]["HoldingsViewsConfig"];
         };
         /** IdeaFit */
         IdeaFit: {
@@ -22499,6 +24889,53 @@ export interface components {
             /** Note */
             note?: string | null;
         };
+        /** IncomeSummary */
+        IncomeSummary: {
+            /** Currency */
+            currency: string | null;
+            /**
+             * As Of
+             * Format: date
+             */
+            as_of: string;
+            /** Trailing 12M */
+            trailing_12m: number | string;
+            /** Next 12M */
+            next_12m: number | string;
+            /** Next 12M Declared */
+            next_12m_declared: number | string;
+            /** Next 12M Estimated */
+            next_12m_estimated: number | string;
+            /** Next 12M Unconfirmed */
+            next_12m_unconfirmed: number | string;
+            /** Change Vs Trailing */
+            change_vs_trailing: number | string | null;
+            /** Monthly Average */
+            monthly_average: number | string;
+            /** Yield On Price */
+            yield_on_price: number | string | null;
+            /** Yield On Cost */
+            yield_on_cost: number | string | null;
+            coverage: components["schemas"]["ResultCoverage"];
+            /** Coverage Sentence */
+            coverage_sentence: string;
+        };
+        /** IncomeTier */
+        IncomeTier: {
+            /**
+             * Tier
+             * @enum {string}
+             */
+            tier: "low" | "medium" | "high" | "unscored";
+            /** Holdings */
+            holdings: number;
+            /** Income */
+            income: number | string;
+            /** Share */
+            share: number | string | null;
+            /** Tickers */
+            tickers: string[];
+        };
         /** IndexComparison */
         IndexComparison: {
             /** Label */
@@ -22685,6 +25122,47 @@ export interface components {
             /** Reason */
             reason?: string | null;
         };
+        /** IndustryHistogram */
+        IndustryHistogram: {
+            /** Available */
+            available: boolean;
+            /** Reason */
+            reason?: string | null;
+            /** Sector */
+            sector: string | null;
+            /** Multiple */
+            multiple: ("pe" | "ps" | "pb") | null;
+            /** Label */
+            label: string | null;
+            /**
+             * Universe Count
+             * @description Sector members in the covered universe.
+             * @default 0
+             */
+            universe_count: number;
+            /**
+             * Value Count
+             * @description Members with a meaningful value.
+             * @default 0
+             */
+            value_count: number;
+            /** Bins */
+            bins?: components["schemas"]["HistBin"][];
+            /** Mean */
+            mean?: number | string | null;
+            /** Median */
+            median?: number | string | null;
+            /** Company Value */
+            company_value?: number | string | null;
+            /** Company Percentile */
+            company_percentile?: number | string | null;
+            /**
+             * Note
+             * @default Covered universe only (instruments the app has data for), grouped by provider sector. Not a global industry distribution.
+             */
+            note: string;
+            footer: components["schemas"]["PictureFooter"];
+        };
         /** IngestOut */
         IngestOut: {
             /** Discovered */
@@ -22731,6 +25209,8 @@ export interface components {
             /** Ticker */
             ticker: string;
             net_discretionary: components["schemas"]["NetDiscretionary"];
+            /** Monthly */
+            monthly?: components["schemas"]["InsiderMonth"][];
             /** Transactions */
             transactions: components["schemas"]["InsiderTransactionRow"][];
             /** Jurisdiction Coverage */
@@ -22802,6 +25282,36 @@ export interface components {
             announced_at: string;
             /** Source Url */
             source_url: string | null;
+        };
+        /**
+         * InsiderMonth
+         * @description Open-market discretionary buying and selling in one calendar month (the rows that count
+         *     toward the headline figure). Values are at reported prices; a month with an unpriced row has
+         *     `value_complete` false and its values are floors.
+         */
+        InsiderMonth: {
+            /**
+             * Month
+             * Format: date
+             * @description The first day of the month.
+             */
+            month: string;
+            /** Bought Shares */
+            bought_shares: number | string;
+            /** Sold Shares */
+            sold_shares: number | string;
+            /** Bought Value */
+            bought_value: number | string;
+            /** Sold Value */
+            sold_value: number | string;
+            /** Net Value */
+            net_value: number | string;
+            /** Buys */
+            buys: number;
+            /** Sells */
+            sells: number;
+            /** Value Complete */
+            value_complete: boolean;
         };
         /** InsiderNetBreakdown */
         InsiderNetBreakdown: {
@@ -22876,6 +25386,22 @@ export interface components {
         InsiderOverrideOut: {
             /** Id */
             id: number;
+        };
+        /** InsiderRow */
+        InsiderRow: {
+            /** Name */
+            name: string;
+            /** Role */
+            role: string;
+            /** Shares */
+            shares: number;
+            /**
+             * As Of
+             * Format: date
+             */
+            as_of: string;
+            /** Share Of Outstanding */
+            share_of_outstanding: number | null;
         };
         /** InsiderSource */
         InsiderSource: {
@@ -23104,6 +25630,43 @@ export interface components {
              * @description Shares as a percent of the share count known at the date; null if unknown.
              */
             percent_of_outstanding: string | null;
+        };
+        /** InsightCoverage */
+        InsightCoverage: {
+            /**
+             * As Of
+             * Format: date
+             */
+            as_of: string;
+            /** Holdings */
+            holdings: components["schemas"]["HoldingInsightCoverage"][];
+            /** Areas */
+            areas: components["schemas"]["AreaSummary"][];
+            /** Method Version */
+            method_version: string;
+        };
+        /** InstitutionRow */
+        InstitutionRow: {
+            /** Cik */
+            cik: string;
+            /** Name */
+            name: string | null;
+            /** Shares */
+            shares: number;
+            /** Value Usd */
+            value_usd: number | null;
+            /** Share Of Outstanding */
+            share_of_outstanding: number | null;
+            /**
+             * Change Pct
+             * @description Against the previous 13F period, fraction.
+             */
+            change_pct: number | null;
+            /**
+             * Portfolio Share
+             * @description The position's value over the holder's whole 13F book (tracked managers only).
+             */
+            portfolio_share: number | null;
         };
         /** InstitutionalChannel */
         InstitutionalChannel: {
@@ -23840,7 +26403,7 @@ export interface components {
             exchange_probes?: components["schemas"]["JobSchedule"];
             /** @description Fetch and version registered issuer IR pages (guidance, consensus, capital return). Default: daily 07:20. */
             ir_releases?: components["schemas"]["JobSchedule"];
-            /** @description Backfill statements and notes from the SEC Financial Statement and Notes datasets. Off by default. */
+            /** @description Backfill statements and notes from the SEC Financial Statement and Notes data sets: the sets not read yet, newest first, a couple a run (settings under `fsds`). Once the history is in, each run only reads the newest month's set. */
             sec_fsds_backfill?: components["schemas"]["JobSchedule"];
             /** @description Parse UK PDMR (MAR Art.19) notifications from the RNS stream. Off by default (retrieval unverified). */
             pdmr_uk?: components["schemas"]["JobSchedule"];
@@ -23860,6 +26423,16 @@ export interface components {
             twelve_data_corporate_actions?: components["schemas"]["JobSchedule"];
             /** @description Ten years of Yahoo dividend events of holdings with a confirmed listing, stored as suggested corporate actions: the keyless dividend source, cross-checked against Twelve Data where that endpoint is on the plan. Daily, at most 15 holdings a run, stalest first, so each holding is refreshed about weekly. */
             yahoo_dividends?: components["schemas"]["JobSchedule"];
+            /** @description Dividend income engine: confirms suggested dividend events that a Trading212 payment matches (when the Checks rule allows it), writes each holding's forward schedule snapshot and lists events still to confirm under Needs you. Daily 08:30. */
+            dividend_forecast?: components["schemas"]["JobSchedule"];
+            /** @description Analyst consensus price targets and the stored estimates of each holding, from the endpoints that passed the access test (FMP, Finnhub, Twelve Data). An endpoint that is not accessible is recorded with its access state, never as zero. Daily, so the target chart (eight snapshots) and its track record fill in weeks, not months. */
+            consensus_snapshot?: components["schemas"]["JobSchedule"];
+            /** @description Access test of the dividend and price-target endpoints the insight features use: one governed request each, recording the verdict with its date. Weekly. */
+            insight_access_probe?: components["schemas"]["JobSchedule"];
+            /** @description Records today's fair value of every holding and watchlist name on each available basis (default and saved DCF, multiple path, thesis, peer multiple, consensus). History starts on the first run; nothing is back-filled. Daily 09:15. */
+            fair_value_snapshot?: components["schemas"]["JobSchedule"];
+            /** @description Recomputes the five-axis checks and risk checks of every holding and watchlist name, so the scorecard, dividend tiers and screener read today's results. Daily. */
+            checks_refresh?: components["schemas"]["JobSchedule"];
             /** @description Fundamentals (SEC XBRL, ESEF) of holdings that filed since the last read (all of them weekly) and the ETF providers' fund P/E and P/B. Default: daily 07:45. */
             valuation_refresh?: components["schemas"]["JobSchedule"];
             /** @description ETF look-through: the funds' holdings from iShares and Vanguard, skipped when the as-of date has not moved. Default: Saturdays 06:40. */
@@ -23940,6 +26513,7 @@ export interface components {
             valuation?: components["schemas"]["ValuationSettings"];
             look_through?: components["schemas"]["LookThroughSettings"];
             xbrl?: components["schemas"]["XbrlSettings"];
+            fsds?: components["schemas"]["FsdsSettings"];
         };
         /** JobsConfigVersion */
         JobsConfigVersion: {
@@ -24339,6 +26913,23 @@ export interface components {
             error: string | null;
             /** Fallback */
             fallback: string | null;
+        };
+        /** LastEvent */
+        LastEvent: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "news" | "company" | "verdict" | "dividend";
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            /** Title */
+            title: string;
+            /** Href */
+            href?: string | null;
         };
         /** LedgerCheck */
         LedgerCheck: {
@@ -25604,6 +28195,29 @@ export interface components {
             /** Warnings */
             warnings: string[];
         };
+        /** MarkOut */
+        MarkOut: {
+            /** Tickers */
+            tickers: string[];
+            /** Axes */
+            axes: {
+                [key: string]: number | string | null;
+            };
+            /** Covered */
+            covered: {
+                [key: string]: number;
+            };
+        };
+        /** MarkRead */
+        MarkRead: {
+            /** Keys */
+            keys: string[];
+        };
+        /** MarkedRead */
+        MarkedRead: {
+            /** Marked */
+            marked: number;
+        };
         /** MarketContext */
         MarketContext: {
             /** Symbol */
@@ -25668,6 +28282,21 @@ export interface components {
              * @description Yahoo Finance symbol of the same index (^GSPC, ^STOXX): intraday values, and closes when Stooq has none. Empty: the known counterpart of the Stooq symbol.
              */
             yahoo_symbol?: string | null;
+        };
+        /** MarksIn */
+        MarksIn: {
+            /** Tickers */
+            tickers: string[];
+        };
+        /** MarksOut */
+        MarksOut: {
+            /** Marks */
+            marks: {
+                [key: string]: {
+                    [key: string]: number | string | null;
+                };
+            };
+            aggregate: components["schemas"]["MarkOut"];
         };
         /** MeasuredLine */
         MeasuredLine: {
@@ -25871,6 +28500,16 @@ export interface components {
              * @description Optional provider whose key this metric depends on; null = key-free.
              */
             needs_provider?: string | null;
+            /**
+             * Ticks
+             * @description Range-slider ticks in the metric's unit, spaced evenly on the slider (non-linear scale).
+             */
+            ticks?: (number | string)[] | null;
+            /**
+             * Aliases
+             * @description Plain-English names the screen parser maps here.
+             */
+            aliases?: string[];
         };
         /** MetricValue */
         MetricValue: {
@@ -26125,6 +28764,186 @@ export interface components {
              * @default 48
              */
             news_coverage_hours: number;
+        };
+        /** MonthBar */
+        MonthBar: {
+            /** Month */
+            month: string;
+            /**
+             * Phase
+             * @enum {string}
+             */
+            phase: "history" | "forecast";
+            /** Received */
+            received: number | string;
+            /** Declared */
+            declared: number | string;
+            /** Estimated */
+            estimated: number | string;
+            /** Payments */
+            payments: components["schemas"]["PaymentLine"][];
+        };
+        /**
+         * MultipleAssumptions
+         * @description One scenario's inputs. Every one is the owner's assumption, shown beside the company's own
+         *     history and the peer value.
+         */
+        MultipleAssumptions: {
+            /** Name */
+            name: string;
+            /**
+             * Years
+             * @description Horizon in years.
+             * @default 5
+             */
+            years: number;
+            /**
+             * Base Revenue
+             * @description Starting revenue; null uses TTM or the last fiscal year.
+             */
+            base_revenue?: number | string | null;
+            /**
+             * Revenue Growth
+             * @description Revenue growth per year (fractions); one value is constant.
+             */
+            revenue_growth: (number | string)[];
+            /**
+             * Net Margin
+             * @description Net margin per year (fractions); one value is constant.
+             */
+            net_margin: (number | string)[];
+            /**
+             * Exit Pe
+             * @description P/E at the end of the horizon.
+             */
+            exit_pe: number | string;
+            /**
+             * Share Change
+             * @description Diluted share count change per year; negative is a buyback.
+             */
+            share_change?: (number | string)[];
+            /** Diluted Shares */
+            diluted_shares?: number | string | null;
+            /**
+             * Risk Free
+             * @default 0.04
+             */
+            risk_free: number | string;
+            /**
+             * Equity Risk Premium
+             * @default 0.05
+             */
+            equity_risk_premium: number | string;
+            /**
+             * Beta
+             * @default 1
+             */
+            beta: number | string;
+            /**
+             * Extra Premium
+             * @default 0
+             */
+            extra_premium: number | string;
+            /** Discount Rate */
+            discount_rate?: number | string | null;
+        };
+        /** MultipleHistory */
+        MultipleHistory: {
+            /** Available */
+            available: boolean;
+            /** Reason */
+            reason?: string | null;
+            /** Currency */
+            currency?: string | null;
+            /** Points */
+            points?: components["schemas"]["HistoryPoint"][];
+            /** Windows */
+            windows?: components["schemas"]["HistoryWindow"][];
+            /** Current */
+            current?: number | string | null;
+            /**
+             * Basis
+             * @default Weekly closes over trailing diluted EPS: each week uses the latest fiscal-year EPS as first reported and known by that date, put on today's share basis with stored splits.
+             */
+            basis: string;
+            footer: components["schemas"]["PictureFooter"];
+        };
+        /** MultipleRequest */
+        MultipleRequest: {
+            /** Scenarios */
+            scenarios?: components["schemas"]["MultipleAssumptions"][];
+            /** Selected */
+            selected?: string | null;
+        };
+        /** MultipleScenarioResult */
+        MultipleScenarioResult: {
+            /** Name */
+            name: string;
+            assumptions: components["schemas"]["MultipleAssumptions"];
+            /** Discount Rate */
+            discount_rate: number | string;
+            /** Discount Rate Build */
+            discount_rate_build: string;
+            /** Years */
+            years: components["schemas"]["YearRow"][];
+            /** Exit Market Cap */
+            exit_market_cap: number | string | null;
+            /** Exit Price */
+            exit_price: number | string | null;
+            value_per_share: components["schemas"]["AnalyticsResult"];
+            /** Chain */
+            chain: components["schemas"]["CalcStep"][];
+            /** Margin Of Safety */
+            margin_of_safety?: number | string | null;
+            /** Upside */
+            upside?: number | string | null;
+            /**
+             * Selected
+             * @default false
+             */
+            selected: boolean;
+        };
+        /** MultipleValuation */
+        MultipleValuation: {
+            /** Ticker */
+            ticker: string;
+            /** Currency */
+            currency: string | null;
+            /** Price */
+            price: number | string | null;
+            /** Price Date */
+            price_date: string | null;
+            /** Base Revenue */
+            base_revenue: number | string | null;
+            /** Base Revenue Basis */
+            base_revenue_basis: string;
+            /** Shares */
+            shares: number | string | null;
+            /** Seeds */
+            seeds: components["schemas"]["Seed"][];
+            /** History */
+            history: components["schemas"]["FiledYear"][];
+            /** Scenarios */
+            scenarios: components["schemas"]["MultipleScenarioResult"][];
+            /** Range Low */
+            range_low: number | string | null;
+            /** Range High */
+            range_high: number | string | null;
+            reverse: components["schemas"]["ReverseSolve"];
+            /** Warnings */
+            warnings: string[];
+            /**
+             * Method
+             * @default multiple_path
+             */
+            method: string;
+            /** Method Version */
+            method_version: string;
+            /**
+             * Note
+             * @default Each scenario's value is its exit price (forecast earnings × the exit P/E ÷ shares) discounted to today. Interim dividends are not added. These are your assumptions, not forecasts the app makes.
+             */
+            note: string;
         };
         /** NavIn */
         NavIn: {
@@ -27034,6 +29853,43 @@ export interface components {
              */
             disputed_count: number;
         };
+        /** NextPay */
+        NextPay: {
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            /** Kind */
+            kind: string;
+            /** Amount */
+            amount: number | string | null;
+            /** Per Share */
+            per_share: number | string;
+            /** Currency */
+            currency: string | null;
+        };
+        /** NextPayment */
+        NextPayment: {
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            /** Ex Date */
+            ex_date: string | null;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "declared" | "estimated" | "unconfirmed";
+            /** Amount */
+            amount: number | string | null;
+            /** Per Share */
+            per_share: number | string;
+            /** Currency */
+            currency: string | null;
+        };
         /** NonQuantifiedOut */
         NonQuantifiedOut: {
             /** Supplier */
@@ -27073,18 +29929,6 @@ export interface components {
              * @description Why a block or the whole filing stored nothing.
              */
             skipped: string[];
-        };
-        /** NoteIn */
-        NoteIn: {
-            /** Ticker */
-            ticker?: string | null;
-            /** Text */
-            text: string;
-            /**
-             * Active
-             * @default true
-             */
-            active: boolean;
         };
         /** NotePatch */
         NotePatch: {
@@ -27779,6 +30623,40 @@ export interface components {
             /** Assigned By */
             assigned_by: string;
         };
+        /** OwnershipMix */
+        OwnershipMix: {
+            /** Ticker */
+            ticker: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "complete" | "partial" | "unavailable";
+            /** Reason */
+            reason: string | null;
+            /** Shares Outstanding */
+            shares_outstanding: number | null;
+            /** Shares Outstanding As Of */
+            shares_outstanding_as_of: string | null;
+            /**
+             * Period
+             * @description 13F report period of the institutional figures.
+             */
+            period: string | null;
+            /** Mix */
+            mix: components["schemas"]["HolderTypeShare"][];
+            /** Institutions */
+            institutions: components["schemas"]["InstitutionRow"][];
+            /** Insiders */
+            insiders: components["schemas"]["InsiderRow"][];
+            /**
+             * Coverage
+             * @description What each figure covers and leaves out.
+             */
+            coverage: string[];
+            /** Method Version */
+            method_version: string;
+        };
         /** OwnershipOut */
         OwnershipOut: {
             /** Ticker */
@@ -27891,6 +30769,15 @@ export interface components {
              */
             selection?: string | null;
         };
+        /** Pair */
+        Pair: {
+            /** A */
+            a: string;
+            /** B */
+            b: string;
+            /** Correlation */
+            correlation: number;
+        };
         /** PairOverlap */
         PairOverlap: {
             /** Fund A */
@@ -27989,6 +30876,35 @@ export interface components {
             revision_gate: components["schemas"]["RevisionGateOut"];
             /** Pairs */
             pairs: components["schemas"]["PairReviewItemOut"][];
+        };
+        /** ParseRequest */
+        ParseRequest: {
+            /** Text */
+            text: string;
+        };
+        /** ParseResult */
+        ParseResult: {
+            /** Text */
+            text: string;
+            draft: components["schemas"]["ScreenDraft"];
+            /** Model */
+            model: string | null;
+            /** Cached */
+            cached: boolean;
+            /** Method Version */
+            method_version: string;
+            /** Registry Hash */
+            registry_hash: string;
+            /**
+             * Evaluation
+             * @description Whether the parser's evaluation set passed for this metric registry.
+             */
+            evaluation: string;
+            /**
+             * Note
+             * @default A draft only: nothing has been run. Check the filters, then run the screen yourself.
+             */
+            note: string;
         };
         /** PartyDecisionIn */
         PartyDecisionIn: {
@@ -28130,6 +31046,124 @@ export interface components {
              * @description Distinct days the page was opened.
              */
             days: number;
+        };
+        /** PayAndTenure */
+        PayAndTenure: {
+            /** Ticker */
+            ticker: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "complete" | "partial" | "unavailable";
+            /** Reason */
+            reason: string | null;
+            /** Ceo Name */
+            ceo_name: string | null;
+            /** Ceo Title */
+            ceo_title: string | null;
+            /**
+             * Pay
+             * @description The CEO's pay for the latest fiscal year, one row per source.
+             */
+            pay: components["schemas"]["PayFigure"][];
+            /**
+             * Salary Share
+             * @description Salary over total pay, fraction; None when the salary component was not sent.
+             */
+            salary_share: number | null;
+            /** Pay Fiscal Year */
+            pay_fiscal_year: number | null;
+            /** Ceo Tenure Years */
+            ceo_tenure_years: number | null;
+            /** Ceo Since */
+            ceo_since: string | null;
+            /** Ceo Tenure Basis */
+            ceo_tenure_basis: string | null;
+            /** Ceo Shares */
+            ceo_shares: number | null;
+            /** Ceo Share Of Outstanding */
+            ceo_share_of_outstanding: number | null;
+            /** Ceo Ownership As Of */
+            ceo_ownership_as_of: string | null;
+            /** Management Avg Tenure */
+            management_avg_tenure: number | null;
+            /** Management */
+            management: components["schemas"]["TenurePerson"][];
+            /** Board Avg Tenure */
+            board_avg_tenure: number | null;
+            /** Board */
+            board: components["schemas"]["TenurePerson"][];
+            /**
+             * Form4 Since
+             * @description Earliest stored Form 4 for this company; tenures from Form 4 are floors from here.
+             */
+            form4_since: string | null;
+            /** Caveats */
+            caveats: string[];
+            /** Method Version */
+            method_version: string;
+        };
+        /** PayFigure */
+        PayFigure: {
+            /** Label */
+            label: string;
+            /** Fiscal Year */
+            fiscal_year: number | null;
+            /** Value */
+            value: number;
+            /** Currency */
+            currency: string;
+            /** Source */
+            source: string;
+            /** Source Url */
+            source_url: string | null;
+        };
+        /** PaymentLine */
+        PaymentLine: {
+            /** Ticker */
+            ticker: string;
+            /** Name */
+            name: string | null;
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            /** Ex Date */
+            ex_date?: string | null;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "received" | "declared" | "estimated" | "unconfirmed";
+            /**
+             * Amount
+             * @description Account currency; gross for declared and estimated rows, net for received.
+             */
+            amount: number | string | null;
+            /** Per Share */
+            per_share?: number | string | null;
+            /**
+             * Currency
+             * @description Currency of the per-share amount.
+             */
+            currency?: string | null;
+            /** Note */
+            note?: string | null;
+        };
+        /** Payout */
+        Payout: {
+            /** Earnings */
+            earnings: number | string | null;
+            /** Cash */
+            cash: number | string | null;
+            /** Limit Earnings */
+            limit_earnings: number | string;
+            /** Limit Cash */
+            limit_cash: number | string;
+            /** Fiscal Year */
+            fiscal_year: number | null;
         };
         /**
          * PdlRefreshResponse
@@ -28307,6 +31341,66 @@ export interface components {
             pe: number;
             /** Eps */
             eps: number;
+        };
+        /** PeerBar */
+        PeerBar: {
+            /** Ticker */
+            ticker: string;
+            /** Name */
+            name: string | null;
+            /** Is Subject */
+            is_subject: boolean;
+            /** Value */
+            value: number | string | null;
+            /** Reason */
+            reason?: string | null;
+            /**
+             * Growth
+             * @description Filed revenue growth, 3-year CAGR.
+             */
+            growth?: number | string | null;
+        };
+        /** PeerBars */
+        PeerBars: {
+            /** Available */
+            available: boolean;
+            /** Reason */
+            reason?: string | null;
+            /** Multiple */
+            multiple?: ("pe" | "ps" | "pb") | null;
+            /** Label */
+            label?: string | null;
+            /** Rule */
+            rule: string;
+            /** Scope Label */
+            scope_label: string;
+            /** Bars */
+            bars?: components["schemas"]["PeerBar"][];
+            /** Median */
+            median?: number | string | null;
+            /**
+             * Peer Count
+             * @default 0
+             */
+            peer_count: number;
+            /** Withheld Reason */
+            withheld_reason?: string | null;
+            /**
+             * Forward Available
+             * @default false
+             */
+            forward_available: boolean;
+            /** Forward Reason */
+            forward_reason?: string | null;
+            /** Forward Bars */
+            forward_bars?: components["schemas"]["PeerBar"][];
+            /** Forward Median */
+            forward_median?: number | string | null;
+            /** Excluded */
+            excluded?: {
+                [key: string]: string;
+            }[];
+            footer: components["schemas"]["PictureFooter"];
         };
         /** PeerCompare */
         PeerCompare: {
@@ -28756,6 +31850,18 @@ export interface components {
             /** Note */
             note?: string | null;
         };
+        /** PictureFooter */
+        PictureFooter: {
+            /**
+             * As Of
+             * Format: date
+             */
+            as_of: string;
+            /** Source */
+            source: string;
+            /** Basis */
+            basis: string;
+        };
         /** PilotReport */
         PilotReport: {
             window: components["schemas"]["PilotWindow"];
@@ -28989,6 +32095,22 @@ export interface components {
             /** Note */
             note: string;
         };
+        /** PortfolioConsensus */
+        PortfolioConsensus: {
+            /** Holdings */
+            holdings: components["schemas"]["HoldingConsensus"][];
+            /** Complete */
+            complete: number;
+            /** Partial */
+            partial: number;
+            /** Unavailable */
+            unavailable: number;
+            /**
+             * Note
+             * @default Targets are stored snapshots from the providers your plan can reach; none are synthesised.
+             */
+            note: string;
+        };
         /** PortfolioDataContext */
         PortfolioDataContext: {
             /** Snapshot Date */
@@ -29101,6 +32223,103 @@ export interface components {
             };
             /** Notes */
             notes: string[];
+        };
+        /** PortfolioDividends */
+        PortfolioDividends: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "complete" | "partial" | "unavailable";
+            summary: components["schemas"]["IncomeSummary"];
+            /** Months */
+            months: components["schemas"]["MonthBar"][];
+            /** Years */
+            years: components["schemas"]["YearBar"][];
+            /** Largest */
+            largest: components["schemas"]["ContributorLine"][];
+            /** Smallest */
+            smallest: components["schemas"]["ContributorLine"][];
+            /** Holdings */
+            holdings: components["schemas"]["HoldingIncome"][];
+            /** Tiers */
+            tiers: components["schemas"]["IncomeTier"][];
+            /** Tier Rule */
+            tier_rule: string;
+            /** Unconfirmed Events */
+            unconfirmed_events: number;
+            /** Without Schedule */
+            without_schedule: string[];
+            /** Disagreements */
+            disagreements: string[];
+            accuracy: components["schemas"]["AccuracyOut"];
+            /** Assume Growth */
+            assume_growth: boolean;
+            /** Method Version */
+            method_version: string;
+            /** Input Hash */
+            input_hash: string;
+            /** Warnings */
+            warnings: string[];
+            explain: components["schemas"]["Explain"];
+        };
+        /** PortfolioFairValue */
+        PortfolioFairValue: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "complete" | "partial" | "unavailable";
+            /** Basis */
+            basis: string;
+            /** Basis Label */
+            basis_label: string;
+            /** Bases */
+            bases: {
+                [key: string]: string;
+            };
+            /** Account Currency */
+            account_currency: string | null;
+            /** As Of */
+            as_of: string | null;
+            /** Portfolio Value */
+            portfolio_value: number | string;
+            /** Covered Value */
+            covered_value: number | string;
+            /** Fair Value */
+            fair_value: number | string | null;
+            /**
+             * Difference
+             * @description Fair value / covered value - 1.
+             */
+            difference: number | string | null;
+            /** Upside Amount */
+            upside_amount: number | string | null;
+            /** Overvalued Weight */
+            overvalued_weight: number | string;
+            /** Undervalued Weight */
+            undervalued_weight: number | string;
+            /** Stale Count */
+            stale_count: number;
+            /** Covered */
+            covered: number;
+            /** Total */
+            total: number;
+            /** Uncovered */
+            uncovered: string[];
+            /** Holdings */
+            holdings: components["schemas"]["HoldingFairValue"][];
+            /** History */
+            history: components["schemas"]["HistoryRow"][];
+            /** History Starts */
+            history_starts: string | null;
+            /** Method Version */
+            method_version: string;
+            /**
+             * Note
+             * @default Fair value in the account currency is the position value times fair value over price, so the broker's own conversion applies. A holding without a fair value on this basis is left out and counted, never valued at zero. History starts on the first recorded day.
+             */
+            note: string;
         };
         /** PortfolioFlag */
         PortfolioFlag: {
@@ -29335,6 +32554,50 @@ export interface components {
              */
             beta?: number | null;
         };
+        /** PortfolioScorecard */
+        PortfolioScorecard: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "complete" | "partial" | "unavailable";
+            /** As Of */
+            as_of: string | null;
+            /** Method Version */
+            method_version: string;
+            /** Axes */
+            axes: components["schemas"]["AxisAggregate"][];
+            /** Holdings */
+            holdings: components["schemas"]["HoldingMark"][];
+            /**
+             * Unchecked
+             * @description Holdings without a cached check result yet.
+             */
+            unchecked: string[];
+            /**
+             * Note
+             * @default Each axis is the value-weighted mean of holdings' scores over applicable checks only; a holding whose axis cannot be scored is left out of that axis and counted in its coverage.
+             */
+            note: string;
+        };
+        /** PortfolioStrips */
+        PortfolioStrips: {
+            /** As Of */
+            as_of: unknown;
+            /** Valuation Basis */
+            valuation_basis: string;
+            /** Bases */
+            bases: {
+                [key: string]: string;
+            };
+            /** Strips */
+            strips: components["schemas"]["Strip"][];
+            /**
+             * Note
+             * @default Each dot is one holding; the line is the portfolio's value-weighted mean over the dots placed.
+             */
+            note: string;
+        };
         /**
          * PortfolioTopic
          * @description A portfolio-level watch topic: wire items that mention one of its keywords are tagged
@@ -29528,6 +32791,59 @@ export interface components {
             /** Reason */
             reason: string | null;
         };
+        /** PositionOut */
+        PositionOut: {
+            /** Ticker */
+            ticker: string;
+            /** Name */
+            name: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "open" | "closed";
+            /** First Trade */
+            first_trade: string | null;
+            /** Last Trade */
+            last_trade: string | null;
+            /** Quantity */
+            quantity: number;
+            /**
+             * Invested
+             * @description Cash paid for buys, fees included.
+             */
+            invested: number;
+            /** Proceeds */
+            proceeds: number;
+            /** Dividends */
+            dividends: number;
+            /** Fees */
+            fees: number;
+            /** Realised Gain */
+            realised_gain: number;
+            /** Value */
+            value: number | null;
+            /** Unrealised Gain */
+            unrealised_gain: number | null;
+            /**
+             * Total Gain
+             * @description Realised + unrealised + dividends.
+             */
+            total_gain: number | null;
+            /**
+             * Annualised Return
+             * @description Money-weighted (XIRR) annual return of the holding's own cash flows.
+             */
+            annualised_return: number | null;
+            /** Annualised Reason */
+            annualised_reason: string | null;
+            /** Days Held */
+            days_held: number | null;
+            /** Transactions */
+            transactions: components["schemas"]["PositionTransactionOut"][];
+            /** Warnings */
+            warnings: string[];
+        };
         /** PositionRiskPack */
         PositionRiskPack: {
             /** Ticker */
@@ -29598,6 +32914,35 @@ export interface components {
              */
             hard_limit?: number | null;
         };
+        /** PositionTransactionOut */
+        PositionTransactionOut: {
+            /**
+             * Day
+             * Format: date
+             */
+            day: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "buy" | "sell" | "dividend" | "fee" | "split";
+            /** Quantity */
+            quantity: number | null;
+            /** Price */
+            price: number | null;
+            /**
+             * Cash
+             * @description Signed cash effect on the account: a buy is negative.
+             */
+            cash: number;
+            /**
+             * Running Quantity
+             * @description Units held after this row, in today's units.
+             */
+            running_quantity: number;
+            /** Note */
+            note?: string | null;
+        };
         /**
          * PositionWeightRule
          * @description Limit on a single position's weight; with no ticker it applies to every position.
@@ -29655,6 +33000,32 @@ export interface components {
             control: components["schemas"]["ControlChannel"];
             institutional: components["schemas"]["InstitutionalChannel"];
             funds: components["schemas"]["FundChannel"];
+        };
+        /** PositionsResponse */
+        PositionsResponse: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "complete" | "partial" | "unavailable" | "paid_only" | "disputed";
+            /** As Of */
+            as_of: string | null;
+            /** Currency */
+            currency: string | null;
+            /** Open */
+            open: components["schemas"]["PositionOut"][];
+            /** Closed */
+            closed: components["schemas"]["PositionOut"][];
+            /**
+             * Closed Realised
+             * @description Realised gain over every closed position.
+             */
+            closed_realised: number;
+            /** Closed Dividends */
+            closed_dividends: number;
+            /** Warnings */
+            warnings: string[];
+            explain: components["schemas"]["PerformanceExplain"];
         };
         /** PostedMessage */
         PostedMessage: {
@@ -31180,6 +34551,46 @@ export interface components {
             /** Notes */
             notes: string[];
         };
+        /** ReceivedLine */
+        ReceivedLine: {
+            /** Payment Id */
+            payment_id: string;
+            /**
+             * Paid On
+             * Format: date
+             */
+            paid_on: string;
+            /** Received */
+            received: number | string;
+            /** Quantity */
+            quantity: number | string | null;
+            /** Gross Per Share */
+            gross_per_share: number | string | null;
+            /** Declared Event Id */
+            declared_event_id: number | null;
+            /** Declared Ex Date */
+            declared_ex_date: string | null;
+            /** Declared Per Share */
+            declared_per_share: number | string | null;
+            /** Declared Currency */
+            declared_currency: string | null;
+            /** Declared Status */
+            declared_status: string | null;
+            /** Declared Sources */
+            declared_sources: string[];
+            /** Declared In Account */
+            declared_in_account: number | string | null;
+            /** Fx Rate */
+            fx_rate: number | string | null;
+            /** Withholding Gap */
+            withholding_gap: number | string | null;
+            /** Withholding Share */
+            withholding_share: number | string | null;
+            /** Agrees */
+            agrees: boolean | null;
+            /** Note */
+            note: string;
+        };
         /** ReconcileRequest */
         ReconcileRequest: {
             /**
@@ -31441,6 +34852,19 @@ export interface components {
                 [key: string]: number;
             };
         };
+        /** RegressionPoint */
+        RegressionPoint: {
+            /** Ticker */
+            ticker: string;
+            /** Growth */
+            growth: number | string;
+            /** Margin */
+            margin: number | string;
+            /** Pe */
+            pe: number | string;
+            /** Fitted */
+            fitted: number | string;
+        };
         /** RelatedPartyFigure */
         RelatedPartyFigure: {
             /** Label */
@@ -31558,6 +34982,17 @@ export interface components {
             status: "suggested" | "confirmed" | "rejected" | "disputed";
             /** Decision Reason */
             decision_reason?: string | null;
+        };
+        /** ReleaseDoc */
+        ReleaseDoc: {
+            /** Evidence Sha256 */
+            evidence_sha256: string;
+            /** Period */
+            period: string | null;
+            /** Source Url */
+            source_url: string | null;
+            /** Fetched At */
+            fetched_at: string | null;
         };
         /** RemoveExposureRequest */
         RemoveExposureRequest: {
@@ -32764,6 +36199,19 @@ export interface components {
             /** Meets Asymmetry */
             meets_asymmetry: boolean | null;
         };
+        /** ReverseSolve */
+        ReverseSolve: {
+            /** Exit Pe */
+            exit_pe: number | string | null;
+            /** Exit Pe Reason */
+            exit_pe_reason: string | null;
+            /** Growth */
+            growth: number | string | null;
+            /** Growth Reason */
+            growth_reason: string | null;
+            /** Scenario */
+            scenario: string | null;
+        };
         /** ReviewBody */
         ReviewBody: {
             /** Month */
@@ -33171,6 +36619,50 @@ export interface components {
              */
             fallback: boolean;
         };
+        /** RiskHeadline */
+        RiskHeadline: {
+            /** As Of */
+            as_of: string | null;
+            /** Window Start */
+            window_start: string | null;
+            /** Window End */
+            window_end: string | null;
+            /** Observations */
+            observations: number;
+            /** Benchmark Symbol */
+            benchmark_symbol: string | null;
+            score: components["schemas"]["RiskScore"];
+            /** Tiles */
+            tiles: components["schemas"]["Tile"][];
+            /** Holdings */
+            holdings: components["schemas"]["HoldingRisk"][];
+            /**
+             * Portfolio Reference
+             * @description The portfolio's own volatility, drawdown and beta for the reference bar.
+             */
+            portfolio_reference: {
+                [key: string]: number | null;
+            };
+            /**
+             * Market Reference
+             * @description The benchmark's volatility and drawdown over the window; beta 1.
+             */
+            market_reference: {
+                [key: string]: number | null;
+            };
+            correlation: components["schemas"]["CorrelationMatrix"];
+            /**
+             * Together
+             * @description Pairs that moved most together.
+             */
+            together: components["schemas"]["Pair"][];
+            /** Least Together */
+            least_together: components["schemas"]["Pair"][];
+            /** Concentration Basis */
+            concentration_basis: string;
+            /** Warnings */
+            warnings: string[];
+        };
         /**
          * RiskLimits
          * @description Portfolio risk limits, checked after each sync. Every limit is optional (null = off).
@@ -33444,6 +36936,36 @@ export interface components {
             warnings: string[];
             /** Method */
             method: string;
+        };
+        /** RiskScore */
+        RiskScore: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "complete" | "unknown";
+            /** Score */
+            score: number | null;
+            /**
+             * Benchmark Score
+             * @description The benchmark scored on the same references (50 unless a reference is fixed).
+             */
+            benchmark_score: number | null;
+            /** Band */
+            band: string | null;
+            /**
+             * Tone
+             * @enum {string}
+             */
+            tone: "good" | "caution" | "bad" | "neutral" | "unknown";
+            /** Sub Scores */
+            sub_scores: components["schemas"]["SubScore"][];
+            /** Reason */
+            reason: string | null;
+            /** Method Version */
+            method_version: string;
+            /** Formula */
+            formula: string;
         };
         /** RiskSeriesPoint */
         RiskSeriesPoint: {
@@ -33753,6 +37275,42 @@ export interface components {
             /** Method Note */
             method_note: string;
         };
+        /** SankeyLink */
+        SankeyLink: {
+            /** Source */
+            source: string;
+            /** Target */
+            target: string;
+            /** Weight */
+            weight: number;
+        };
+        /** SankeyNode */
+        SankeyNode: {
+            /** Id */
+            id: string;
+            /** Label */
+            label: string;
+            /**
+             * Column
+             * @description 0 sector, 1 industry, 2 holding.
+             */
+            column: number;
+            /** Weight */
+            weight: number;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "classified" | "unclassified" | "residual" | "other";
+        };
+        /** SaveMultipleIn */
+        SaveMultipleIn: {
+            /** Name */
+            name: string;
+            request: components["schemas"]["MultipleRequest"];
+            /** Note */
+            note?: string | null;
+        };
         /** SaveRebalance */
         SaveRebalance: {
             /** Name */
@@ -33848,6 +37406,37 @@ export interface components {
             isins: string[];
             /** Note */
             note?: string | null;
+        };
+        /**
+         * SavedMultiple
+         * @description A saved earnings-multiple scenario set (method `multiple_path`).
+         */
+        SavedMultiple: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Version */
+            version: number;
+            /** Assumptions */
+            assumptions: components["schemas"]["MultipleAssumptions"][];
+            /** Selected */
+            selected: string | null;
+            /** Method Version */
+            method_version: string;
+            /** Input Hash */
+            input_hash: string | null;
+            /** Note */
+            note: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Saved Result */
+            saved_result?: {
+                [key: string]: unknown;
+            } | null;
         };
         /** SavedOpen */
         SavedOpen: {
@@ -33988,6 +37577,26 @@ export interface components {
              */
             selected: boolean;
         };
+        /** ScoreLine */
+        ScoreLine: {
+            /** Ticker */
+            ticker: string;
+            /** Name */
+            name: string | null;
+            /**
+             * Weight
+             * @description Share of portfolio value.
+             */
+            weight: number | string;
+            /** Score */
+            score: number | string | null;
+            /** Passes */
+            passes: number;
+            /** Applicable */
+            applicable: number;
+            /** Text */
+            text: string;
+        };
         /** ScorePoint */
         ScorePoint: {
             /**
@@ -34062,12 +37671,81 @@ export interface components {
             updated_at: string;
             /** Definition Hash */
             definition_hash?: string | null;
+            /** Last Run At */
+            last_run_at?: string | null;
+            /**
+             * Last Matched
+             * @description Matches recorded by the latest run (first page).
+             */
+            last_matched?: number | null;
+            /**
+             * New Last 7D
+             * @description Matches in the latest run that the last run from 7 or more days earlier did not have; null without such a run.
+             */
+            new_last_7d?: number | null;
+            /** New Tickers */
+            new_tickers?: string[];
+            /**
+             * New Basis
+             * @description What the new-match count compares, or why it is absent.
+             */
+            new_basis?: string | null;
+            /**
+             * Mark
+             * @description Equal-weight mean of the latest run's members' cached axis scores (0-6); null axes are unknown.
+             */
+            mark?: {
+                [key: string]: number | string | null;
+            } | null;
+            /** Mark Covered */
+            mark_covered?: {
+                [key: string]: number;
+            } | null;
             /** Versions */
             versions: components["schemas"]["ScreenVersion"][];
             /** Runs */
             runs: {
                 [key: string]: unknown;
             }[];
+        };
+        /**
+         * ScreenDraft
+         * @description What the sentence asks for, in the screener's own terms. Nothing here has been run.
+         */
+        ScreenDraft: {
+            /**
+             * Kind
+             * @default stock
+             * @constant
+             */
+            kind: "stock";
+            /**
+             * Markets
+             * @description ISO 3166 alpha-2 country codes.
+             */
+            markets?: string[];
+            /**
+             * Industries
+             * @description Sector or industry names as stored.
+             */
+            industries?: string[];
+            /**
+             * Keywords
+             * @description Name or theme words; shown, not applied as a filter.
+             */
+            keywords?: string[];
+            /** Filters */
+            filters?: components["schemas"]["DraftFilter"][];
+            sort?: components["schemas"]["DraftSort"] | null;
+            /** Unmatched Phrases */
+            unmatched_phrases?: string[];
+            /**
+             * Refused
+             * @default false
+             */
+            refused: boolean;
+            /** Refusal Reason */
+            refusal_reason?: string | null;
         };
         /** ScreenFilter */
         ScreenFilter: {
@@ -34214,6 +37892,76 @@ export interface components {
             updated_at: string;
             /** Definition Hash */
             definition_hash?: string | null;
+            /** Last Run At */
+            last_run_at?: string | null;
+            /**
+             * Last Matched
+             * @description Matches recorded by the latest run (first page).
+             */
+            last_matched?: number | null;
+            /**
+             * New Last 7D
+             * @description Matches in the latest run that the last run from 7 or more days earlier did not have; null without such a run.
+             */
+            new_last_7d?: number | null;
+            /** New Tickers */
+            new_tickers?: string[];
+            /**
+             * New Basis
+             * @description What the new-match count compares, or why it is absent.
+             */
+            new_basis?: string | null;
+            /**
+             * Mark
+             * @description Equal-weight mean of the latest run's members' cached axis scores (0-6); null axes are unknown.
+             */
+            mark?: {
+                [key: string]: number | string | null;
+            } | null;
+            /** Mark Covered */
+            mark_covered?: {
+                [key: string]: number;
+            } | null;
+        };
+        /** ScreenTemplate */
+        ScreenTemplate: {
+            /** Id */
+            id: string;
+            /** Title */
+            title: string;
+            /** Rationale */
+            rationale: string;
+            /** Filters */
+            filters: components["schemas"]["TemplateFilter"][];
+            /** Sort By */
+            sort_by?: string | null;
+            /**
+             * Descending
+             * @default true
+             */
+            descending: boolean;
+        };
+        /** ScreenTemplatesConfig */
+        ScreenTemplatesConfig: {
+            /**
+             * Schema Version
+             * @default 1
+             * @constant
+             */
+            schema_version: 1;
+            /** Templates */
+            templates?: components["schemas"]["ScreenTemplate"][];
+        };
+        /** ScreenTemplatesVersion */
+        ScreenTemplatesVersion: {
+            /**
+             * Id
+             * @description Saved version id; null while the defaults apply.
+             */
+            id: number | null;
+            /** Created At */
+            created_at: string | null;
+            body: components["schemas"]["ScreenTemplatesConfig"];
         };
         /** ScreenVersion */
         ScreenVersion: {
@@ -34326,6 +38074,24 @@ export interface components {
              * @default Companies are the ones with a stored profile. Revenue growth and operating margin are the latest filed year from the peer-comparison engine; price/earnings is the provider's trailing figure. A median needs at least three companies with a value.
              */
             method: string;
+        };
+        /**
+         * Seed
+         * @description What the defaults were seeded from, shown beside each input.
+         */
+        Seed: {
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Company */
+            company: number | string | null;
+            /** Company Basis */
+            company_basis: string | null;
+            /** Peer */
+            peer: number | string | null;
+            /** Peer Basis */
+            peer_basis: string | null;
         };
         /** SegmentAnalysis */
         SegmentAnalysis: {
@@ -35694,6 +39460,20 @@ export interface components {
             /** Last Checked At */
             last_checked_at: string | null;
         };
+        /** SourceState */
+        SourceState: {
+            /** Source */
+            source: string;
+            /** Access State */
+            access_state: string;
+            /**
+             * As Of
+             * Format: date
+             */
+            as_of: string;
+            /** Detail */
+            detail: string | null;
+        };
         /** SourceTrustOut */
         SourceTrustOut: {
             /** Host */
@@ -36275,6 +40055,26 @@ export interface components {
              */
             status: "read" | "dismissed";
         };
+        /** StepPoint */
+        StepPoint: {
+            /**
+             * As Of
+             * Format: date
+             */
+            as_of: string;
+            /** Value */
+            value: number | string;
+        };
+        /** StepValue */
+        StepValue: {
+            /**
+             * As Of
+             * Format: date
+             */
+            as_of: string;
+            /** Value */
+            value: number | string;
+        };
         /** StockRequest */
         StockRequest: {
             /**
@@ -36774,6 +40574,65 @@ export interface components {
             /** Reason */
             reason: string | null;
         };
+        /** Strip */
+        Strip: {
+            /** Metric */
+            metric: string;
+            /** Label */
+            label: string;
+            /**
+             * Unit
+             * @enum {string}
+             */
+            unit: "fraction" | "multiple";
+            /** Basis */
+            basis: string;
+            /** Dots */
+            dots: components["schemas"]["StripDot"][];
+            /**
+             * Portfolio
+             * @description Value-weighted mean over the holdings with a value.
+             */
+            portfolio: number | string | null;
+            /** Covered Weight */
+            covered_weight: number | string;
+            /** Benchmark */
+            benchmark?: number | string | null;
+            /**
+             * Benchmark Note
+             * @default No benchmark line: benchmark constituents and their fundamentals are not stored.
+             */
+            benchmark_note: string;
+            /** Zones */
+            zones: components["schemas"]["StripZone"][];
+        };
+        /** StripDot */
+        StripDot: {
+            /** Ticker */
+            ticker: string;
+            /** Name */
+            name: string | null;
+            /** Weight */
+            weight: number | string;
+            /** Value */
+            value: number | string | null;
+            /** Reason */
+            reason?: string | null;
+        };
+        /** StripZone */
+        StripZone: {
+            /** Lo */
+            lo: number | string | null;
+            /** Hi */
+            hi: number | string | null;
+            /**
+             * Tone
+             * @enum {string}
+             */
+            tone: "gain" | "loss" | "neutral";
+            /** Label */
+            label: string;
+        };
         /** StudyRow */
         StudyRow: {
             /** Event Type */
@@ -36856,6 +40715,39 @@ export interface components {
              * @default 1.0.0
              */
             method_version: string;
+        };
+        /** SubScore */
+        SubScore: {
+            /** Input */
+            input: string;
+            /** Label */
+            label: string;
+            /**
+             * Value
+             * @description The figure as a positive size of risk.
+             */
+            value: number | null;
+            /**
+             * Reference
+             * @description Market reference: sub-score 50.
+             */
+            reference: number;
+            /**
+             * Reference Basis
+             * @enum {string}
+             */
+            reference_basis: "benchmark" | "fixed";
+            /**
+             * Very High
+             * @description Sub-score 100.
+             */
+            very_high: number;
+            /** Score */
+            score: number | null;
+            /** Weight */
+            weight: number;
+            /** Reason */
+            reason?: string | null;
         };
         /** Summary */
         Summary: {
@@ -37295,6 +41187,52 @@ export interface components {
             /** With Mismatch */
             with_mismatch: number;
         };
+        /** TemplateFilter */
+        TemplateFilter: {
+            /** Metric */
+            metric: string;
+            /**
+             * Op
+             * @enum {string}
+             */
+            op: "gte" | "lte" | "in";
+            /** Value */
+            value: number | string | string[];
+        };
+        /** TemplateOut */
+        TemplateOut: {
+            /** Id */
+            id: string;
+            /** Title */
+            title: string;
+            /** Rationale */
+            rationale: string;
+            /** Filters */
+            filters: components["schemas"]["DiscoverFilter"][];
+            /** Sort By */
+            sort_by: string | null;
+            /** Descending */
+            descending: boolean;
+            /**
+             * Matched
+             * @description Covered stocks passing today; null when a filter is disabled.
+             */
+            matched: number | null;
+            /**
+             * Mark
+             * @description Mean checks score (0-6) per axis over the matches that have one; null where none has.
+             */
+            mark: {
+                [key: string]: number | string | null;
+            };
+            /** Mark Basis */
+            mark_basis: string;
+            /**
+             * Disabled
+             * @description Filters that cannot run on the current data, with the reason.
+             */
+            disabled: string[];
+        };
         /** TemplateSection */
         TemplateSection: {
             /**
@@ -37317,6 +41255,33 @@ export interface components {
              * @default false
              */
             detail_only: boolean;
+        };
+        /** TemplatesOut */
+        TemplatesOut: {
+            /**
+             * As Of
+             * Format: date
+             */
+            as_of: string;
+            /**
+             * Version Id
+             * @description Saved version of the templates; null while the defaults apply.
+             */
+            version_id: number | null;
+            /** Templates */
+            templates: components["schemas"]["TemplateOut"][];
+            /**
+             * Note
+             * @default Starting points written in the screener's own metrics, not recommendations. Edit them in Settings.
+             */
+            note: string;
+        };
+        /** TenurePerson */
+        TenurePerson: {
+            /** Name */
+            name: string;
+            /** Years */
+            years: number;
         };
         /** TestAlertRequest */
         TestAlertRequest: {
@@ -38151,6 +42116,24 @@ export interface components {
             /** Budget */
             budget: number | null;
         };
+        /** Tile */
+        Tile: {
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Value */
+            value: number | null;
+            /** Unit */
+            unit: string;
+            /** Benchmark Value */
+            benchmark_value: number | null;
+            /** Status */
+            status: string;
+            /** Reason */
+            reason: string | null;
+            verdict: components["schemas"]["Verdict"] | null;
+        };
         /** Tilt */
         Tilt: {
             /** Factor */
@@ -38315,6 +42298,52 @@ export interface components {
              * @default 0
              */
             report_traces: number;
+        };
+        /** TrackRecord */
+        TrackRecord: {
+            /** Available */
+            available: boolean;
+            /**
+             * Starts
+             * @description First date a 12-month-old snapshot exists.
+             */
+            starts: string | null;
+            /** Reason */
+            reason?: string | null;
+            /** Rows */
+            rows?: components["schemas"]["TrackRow"][];
+            /** Hit Rate */
+            hit_rate?: number | string | null;
+            /** Mean Error */
+            mean_error?: number | string | null;
+            /**
+             * N
+             * @default 0
+             */
+            n: number;
+        };
+        /** TrackRow */
+        TrackRow: {
+            /**
+             * As Of
+             * Format: date
+             */
+            as_of: string;
+            /** Target */
+            target: number | string;
+            /** Price Then */
+            price_then: number | string | null;
+            /** Price After */
+            price_after: number | string | null;
+            /** After Date */
+            after_date: string | null;
+            /** Reached */
+            reached: boolean | null;
+            /**
+             * Error
+             * @description Price 12 months later / target - 1.
+             */
+            error: number | string | null;
         };
         /** TrackedManager */
         TrackedManager: {
@@ -38801,6 +42830,18 @@ export interface components {
              */
             demote_below: number;
         };
+        /** TypeCount */
+        TypeCount: {
+            /**
+             * Type
+             * @enum {string}
+             */
+            type: "news" | "earnings" | "analyst" | "valuation" | "dividend" | "insider" | "risk" | "other";
+            /** Total */
+            total: number;
+            /** Unread */
+            unread: number;
+        };
         /** UnappliedReportOut */
         UnappliedReportOut: {
             /** Cik */
@@ -38922,6 +42963,75 @@ export interface components {
             detail: string;
             /** Source */
             source?: string | null;
+        };
+        /** Update */
+        Update: {
+            /**
+             * Key
+             * @description Stable id: the read state is stored against it.
+             */
+            key: string;
+            /**
+             * Type
+             * @enum {string}
+             */
+            type: "news" | "earnings" | "analyst" | "valuation" | "dividend" | "insider" | "risk" | "other";
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "inbox" | "news" | "changes" | "dividends";
+            /** Ticker */
+            ticker: string | null;
+            /** Name */
+            name?: string | null;
+            /** Headline */
+            headline: string;
+            /** What Changed */
+            what_changed: string | null;
+            /**
+             * Occurred At
+             * Format: date-time
+             */
+            occurred_at: string;
+            /** Age Days */
+            age_days: number;
+            /**
+             * Price
+             * @description Latest stored close of the holding.
+             */
+            price?: number | null;
+            /** Price Currency */
+            price_currency?: string | null;
+            /**
+             * Change 1D
+             * @description One-day move of that close, fraction.
+             */
+            change_1d?: number | null;
+            /** Severity */
+            severity?: number | null;
+            /** Href */
+            href: string;
+            /** Read */
+            read: boolean;
+        };
+        /** UpdatesFeed */
+        UpdatesFeed: {
+            /** Items */
+            items: components["schemas"]["Update"][];
+            /**
+             * Counts
+             * @description Per type over the whole window, before the type filter.
+             */
+            counts: components["schemas"]["TypeCount"][];
+            /** Unread */
+            unread: number;
+            /** Window Days */
+            window_days: number;
+            /** Method Version */
+            method_version: string;
+            /** Notes */
+            notes: string[];
         };
         /** UsageIn */
         UsageIn: {
@@ -39110,6 +43220,17 @@ export interface components {
              */
             fetched_at: string;
         };
+        /** ValuationPictures */
+        ValuationPictures: {
+            /** Ticker */
+            ticker: string;
+            peers: components["schemas"]["PeerBars"];
+            histogram: components["schemas"]["IndustryHistogram"];
+            history: components["schemas"]["MultipleHistory"];
+            fair_multiple: components["schemas"]["FairMultiple"];
+            /** Method Version */
+            method_version: string;
+        };
         /** ValuationPrice */
         ValuationPrice: {
             /** Symbol */
@@ -39213,6 +43334,22 @@ export interface components {
              * @description ETFs whose fund-level P/E and P/B are read from the provider.
              */
             funds?: components["schemas"]["FundValuationSource"][];
+        };
+        /** Verdict */
+        Verdict: {
+            /** Metric */
+            metric: string;
+            /** Band */
+            band: string;
+            /**
+             * Tone
+             * @enum {string}
+             */
+            tone: "good" | "caution" | "bad" | "neutral" | "unknown";
+            /** Phrase */
+            phrase: string;
+            /** Method Version */
+            method_version: string;
         };
         /** VerdictActivity */
         VerdictActivity: {
@@ -39376,6 +43513,27 @@ export interface components {
             weight: number;
             /** Value Base */
             value_base: number;
+        };
+        /** WatchFairValue */
+        WatchFairValue: {
+            /** Ticker */
+            ticker: string;
+            /** List Name */
+            list_name: string;
+            /** Name */
+            name: string | null;
+            /** Price */
+            price: number | string | null;
+            /** Price Currency */
+            price_currency: string | null;
+            /** Price Date */
+            price_date: string | null;
+            /** Default Basis */
+            default_basis: string | null;
+            /** Bases */
+            bases: components["schemas"]["BasisValue"][];
+            /** History */
+            history: components["schemas"]["StepPoint"][];
         };
         /**
          * WatcherSettings
@@ -40543,6 +44701,52 @@ export interface components {
             /** Warnings */
             warnings: string[];
         };
+        /** YearBar */
+        YearBar: {
+            /** Year */
+            year: number;
+            /**
+             * Phase
+             * @enum {string}
+             */
+            phase: "history" | "forecast" | "mixed";
+            /** Received */
+            received: number | string;
+            /** Declared */
+            declared: number | string;
+            /** Estimated */
+            estimated: number | string;
+        };
+        /** YearRow */
+        YearRow: {
+            /** Year */
+            year: number;
+            /** Revenue */
+            revenue: number | string;
+            /** Growth */
+            growth: number | string;
+            /** Net Margin */
+            net_margin: number | string;
+            /** Earnings */
+            earnings: number | string;
+            /** Shares */
+            shares: number | string;
+            /** Eps */
+            eps: number | string;
+        };
+        /** YieldVsPeers */
+        YieldVsPeers: {
+            /** Company */
+            company: number | string | null;
+            /** Peer Median */
+            peer_median: number | string | null;
+            /** Peer Count */
+            peer_count: number;
+            /** Basis */
+            basis: string | null;
+            /** Reason */
+            reason: string | null;
+        };
         /** Recorded */
         api__action_routes__Recorded: {
             /** Recorded */
@@ -40596,6 +44800,53 @@ export interface components {
             owner_verified: boolean;
         } & {
             [key: string]: unknown;
+        };
+        /** Check */
+        steward__checks__contract__Check: {
+            /** Id */
+            id: string;
+            /**
+             * Axis
+             * @enum {string}
+             */
+            axis: "value" | "future" | "past" | "health" | "dividend" | "risk";
+            /** Label */
+            label: string;
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "pass" | "fail" | "na" | "unknown";
+            /** Value */
+            value?: number | string | null;
+            /** Threshold */
+            threshold?: number | string | null;
+            /** Unit */
+            unit?: string | null;
+            /**
+             * Basis
+             * @description What the value is compared with.
+             */
+            basis?: string | null;
+            /** Sentence */
+            sentence: string;
+            /** Inputs */
+            inputs?: {
+                [key: string]: unknown;
+            };
+            /**
+             * Section Ref
+             * @description Where in the app the inputs are shown (a path).
+             */
+            section_ref?: string | null;
+            /** Method Version */
+            method_version: string;
+            /**
+             * Informational
+             * @description Shown in the list but never counted (earnings date).
+             * @default false
+             */
+            informational: boolean;
         };
         /** CoverageEntry */
         steward__data_context__holding__CoverageEntry: {
@@ -40685,6 +44936,18 @@ export interface components {
             /** Reason */
             reason?: string | null;
         };
+        /** NoteIn */
+        steward__inbox__service__NoteIn: {
+            /** Ticker */
+            ticker?: string | null;
+            /** Text */
+            text: string;
+            /**
+             * Active
+             * @default true
+             */
+            active: boolean;
+        };
         /** Coverage */
         steward__lookthrough__read__Coverage: {
             /** Total Value */
@@ -40744,6 +45007,11 @@ export interface components {
              * @description (real + proxied) / invested.
              */
             covered_share: number;
+        };
+        /** NoteIn */
+        steward__portfolio__holding_insight__NoteIn: {
+            /** Body */
+            body: string;
         };
         /** Check */
         steward__quality__cockpit__Check: {
@@ -40995,7 +45263,7 @@ export interface operations {
             header?: never;
             path: {
                 /** @description Config domain, as in /config/<domain>. */
-                domain: "strategy" | "theses" | "jobs" | "holding-profiles" | "verification" | "news-sources" | "event-rules" | "notifications" | "budget" | "research-profiles" | "prompts" | "performance";
+                domain: "strategy" | "theses" | "jobs" | "holding-profiles" | "verification" | "news-sources" | "event-rules" | "notifications" | "budget" | "research-profiles" | "prompts" | "performance" | "checks" | "holdings-views" | "screen-templates";
             };
             cookie?: never;
         };
@@ -41027,7 +45295,7 @@ export interface operations {
             header?: never;
             path: {
                 /** @description Config domain, as in /config/<domain>. */
-                domain: "strategy" | "theses" | "jobs" | "holding-profiles" | "verification" | "news-sources" | "event-rules" | "notifications" | "budget" | "research-profiles" | "prompts" | "performance";
+                domain: "strategy" | "theses" | "jobs" | "holding-profiles" | "verification" | "news-sources" | "event-rules" | "notifications" | "budget" | "research-profiles" | "prompts" | "performance" | "checks" | "holdings-views" | "screen-templates";
                 version_id: number;
             };
             cookie?: never;
@@ -41063,7 +45331,7 @@ export interface operations {
             header?: never;
             path: {
                 /** @description Config domain, as in /config/<domain>. */
-                domain: "strategy" | "theses" | "jobs" | "holding-profiles" | "verification" | "news-sources" | "event-rules" | "notifications" | "budget" | "research-profiles" | "prompts" | "performance";
+                domain: "strategy" | "theses" | "jobs" | "holding-profiles" | "verification" | "news-sources" | "event-rules" | "notifications" | "budget" | "research-profiles" | "prompts" | "performance" | "checks" | "holdings-views" | "screen-templates";
             };
             cookie?: never;
         };
@@ -41099,7 +45367,7 @@ export interface operations {
             header?: never;
             path: {
                 /** @description Config domain, as in /config/<domain>. */
-                domain: "strategy" | "theses" | "jobs" | "holding-profiles" | "verification" | "news-sources" | "event-rules" | "notifications" | "budget" | "research-profiles" | "prompts" | "performance";
+                domain: "strategy" | "theses" | "jobs" | "holding-profiles" | "verification" | "news-sources" | "event-rules" | "notifications" | "budget" | "research-profiles" | "prompts" | "performance" | "checks" | "holdings-views" | "screen-templates";
                 version_id: number;
             };
             cookie?: never;
@@ -47254,7 +51522,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["NoteIn"];
+                "application/json": components["schemas"]["steward__inbox__service__NoteIn"];
             };
         };
         responses: {
@@ -49893,6 +54161,39 @@ export interface operations {
             };
         };
     };
+    parse_screen_request: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ParseRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ParseResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     discover_stocks: {
         parameters: {
             query?: never;
@@ -50358,6 +54659,1024 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    screen_templates: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TemplatesOut"];
+                };
+            };
+        };
+    };
+    get_checks_config: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChecksConfigVersion"];
+                };
+            };
+        };
+    };
+    save_checks_config: {
+        parameters: {
+            query?: {
+                /** @description Why this change was made. */
+                note?: string | null;
+                /** @description The version the edit started from. If another save has happened since, nothing is saved and the answer is 409. */
+                base_version_id?: number | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChecksConfig"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChecksConfigVersion"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    validate_checks: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChecksConfig"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChecksConfig"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    checks_defaults: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChecksConfig"];
+                };
+            };
+        };
+    };
+    get_company_checks: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CompanyChecks"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    portfolio_scorecard: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PortfolioScorecard"];
+                };
+            };
+        };
+    };
+    get_portfolio_strips: {
+        parameters: {
+            query?: {
+                /** @description Fair-value basis of the valuation strip; saves nothing. */
+                basis?: "dcf_default" | "dcf_base" | "multiple_base" | "thesis_target" | "consensus_target" | "peer_multiple";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PortfolioStrips"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    check_marks: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MarksIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MarksOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    portfolio_dividends: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PortfolioDividends"];
+                };
+            };
+        };
+    };
+    dividend_calendar: {
+        parameters: {
+            query: {
+                /** @description YYYY-MM */
+                month: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DividendCalendar"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    company_dividends: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CompanyDividends"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    confirm_dividends: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DividendConfirmIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConfirmOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_portfolio_fair_value: {
+        parameters: {
+            query?: {
+                /** @description Fair-value basis; switching it saves nothing. */
+                basis?: "dcf_default" | "dcf_base" | "multiple_base" | "thesis_target" | "consensus_target" | "peer_multiple";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PortfolioFairValue"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    watchlist_fair_value: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WatchFairValue"][];
+                };
+            };
+        };
+    };
+    get_insight_coverage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InsightCoverage"];
+                };
+            };
+        };
+    };
+    get_insight_clocks: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClockRetrospective"];
+                };
+            };
+        };
+    };
+    insight_access: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccessVerdict"][];
+                };
+            };
+        };
+    };
+    get_company_consensus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConsensusView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_portfolio_consensus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PortfolioConsensus"];
+                };
+            };
+        };
+    };
+    get_holdings_insight: {
+        parameters: {
+            query?: {
+                /** @description Fair-value basis for the price-against-value columns. */
+                basis?: "dcf_default" | "dcf_base" | "multiple_base" | "thesis_target" | "consensus_target" | "peer_multiple";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HoldingsInsight"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_holdings_views: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HoldingsViewsVersion"];
+                };
+            };
+        };
+    };
+    save_holdings_views: {
+        parameters: {
+            query?: {
+                /** @description Why this change was made. */
+                note?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HoldingsViewsConfig"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HoldingsViewsVersion"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_holding_notes: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HoldingNote"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_holding_note: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["steward__portfolio__holding_insight__NoteIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HoldingNote"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_holding_note: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ticker: string;
+                note_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["steward__portfolio__holding_insight__NoteIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HoldingNote"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_holding_note: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ticker: string;
+                note_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_screen_templates: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScreenTemplatesVersion"];
+                };
+            };
+        };
+    };
+    save_screen_templates: {
+        parameters: {
+            query?: {
+                /** @description Why this change was made. */
+                note?: string | null;
+                /** @description The version the edit started from. If another save has happened since, nothing is saved and the answer is 409. */
+                base_version_id?: number | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ScreenTemplatesConfig"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScreenTemplatesVersion"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    screen_template_defaults: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScreenTemplatesConfig"];
+                };
+            };
+        };
+    };
+    get_updates: {
+        parameters: {
+            query?: {
+                days?: number;
+                type?: ("news" | "earnings" | "analyst" | "valuation" | "dividend" | "insider" | "risk" | "other") | null;
+                unread?: boolean;
+                ticker?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UpdatesFeed"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    mark_updates_read: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MarkRead"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MarkedRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_ownership_mix: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OwnershipMix"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_pay_tenure: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PayAndTenure"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_earnings_summary: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EarningsSummaryView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_earnings_summary: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EarningsNote"];
+                };
             };
             /** @description Validation Error */
             422: {
@@ -51065,6 +56384,203 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SavedScenario"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    multiple_defaults: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MultipleAssumptions"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    run_multiple: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MultipleRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MultipleValuation"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_saved_multiple: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SavedMultiple"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    save_multiple: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SaveMultipleIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SavedMultiple"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    multiple_drift: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Drift"] | null;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    valuation_pictures: {
+        parameters: {
+            query?: {
+                scope?: "confirmed" | "group" | "home_market" | "global";
+                group_id?: number | null;
+            };
+            header?: never;
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ValuationPictures"];
                 };
             };
             /** @description Validation Error */
@@ -52476,6 +57992,26 @@ export interface operations {
             };
         };
     };
+    get_positions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PositionsResponse"];
+                };
+            };
+        };
+    };
     get_attribution: {
         parameters: {
             query?: {
@@ -52541,7 +58077,7 @@ export interface operations {
     export_performance: {
         parameters: {
             query: {
-                kind: "ledger" | "lots" | "realized" | "attribution";
+                kind: "ledger" | "lots" | "realized" | "attribution" | "closed_positions" | "positions";
                 days?: number;
             };
             header?: never;
@@ -52884,6 +58420,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["XrayConcentrationResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_diversification: {
+        parameters: {
+            query?: {
+                /** @description Show the holdings as they were on this date (the latest snapshot before). */
+                as_of?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Diversification"];
                 };
             };
             /** @description Validation Error */
@@ -53554,6 +59122,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RiskReport"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_risk_score: {
+        parameters: {
+            query?: {
+                days?: number;
+                benchmark?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RiskHeadline"];
                 };
             };
             /** @description Validation Error */

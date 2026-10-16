@@ -638,6 +638,91 @@ async def lots_report(pool: asyncpg.Pool, settings: PerformanceSettings) -> r.Lo
     )  # fmt: skip
 
 
+# --- positions (insight I11.3) --------------------------------------------------------------------
+
+
+POSITIONS_FORMULA = [
+    "Per ticker from the classified ledger (account currency), with your entered splits shown as rows "
+    "and earlier units restated to today's units.",
+    "invested = cash paid for buys, fees included; proceeds = cash received for sales; realised gain "
+    "from the lot book (your cost method); unrealised gain = today's value - the broker's cost.",
+    "Annualised return = XIRR of the holding's own dated cash flows plus today's value (closed: the "
+    "flows alone); none under 30 days held or when the flows admit no single rate.",
+]
+
+
+async def positions_report(
+    pool: asyncpg.Pool, settings: PerformanceSettings
+) -> r.PositionsResponse:
+    from steward.performance.positions import PositionValue, build_positions
+
+    explain = r.PerformanceExplain(formula_version="positions 1.0.0", formula=POSITIONS_FORMULA)
+    snapshots = await _snapshots(pool)
+    account_currency = snapshots[-1]["account_currency"] if snapshots else None
+    ledger = await _ledger(pool, account_currency, settings)
+    if not ledger:
+        return r.PositionsResponse(
+            status="unavailable", as_of=None, currency=account_currency, open=[], closed=[],
+            closed_realised=0.0, closed_dividends=0.0, warnings=["no transactions stored"],
+            explain=explain,
+        )  # fmt: skip
+    book = build_lots(
+        ledger, settings.cost_method, spin_offs_of(settings), settings.time_test_years
+    )
+    rows = await pool.fetch(
+        "select p.snapshot_date, p.ticker, p.quantity, p.value_account, p.cost_account, i.name"
+        " from public.position_snapshot p left join public.instrument i on i.t212_ticker = p.ticker"
+        " where p.snapshot_date = (select max(snapshot_date) from public.position_snapshot)"
+    )
+    names: dict[str, str | None] = {x["ticker"]: x["name"] for x in rows}
+    open_values = {
+        x["ticker"]: PositionValue(
+            x["quantity"], x["value_account"], x["cost_account"], x["snapshot_date"]
+        )
+        for x in rows
+    }
+    if len(names) < len({e.ticker for e in ledger if e.ticker}):
+        for x in await pool.fetch(
+            "select t212_ticker, name from public.instrument where t212_ticker = any($1::text[])",
+            sorted({e.ticker for e in ledger if e.ticker}),
+        ):
+            names.setdefault(x["t212_ticker"], x["name"])
+    as_of = rows[0]["snapshot_date"] if rows else None
+    splits = [Split(s.ticker, s.day, s.ratio) for s in settings.splits]
+    positions = build_positions(
+        ledger, splits, book.realized, open_values, as_of or dt.date.today()
+    )
+
+    def out(p: Any) -> r.PositionOut:
+        return r.PositionOut(
+            ticker=p.ticker, name=names.get(p.ticker), status=p.status, first_trade=p.first_trade,
+            last_trade=p.last_trade, quantity=float(p.quantity), invested=float(p.invested),
+            proceeds=float(p.proceeds), dividends=float(p.dividends), fees=float(p.fees),
+            realised_gain=float(p.realised_gain), value=r.num(p.value),
+            unrealised_gain=r.num(p.unrealised_gain), total_gain=r.num(p.total_gain),
+            annualised_return=r.num(p.annualised_return), annualised_reason=p.annualised_reason,
+            days_held=p.days_held,
+            transactions=[
+                r.PositionTransactionOut(day=t.day, kind=t.kind, quantity=r.num(t.quantity),
+                                 price=r.num(t.price), cash=float(t.cash),
+                                 running_quantity=float(t.running_quantity), note=t.note)
+                for t in p.transactions
+            ],
+            warnings=p.warnings,
+        )  # fmt: skip
+
+    opened = [out(p) for p in positions if p.status == "open"]
+    closed = [out(p) for p in positions if p.status == "closed"]
+    warnings = sorted({f"{p.ticker}: {w}" for p in positions for w in p.warnings})
+    return r.PositionsResponse(
+        status="partial" if warnings else "complete", as_of=as_of, currency=account_currency,
+        open=opened, closed=closed,
+        closed_realised=sum((c.realised_gain for c in closed), 0.0),
+        closed_dividends=sum((c.dividends for c in closed), 0.0),
+        warnings=warnings, explain=explain,
+    )  # fmt: skip
+
+
 # --- attribution --------------------------------------------------------------------------------
 
 
@@ -778,6 +863,7 @@ async def attribution_report(
             net_trading=float(report.net_trading),
             components={k: float(v) for k, v in bridge.components.items()},
             residual=float(bridge.residual), unattributed_tickers=report.unattributed_tickers,
+            price_realised=float(report.realised), price_unrealised=float(report.unrealised),
         ),
         holdings=[
             r.ContributionOut(
@@ -785,7 +871,7 @@ async def attribution_report(
                 price=float(h.price), fx=float(h.fx), income=float(h.income), fees=float(h.fees),
                 total=float(h.total),
                 pct_of_start=float(h.total / start_total) if start_total else None,
-                attributed=h.attributed,
+                attributed=h.attributed, realised=float(h.realised),
                 benchmark_equivalent=_float(relative[h.ticker].benchmark_equivalent)
                 if h.ticker in relative else None,
                 active=_float(relative[h.ticker].active) if h.ticker in relative else None,

@@ -29,14 +29,17 @@ import {
   type ScreenSummary,
   type UniverseId,
 } from "@/lib/discover/discover";
+import { draftFilters, templateId, toDrafts, type ParseResult, type TemplateOut } from "@/lib/discover/screen-draft";
 import { formatDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
+import { AskScreen } from "./ask-screen";
 import { CompareTray } from "./compare-tray";
 import { FilterBuilder, SELECT } from "./filter-builder";
 import { ProviderPanel } from "./provider-panel";
 import { ResultsPanel } from "./results-panel";
 import { SavedScreens } from "./saved-screens";
+import { TemplatesPanel } from "./templates-panel";
 
 type Run =
   | { kind: "idle" }
@@ -84,6 +87,15 @@ export function DiscoverView() {
   usePageSelection(activeScreen !== null ? `screen ${activeScreen}` : null);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  const [template, setTemplate] = useState<string | null>(null);
+  const [pendingRun, setPendingRun] = useState(false);
+
+  // A link such as /discover?template=quality_payers highlights that starter screen.
+  useEffect(() => {
+    const id = templateId(new URLSearchParams(window.location.search).get("template"));
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (id) setTemplate(id);
+  }, []);
 
   const api = getBrowserApiClient();
   const [basic, setBasic] = useState(false);
@@ -320,6 +332,39 @@ export function DiscoverView() {
     } else setNotice(`Could not save the column set (HTTP ${r.response.status}).`);
   };
 
+  // Starter screens and "Ask for a screen" both fill the builder; neither runs without consent.
+  const fillBuilder = (filters: Parameters<typeof toDrafts>[0], sort: string | null) => {
+    setDrafts(toDrafts(filters, allMetrics, () => nextId.current++));
+    setSortBy(sort && allMetrics.some((m) => m.id === sort) ? sort : "");
+    setActiveScreen(null);
+    setErrors([]);
+  };
+  const applyTemplate = (t: TemplateOut) => {
+    if (basic && t.filters.some((f) => allMetrics.find((m) => m.id === f.metric)?.needs_provider)) chooseBasic(false);
+    setTemplate(t.id);
+    fillBuilder(t.filters as never, t.sort_by);
+    setNotice(`Filled in "${t.title}". Change any condition, then run it.`);
+  };
+  const applyDraft = (result: ParseResult, runNow: boolean) => {
+    if (basic) chooseBasic(false);
+    setTemplate(null);
+    fillBuilder(draftFilters(result.draft), result.draft.sort?.metric_id ?? null);
+    if (runNow) setPendingRun(true);
+  };
+  const currentScreen = () => {
+    const built = buildFilters(drafts, metrics);
+    if (built.errors.length > 0) return null;
+    return { filters: built.filters as never, sortBy: sortBy || null };
+  };
+  // Run once the builder holds the drafted conditions (state settles on the next render).
+  useEffect(() => {
+    if (!pendingRun) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- clears the one-shot run request
+    setPendingRun(false);
+    void execute();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingRun]);
+
   const info = catalogue?.universe as Record<string, unknown> | undefined;
   const selectedRows = [...selected.values()];
 
@@ -362,6 +407,8 @@ export function DiscoverView() {
           {notice}
         </p>
       ) : null}
+
+      {catalogue && kind === "stock" ? <TemplatesPanel catalogue={metrics} selected={template} onUse={applyTemplate} current={currentScreen} /> : null}
 
       <section aria-labelledby="builder-heading" className="blueprint space-y-4 px-5 py-5">
         <BlueprintCorners />
@@ -444,6 +491,8 @@ export function DiscoverView() {
         ) : null}
 
         {catalogue ? <ProviderPanel catalogue={catalogue} basic={basic} onBasic={chooseBasic} /> : null}
+
+        {catalogue && kind === "stock" ? <AskScreen catalogue={metrics} onApply={applyDraft} /> : null}
 
         {catalogue ? (
           <FilterBuilder catalogue={metrics} drafts={drafts} onChange={setDrafts} nextId={() => nextId.current++} />

@@ -13,6 +13,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { getBrowserApiClient, type WatchlistItem } from "@/lib/api/client";
 
+import { WatchlistFairValue } from "./fair-value-panel";
+
 type Draft = { ticker: string; list_name: string; buy_target: string; sell_target: string; reason: string; note: string };
 const emptyDraft = (): Draft => ({ ticker: "", list_name: "Default", buy_target: "", sell_target: "", reason: "", note: "" });
 const fetchWatchlist = () => getBrowserApiClient().GET("/watchlist");
@@ -168,6 +170,7 @@ export function WatchlistView() {
         )}
       </Blueprint>
       {items.length > 0 ? <p className="text-xs text-text-muted">Prices use the latest stored quote for securities already in your holdings. Other tickers are shown without a quote.</p> : null}
+      {items.length > 0 ? <WatchlistFairValue /> : null}
     </div>
   );
 }

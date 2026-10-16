@@ -42,6 +42,11 @@ class MetricDef:
     # An optional provider whose key unlocks more of this metric's data. Set by hand where a
     # provider fills the metric without being a hard gate (`requires_access` is the hard gate).
     optional_provider: str | None = None
+    # Range-slider scale (insight I10.8): tick values in the metric's unit, spaced evenly on the
+    # slider, so a non-linear spread (a P/E of 5 to 100) gets usable resolution at the low end.
+    ticks: tuple[Decimal, ...] | None = None
+    # Plain-English names the screen parser maps to this metric (insight I10.2).
+    aliases: tuple[str, ...] = ()
 
     @property
     def needs_provider(self) -> str | None:
@@ -207,6 +212,15 @@ _STOCK: tuple[MetricDef, ...] = (
     _filed("revenue_growth", "Revenue growth", "fraction", True),
     _filed("gross_margin", "Gross margin", "fraction", True),
     _filed("operating_margin", "Operating margin", "fraction", True),
+    MetricDef(
+        "net_margin",
+        "Net margin",
+        "financials",
+        "numeric",
+        "fraction",
+        "net income / revenue, latest fiscal year (revenue > 0)",
+        higher_is_better=True,
+    ),
     _filed("roic", "Return on invested capital", "fraction", True),
     _filed("net_debt_to_equity", "Net debt to equity", "multiple", False),
     _filed("free_cash_flow_conversion", "Free cash flow conversion", "fraction", True),
@@ -229,6 +243,15 @@ _STOCK: tuple[MetricDef, ...] = (
         "numeric",
         "multiple",
         "market cap / shareholders' equity (equity > 0)",
+        higher_is_better=False,
+    ),
+    MetricDef(
+        "price_to_sales",
+        "P/S",
+        "value",
+        "numeric",
+        "multiple",
+        "market cap / latest annual revenue (revenue > 0)",
         higher_is_better=False,
     ),
     _ratio("gross_profit_to_assets"),
@@ -265,6 +288,35 @@ _STOCK: tuple[MetricDef, ...] = (
         "latest close / published analyst-consensus EPS for the next fiscal year",
         period="next_fy",
         requires_access=("fmp", "analyst_estimates"),
+        higher_is_better=False,
+    ),
+    *(
+        MetricDef(
+            f"checks_{axis}_score",
+            f"{label} checks score",
+            "checks",
+            "numeric",
+            "ratio",
+            f"passes over applicable {label.lower()} checks, scaled to 0-6 (method checks; not applicable and unknown checks are left out); from the latest company checks",
+            period="as_of",
+            higher_is_better=True,
+        )
+        for axis, label in (
+            ("value", "Value"),
+            ("future", "Future"),
+            ("past", "Past"),
+            ("health", "Health"),
+            ("dividend", "Dividend"),
+        )
+    ),
+    MetricDef(
+        "checks_risk_flags",
+        "Risk checks failed",
+        "checks",
+        "numeric",
+        "count",
+        "risk checks in the fail state (informational ones excluded); from the latest company checks",
+        period="as_of",
         higher_is_better=False,
     ),
     MetricDef(
@@ -431,7 +483,291 @@ _FUND: tuple[MetricDef, ...] = (
     ),
 )
 
-STOCK_CATALOGUE: dict[str, MetricDef] = {m.id: m for m in _STOCK}
+
+def _d(*xs: str | int) -> tuple[Decimal, ...]:
+    return tuple(Decimal(str(x)) for x in xs)
+
+
+# Insight I10.5: metrics the statements, dividends and insider filings already support.
+_PARITY: tuple[MetricDef, ...] = (
+    MetricDef(
+        "buyback_yield",
+        "Buyback yield",
+        "income",
+        "numeric",
+        "fraction",
+        "share repurchases paid in the latest fiscal year / market cap (same statement currency)",
+        higher_is_better=True,
+    ),
+    MetricDef(
+        "shareholder_yield",
+        "Total shareholder yield",
+        "income",
+        "numeric",
+        "fraction",
+        "(dividends paid + share repurchases paid) in the latest fiscal year / market cap; both lines must be filed",
+        higher_is_better=True,
+    ),
+    MetricDef(
+        "payout_ratio",
+        "Payout ratio (earnings)",
+        "income",
+        "numeric",
+        "fraction",
+        "dividends paid / net income, latest fiscal year (net income > 0)",
+    ),
+    MetricDef(
+        "payout_ratio_fcf",
+        "Payout ratio (free cash flow)",
+        "income",
+        "numeric",
+        "fraction",
+        "dividends paid / (operating cash flow - capital expenditure), latest fiscal year (free cash flow > 0)",
+    ),
+    MetricDef(
+        "dividend_growth_1y",
+        "Dividend growth (1 year)",
+        "income",
+        "numeric",
+        "fraction",
+        "split-adjusted dividends per share with ex-date in the last 12 months / the 12 months before - 1; same currency",
+        period="ttm",
+        higher_is_better=True,
+    ),
+    MetricDef(
+        "dividend_growth_5y",
+        "Dividend growth (5 years, a year)",
+        "income",
+        "numeric",
+        "fraction",
+        "(split-adjusted dividends per share in the last 12 months / the same 12 months five years earlier) ^ (1/5) - 1",
+        period="5y",
+        higher_is_better=True,
+    ),
+    MetricDef(
+        "net_debt_to_ebitda",
+        "Net debt to EBITDA",
+        "financials",
+        "numeric",
+        "multiple",
+        "(debt - cash) / (operating income + depreciation and amortisation), latest fiscal year (EBITDA > 0)",
+        higher_is_better=False,
+    ),
+    MetricDef(
+        "insider_buy_ratio_90d",
+        "Insider buying ratio (90 days)",
+        "signal",
+        "numeric",
+        "fraction",
+        "distinct insiders with open-market buys / distinct insiders with open-market buys or sells, 90 days (Form 4; planned trades excluded)",
+        period="90d",
+        higher_is_better=True,
+    ),
+    MetricDef(
+        "forward_eps_growth",
+        "Forecast EPS growth (next year)",
+        "estimates",
+        "numeric",
+        "fraction",
+        "published consensus EPS for the next fiscal year / latest annual diluted EPS (net income / diluted shares) - 1; trailing EPS > 0, one currency",
+        period="next_fy",
+        requires_access=("fmp", "analyst_estimates"),
+        higher_is_better=True,
+    ),
+)
+
+# Slider ticks and parser aliases per metric (insight I10.2, I10.8).
+_PCT_TICKS = _d("-0.5", "-0.2", "-0.1", "0", "0.02", "0.05", "0.1", "0.2", "0.3", "0.5", "1")
+_YIELD_TICKS = _d("0", "0.01", "0.02", "0.03", "0.04", "0.05", "0.06", "0.08", "0.1", "0.15")
+_MULT_TICKS = _d("0", "5", "8", "10", "12", "15", "20", "25", "30", "40", "60", "100")
+_EXTRA: dict[str, dict[str, object]] = {
+    "market_cap": {
+        "ticks": _d(
+            0,
+            "50000000",
+            "300000000",
+            "2000000000",
+            "10000000000",
+            "50000000000",
+            "200000000000",
+            "1000000000000",
+        ),
+        "aliases": ("market cap", "size", "large cap", "small cap", "mega cap", "micro cap"),
+    },
+    "dividend_yield": {
+        "ticks": _YIELD_TICKS,
+        "aliases": ("dividend yield", "yield", "yielding", "dividend payers", "pays a dividend"),
+    },
+    "return_1y": {
+        "ticks": _PCT_TICKS,
+        "aliases": ("1 year return", "one-year return", "performance this year"),
+    },
+    "return_3y": {"ticks": _PCT_TICKS, "aliases": ("3 year return",)},
+    "return_5y": {"ticks": _PCT_TICKS, "aliases": ("5 year return",)},
+    "volatility_1y": {
+        "ticks": _d("0", "0.1", "0.15", "0.2", "0.25", "0.3", "0.4", "0.6", "1"),
+        "aliases": ("volatility", "low volatility", "risk"),
+    },
+    "revenue_growth": {
+        "ticks": _PCT_TICKS,
+        "aliases": ("revenue growth", "sales growth", "growing revenue"),
+    },
+    "gross_margin": {
+        "ticks": _d("0", "0.1", "0.2", "0.3", "0.4", "0.5", "0.6", "0.7", "0.8"),
+        "aliases": ("gross margin",),
+    },
+    "operating_margin": {"ticks": _PCT_TICKS, "aliases": ("operating margin", "ebit margin")},
+    "net_margin": {
+        "ticks": _PCT_TICKS,
+        "aliases": ("net margin", "profit margin", "profitable", "net profit margin"),
+    },
+    "roic": {
+        "ticks": _PCT_TICKS,
+        "aliases": ("roic", "return on invested capital", "return on capital"),
+    },
+    "net_debt_to_equity": {
+        "ticks": _d("-1", "-0.5", "0", "0.25", "0.5", "1", "1.5", "2", "3"),
+        "aliases": (
+            "net debt to equity",
+            "debt to equity",
+            "debt",
+            "leverage",
+            "low debt",
+            "gearing",
+        ),
+    },
+    "free_cash_flow_conversion": {
+        "ticks": _d("0", "0.25", "0.5", "0.75", "1", "1.25", "1.5"),
+        "aliases": ("cash conversion", "fcf conversion"),
+    },
+    "earnings_yield": {"ticks": _YIELD_TICKS, "aliases": ("earnings yield",)},
+    "pe_ratio": {
+        "ticks": _MULT_TICKS,
+        "aliases": ("p/e", "pe", "pe ratio", "price to earnings", "cheap", "earnings multiple"),
+    },
+    "fcf_yield": {"ticks": _YIELD_TICKS, "aliases": ("free cash flow yield", "fcf yield")},
+    "ev_ebit": {"ticks": _MULT_TICKS, "aliases": ("ev/ebit", "ev to ebit", "enterprise multiple")},
+    "price_to_book": {
+        "ticks": _d("0", "0.5", "1", "1.5", "2", "3", "5", "10", "20"),
+        "aliases": ("p/b", "price to book", "book value"),
+    },
+    "price_to_sales": {
+        "ticks": _d("0", "0.5", "1", "2", "3", "5", "8", "12", "20"),
+        "aliases": ("p/s", "price to sales", "sales multiple"),
+    },
+    "momentum_12_1": {
+        "ticks": _PCT_TICKS,
+        "aliases": ("momentum", "price momentum", "trending up"),
+    },
+    "share_change_1y": {
+        "ticks": _d("-0.1", "-0.05", "-0.02", "0", "0.02", "0.05", "0.1", "0.2"),
+        "aliases": ("dilution", "share dilution", "share count change", "issuing shares"),
+    },
+    "share_change_3y": {
+        "ticks": _d("-0.1", "-0.05", "-0.02", "0", "0.02", "0.05", "0.1"),
+        "aliases": ("3 year dilution",),
+    },
+    "cash_runway_years": {
+        "ticks": _d("0", "0.5", "1", "2", "3", "5", "10"),
+        "aliases": ("cash runway", "runway"),
+    },
+    "insider_buyers_90d": {
+        "ticks": _d("0", "1", "2", "3", "5", "10"),
+        "aliases": ("insider buying", "insiders buying", "insider buyers"),
+    },
+    "forward_pe": {
+        "ticks": _MULT_TICKS,
+        "aliases": ("forward p/e", "forward pe", "forward earnings multiple"),
+    },
+    "buyback_yield": {
+        "ticks": _YIELD_TICKS,
+        "aliases": ("buyback yield", "buybacks", "repurchasing shares", "share buybacks"),
+    },
+    "shareholder_yield": {
+        "ticks": _YIELD_TICKS,
+        "aliases": ("shareholder yield", "total shareholder yield", "capital returned"),
+    },
+    "payout_ratio": {
+        "ticks": _d("0", "0.2", "0.4", "0.5", "0.6", "0.75", "0.9", "1", "1.5"),
+        "aliases": (
+            "payout ratio",
+            "payout",
+            "earnings payout",
+            "covered dividend",
+            "sustainable dividend",
+        ),
+    },
+    "payout_ratio_fcf": {
+        "ticks": _d("0", "0.2", "0.4", "0.5", "0.6", "0.75", "0.9", "1", "1.5"),
+        "aliases": ("cash payout ratio", "fcf payout"),
+    },
+    "dividend_growth_1y": {
+        "ticks": _PCT_TICKS,
+        "aliases": ("dividend growth", "growing dividend", "rising dividend", "dividend raise"),
+    },
+    "dividend_growth_5y": {
+        "ticks": _PCT_TICKS,
+        "aliases": ("5 year dividend growth", "long-term dividend growth"),
+    },
+    "net_debt_to_ebitda": {
+        "ticks": _d("-1", "0", "0.5", "1", "1.5", "2", "3", "4", "6"),
+        "aliases": ("net debt to ebitda", "debt to ebitda", "leverage ratio"),
+    },
+    "insider_buy_ratio_90d": {
+        "ticks": _d("0", "0.25", "0.5", "0.75", "1"),
+        "aliases": ("insider buying ratio", "net insider buying"),
+    },
+    "forward_eps_growth": {
+        "ticks": _PCT_TICKS,
+        "aliases": (
+            "earnings growth",
+            "eps growth",
+            "forecast growth",
+            "expected earnings growth",
+            "positive earnings growth",
+        ),
+    },
+    "years_since_listing": {
+        "ticks": _d("0", "1", "2", "3", "5", "10", "20", "50"),
+        "aliases": ("years listed", "recent ipo", "new listing"),
+    },
+    "avg_daily_turnover": {
+        "ticks": _d("0", "100000", "1000000", "10000000", "100000000", "1000000000"),
+        "aliases": ("liquidity", "trading volume", "turnover"),
+    },
+    "qvm_score": {
+        "ticks": _d("0", "0.2", "0.4", "0.5", "0.6", "0.8", "1"),
+        "aliases": ("quality value momentum", "qvm"),
+    },
+    "checks_risk_flags": {
+        "ticks": _d("0", "1", "2", "3", "5"),
+        "aliases": ("risk flags", "risk checks failed"),
+    },
+    "sector": {"aliases": ("sector",)},
+    "industry": {"aliases": ("industry",)},
+    "country": {"aliases": ("country", "market", "based in", "listed in")},
+}
+for _axis in ("value", "future", "past", "health", "dividend"):
+    _EXTRA[f"checks_{_axis}_score"] = {
+        "ticks": _d(0, 1, 2, 3, 4, 5, 6),
+        "aliases": (
+            f"{_axis} score",
+            f"{_axis} checks",
+            "financially healthy" if _axis == "health" else f"strong {_axis}",
+        ),
+    }
+
+
+def _with_extra(m: MetricDef) -> MetricDef:
+    extra = _EXTRA.get(m.id)
+    if not extra:
+        return m
+    from dataclasses import replace
+
+    return replace(m, **extra)  # type: ignore[arg-type]
+
+
+STOCK_CATALOGUE: dict[str, MetricDef] = {m.id: _with_extra(m) for m in (*_STOCK, *_PARITY)}
 FUND_CATALOGUE: dict[str, MetricDef] = {m.id: m for m in _FUND}
 
 NUMERIC_OPS = ("gte", "lte")

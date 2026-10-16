@@ -564,6 +564,26 @@ async def _finish(pool: asyncpg.Pool, job_id: int, status: str, error: str | Non
     )
 
 
+# Error texts of a run that died because the database went away (a restart, a failover), not
+# because of anything in the job; asyncpg and the socket layer word them like this.
+_DB_OUTAGE_MARKERS = (
+    "connection reset by peer",
+    "connection refused",
+    "terminating connection due to administrator command",
+    "the database system is shutting down",
+    "the database system is starting up",
+    "the database system is in recovery mode",
+    "connection was closed in the middle of operation",
+    "connection is closed",
+)
+
+
+def is_database_outage(error: str | None) -> bool:
+    """Whether a failed job's stored error says the database dropped out from under it."""
+    text = (error or "").lower()
+    return any(marker in text for marker in _DB_OUTAGE_MARKERS)
+
+
 def _error_text(exc: BaseException) -> str:
     # Stored on the job and its step and shown in the UI: never a credential.
     text = redact_text(str(exc) or type(exc).__name__)

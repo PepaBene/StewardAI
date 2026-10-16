@@ -9,6 +9,8 @@ import { formatDate, formatPercent } from "@/lib/format";
 import { useApiResource } from "@/lib/hooks/use-api-resource";
 import { ISSUE_LABEL, SNOOZE_CHOICES, snoozeUntil, weightBar, type Cockpit, type QualityIssue } from "@/lib/journal/journal";
 
+import { InsightCoveragePanel } from "./insight-coverage-panel";
+
 const fetchCockpit = () => getBrowserApiClient().GET("/quality/cockpit");
 
 export function QualityView() {
@@ -197,6 +199,8 @@ function Body({ cockpit, onChanged }: { cockpit: Cockpit; onChanged: () => void 
           </ul>
         </Blueprint>
       </div>
+
+      <InsightCoveragePanel />
     </div>
   );
 }

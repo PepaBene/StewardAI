@@ -3,7 +3,9 @@
 import { BookmarkIcon, PlayIcon, Trash2Icon } from "lucide-react";
 import { useState } from "react";
 
+import { ScoreMark } from "@/components/insight/score-mark";
 import { Button } from "@/components/ui/button";
+import { petalsFromMap } from "@/lib/insight/insight";
 import { Input } from "@/components/ui/input";
 import type { ColumnSet, ScreenSummary } from "@/lib/discover/discover";
 
@@ -56,6 +58,19 @@ export function SavedScreens({
                   {s.name}
                 </button>
                 <span className="num text-xs text-text-muted">v{s.latest_version}</span>
+                {s.mark ? <ScoreMark petals={petalsFromMap(s.mark)} label={`${s.name}, mean of ${s.last_matched ?? 0} matches`} /> : null}
+                {s.new_last_7d !== null && s.new_last_7d !== undefined ? (
+                  <span
+                    className={`num border px-1.5 text-[11px] ${s.new_last_7d > 0 ? "border-accent text-accent-ink" : "border-border text-text-muted"}`}
+                    title={`${s.new_basis ?? ""}${s.new_tickers?.length ? `: ${s.new_tickers.join(", ")}` : ""}`}
+                  >
+                    {s.new_last_7d} new in 7 days
+                  </span>
+                ) : s.last_run_at ? (
+                  <span className="text-[11px] text-text-faint" title={s.new_basis ?? undefined}>
+                    {s.last_matched ?? 0} matches
+                  </span>
+                ) : null}
                 <Button type="button" variant="ghost" size="sm" aria-label={`Run ${s.name}`} onClick={() => onRun(s.id)} disabled={busy}>
                   <PlayIcon aria-hidden="true" />
                 </Button>

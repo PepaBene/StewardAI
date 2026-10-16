@@ -7,6 +7,7 @@ import { AlertMessage } from "@/components/alert-message";
 import { EmptyState } from "@/components/empty-state";
 import { PageHeader } from "@/components/page-header";
 import type { AllocationItem } from "@/components/portfolio/allocation-bars";
+import { ScorecardPanel } from "@/components/insight/scorecard-panel";
 import { AllocationPanel } from "@/components/portfolio/allocation-panel";
 import { CashFlowPanel } from "@/components/portfolio/cash-flow-panel";
 import { ConcentrationCompliance } from "@/components/portfolio/concentration-compliance";
@@ -34,6 +35,7 @@ import { lookThroughRisk } from "@/lib/portfolio/look-through";
 import { formatCompactMoney, formatSignedPct } from "@/lib/portfolio/money";
 import { DEFAULT_HERO_RANGE, HISTORY_DAYS, rangeStart, sliceFrom, trailingRisk, type HeroRangeId } from "@/lib/portfolio/performance";
 import { foreignCurrencyShare, riskAxes } from "@/lib/portfolio/risk-profile";
+import { UpdatesFeedPanel } from "@/components/insight/updates-feed";
 import { cn } from "@/lib/utils";
 
 const fetchOverview = () => getBrowserApiClient().GET("/portfolio/overview");
@@ -246,6 +248,8 @@ function Overview({ data }: { data: PortfolioOverview }) {
         </section>
       </div>
 
+      <ScorecardPanel />
+
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-2 xl:grid-cols-3">
         <AllocationPanel items={allocationItems} currency={baseCcy} fxSource={base.fx_source} />
         <DriftPanel data={data} />
@@ -273,6 +277,8 @@ function Overview({ data }: { data: PortfolioOverview }) {
         <ContributionCard />
         <DriftTable data={data} />
       </div>
+
+      <UpdatesFeedPanel title="What happened to your holdings" limit={12} />
 
       <PortfolioDataContextSection />
 

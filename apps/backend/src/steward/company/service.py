@@ -21,6 +21,7 @@ from steward.analytics.ratios import RatioValue
 from steward.analytics.thresholds import THRESHOLDS
 from steward.analytics.versions import version
 from steward.company.currency import Translator, translate
+from steward.company.multiple_path import MultipleAssumptions, MultipleRequest
 from steward.company.ratios import (
     Market,
     PeerExcluded,
@@ -318,7 +319,7 @@ async def _rank_by_size(
         """select distinct on (ticker) ticker, value from public.financial_statement_fact
            where ticker=any($1::text[]) and value > 0 and unit=$2
              and lower(split_part(concept, ':', 2)) = any($3::text[])
-             and dimensions = '{}'::jsonb and period_end - period_start between 330 and 380
+             and coalesce(dimensions->'members', '[]'::jsonb) = '[]'::jsonb and period_end - period_start between 330 and 380
            order by ticker, period_end desc, known_at desc""",
         candidates,
         company.annual.currency,
@@ -704,11 +705,89 @@ def _saved(r: asyncpg.Record) -> SavedScenario:
 
 async def list_scenarios(pool: asyncpg.Pool, owner_id: Any, ticker: str) -> list[SavedScenario]:
     rows = await pool.fetch(
-        "select * from public.company_valuation_scenario where owner_id=$1 and ticker=$2 order by name, version desc",
+        "select * from public.company_valuation_scenario where owner_id=$1 and ticker=$2 and method='dcf' order by name, version desc",
         owner_id,
         ticker,
     )
     return [_saved(r) for r in rows]
+
+
+class SavedMultiple(BaseModel):
+    """A saved earnings-multiple scenario set (method `multiple_path`)."""
+
+    id: int
+    name: str
+    version: int
+    assumptions: list[MultipleAssumptions]
+    selected: str | None
+    method_version: str
+    input_hash: str | None
+    note: str | None
+    created_at: dt.datetime
+    saved_result: dict[str, Any] | None = None
+
+
+class SaveMultipleIn(BaseModel):
+    name: str = Field(min_length=1, max_length=80)
+    request: MultipleRequest
+    note: str | None = Field(default=None, max_length=500)
+
+
+def _saved_multiple(r: asyncpg.Record) -> SavedMultiple:
+    a = r["assumptions"]
+    a = json.loads(a) if isinstance(a, str) else a
+    stored = r["result"]
+    stored = json.loads(stored) if isinstance(stored, str) else stored
+    return SavedMultiple(
+        saved_result=stored,
+        id=r["id"],
+        name=r["name"],
+        version=r["version"],
+        assumptions=[MultipleAssumptions(**x) for x in a["scenarios"]],
+        selected=a.get("selected"),
+        method_version=r["method_version"],
+        input_hash=r["input_hash"],
+        note=r["note"],
+        created_at=r["created_at"],
+    )
+
+
+async def list_multiple(pool: asyncpg.Pool, owner_id: Any, ticker: str) -> list[SavedMultiple]:
+    rows = await pool.fetch(
+        "select * from public.company_valuation_scenario where owner_id=$1 and ticker=$2 and method='multiple_path' order by name, version desc",
+        owner_id,
+        ticker,
+    )
+    return [_saved_multiple(r) for r in rows]
+
+
+async def save_multiple(
+    pool: asyncpg.Pool,
+    owner_id: Any,
+    ticker: str,
+    body: SaveMultipleIn,
+    hash_: str | None,
+    result: dict[str, Any] | None = None,
+) -> SavedMultiple:
+    payload = json.dumps(
+        {
+            "scenarios": [json.loads(a.model_dump_json()) for a in body.request.scenarios],
+            "selected": body.request.selected,
+        }
+    )
+    r = await _insert_scenario(
+        pool,
+        owner_id,
+        ticker,
+        body.name.strip(),
+        payload,
+        "multiple_path",
+        version("multiple_path"),
+        hash_,
+        body.note,
+        result,
+    )
+    return _saved_multiple(r)
 
 
 class VersionConflict(Exception):
@@ -729,7 +808,33 @@ async def save_scenario(
             "selected": body.request.selected,
         }
     )
-    name = body.name.strip()
+    r = await _insert_scenario(
+        pool,
+        owner_id,
+        ticker,
+        body.name.strip(),
+        payload,
+        "dcf",
+        version("valuation_scenarios"),
+        hash_,
+        body.note,
+        result,
+    )
+    return _saved(r)
+
+
+async def _insert_scenario(
+    pool: asyncpg.Pool,
+    owner_id: Any,
+    ticker: str,
+    name: str,
+    payload: str,
+    method: str,
+    method_version: str,
+    hash_: str | None,
+    note: str | None,
+    result: dict[str, Any] | None,
+) -> asyncpg.Record:
     try:
         async with pool.acquire() as con, con.transaction():
             # One save per owner, ticker and name at a time, so max+1 cannot hand out a number twice.
@@ -744,19 +849,20 @@ async def save_scenario(
                 name,
             )
             r = await con.fetchrow(
-                """insert into public.company_valuation_scenario (owner_id, ticker, name, version, assumptions, method_version, input_hash, note, result)
-                   values ($1,$2,$3,$4,$5::jsonb,$6,$7,$8,$9::jsonb) returning *""",
+                """insert into public.company_valuation_scenario (owner_id, ticker, name, version, assumptions, method_version, input_hash, note, result, method)
+                   values ($1,$2,$3,$4,$5::jsonb,$6,$7,$8,$9::jsonb,$10) returning *""",
                 owner_id,
                 ticker,
                 name,
                 nxt,
                 payload,
-                version("valuation_scenarios"),
+                method_version,
                 hash_,
-                body.note,
+                note,
                 json.dumps(result) if result is not None else None,
+                method,
             )
     except asyncpg.UniqueViolationError as err:
         raise VersionConflict("Another save took this version number; try again.") from err
     assert r is not None
-    return _saved(r)
+    return r

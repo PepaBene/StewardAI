@@ -1122,6 +1122,18 @@ _add(
     _ev_ratio(lambda p: _num(p, "revenue"), "revenue"),
 )
 _add(
+    "ps",
+    "P/S",
+    "valuation",
+    "multiple",
+    "market cap / revenue",
+    PRICE,
+    "n/m when revenue is not positive",
+    None,
+    ("revenue",),
+    lambda p: _ratio(p.market_cap, _num(p, "revenue"), "market cap or revenue", den_name="revenue"),
+)
+_add(
     "pb",
     "P/B",
     "valuation",

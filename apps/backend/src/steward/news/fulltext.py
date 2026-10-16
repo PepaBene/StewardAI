@@ -28,6 +28,7 @@ from dataclasses import dataclass
 from typing import Any
 
 import asyncpg
+import httpx
 
 from steward.config.news_sources import FetchPolicy, NewsSourcesConfig
 from steward.documents.text import html_to_text
@@ -234,6 +235,11 @@ async def acquire_fulltext(
         except IrError as exc:
             # Refused, blocked, robots-disallowed: recorded, never worked around.
             note = str(exc)[:300]
+            continue
+        except httpx.HTTPError as exc:
+            # A slow or dropped page is this article's failure, not the job's: the next rung
+            # (or the next run) gets its turn.
+            note = f"{type(exc).__name__}: {exc}"[:300]
             continue
         if result is None:
             continue

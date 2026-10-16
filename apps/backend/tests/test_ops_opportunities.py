@@ -24,6 +24,17 @@ def test_the_notice_names_the_stocks() -> None:
     assert op.describe("Q", ["A"], {})[0] == "1 new stock passes Q"
 
 
+def test_watchlist_names_are_named_first() -> None:
+    title, detail = op.describe("Quality", ["A", "W"], {"W": "Watched Co"}, {"W"})
+    assert title == "2 new stocks pass Quality"
+    assert detail.startswith("Newly matching your saved screen: Watched Co (watchlist), A")
+    assert (
+        op.describe("Q", ["W"], {"W": "Watched Co"}, {"W"})[0]
+        == "Watched Co from your watchlist now passes Q"
+    )
+    assert op.describe("Q", ["W", "V"], {}, {"W", "V"})[0] == "2 watchlist stocks now pass Q"
+
+
 @pytest.mark.db
 async def test_a_stock_that_newly_matches_is_announced_once(
     backend_pool: asyncpg.Pool, migrated_db: MigratedDatabase

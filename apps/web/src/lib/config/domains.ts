@@ -17,6 +17,9 @@ export const CONFIG_DOMAINS: Record<ConfigDomainSlug, { label: string; editor: s
   "research-profiles": { label: "Research profiles", editor: "/config/research-profiles" },
   budget: { label: "Budget", editor: "/config/budget" },
   prompts: { label: "Prompts", editor: "/config/prompts" },
+  checks: { label: "Checks", editor: "/config/checks" },
+  "holdings-views": { label: "Holdings views", editor: "/holdings", note: "Chosen with the preset buttons above the holdings table." },
+  "screen-templates": { label: "Starter screens", editor: "/discover", note: "Added and removed under Starter screens on Discover." },
   performance: { label: "Performance", editor: "/performance/ledger", note: "Edited on the Performance pages." },
 };
 

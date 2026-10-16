@@ -12,6 +12,8 @@ import { formatFigure, toNumber, type CapitalAllocation, type Estimates, type Go
 import { formatDate } from "@/lib/format";
 import { useApiResource } from "@/lib/hooks/use-api-resource";
 
+import { OwnershipMixPanel, PayTenurePanel } from "./insight-panels";
+
 const fig = (v: number | string | null | undefined) => formatFigure(v, "money");
 const pct = (v: number | string | null | undefined) => formatFigure(v, "fraction");
 
@@ -376,7 +378,9 @@ export function GovernanceView({ ticker }: { ticker: string }) {
           </>
         )}
       </ResourceGate>
+      <PayTenurePanel ticker={ticker} />
       <InsiderTradesSection ticker={ticker} />
+      <OwnershipMixPanel ticker={ticker} />
       <OwnershipSection resource={ownership} />
     </div>
   );

@@ -1,7 +1,9 @@
 "use client";
 
-import { PlusIcon, XIcon } from "lucide-react";
+import { PlusIcon, SlidersHorizontalIcon, XIcon } from "lucide-react";
+import { useState } from "react";
 
+import { SliderRange } from "@/components/insight/slider-range";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -14,7 +16,13 @@ import {
   type FilterDraft,
   type MetricInfo,
 } from "@/lib/discover/discover";
+import { rangeOf, setRange, typedTicks } from "@/lib/discover/screen-draft";
 import { cn } from "@/lib/utils";
+
+/** The slider sits under the first condition on a metric; the second end lives in a sibling row. */
+function firstOfMetric(drafts: readonly FilterDraft[], d: FilterDraft): boolean {
+  return drafts.find((x) => x.metric === d.metric)?.id === d.id;
+}
 
 export const SELECT =
   "h-9 border border-border bg-surface-raised px-2 text-sm text-text focus-visible:border-focus focus-visible:ring-2 focus-visible:ring-focus/30 focus-visible:outline-none";
@@ -50,6 +58,13 @@ export function FilterBuilder({
   nextId: () => number;
 }) {
   const groups = groupMetrics(catalogue);
+  const [sliderFor, setSliderFor] = useState<ReadonlySet<string>>(() => new Set());
+  const toggleSlider = (metric: string) =>
+    setSliderFor((cur) => {
+      const next = new Set(cur);
+      if (!next.delete(metric)) next.add(metric);
+      return next;
+    });
   const update = (id: number, patch: Partial<FilterDraft>) => onChange(drafts.map((d) => (d.id === id ? { ...d, ...patch } : d)));
 
   return (
@@ -106,10 +121,33 @@ export function FilterBuilder({
                   />
                   {!categorical && info ? <span className="text-sm text-text-muted">{unitSuffix(info.unit)}</span> : null}
                 </span>
+                {!categorical && typedTicks(info) && firstOfMetric(drafts, d) ? (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    aria-pressed={sliderFor.has(d.metric)}
+                    onClick={() => toggleSlider(d.metric)}
+                    title="Set a range with a slider"
+                  >
+                    <SlidersHorizontalIcon aria-hidden="true" />
+                    Range
+                  </Button>
+                ) : null}
                 <Button type="button" variant="ghost" size="sm" aria-label={`Remove filter ${i + 1}`} onClick={() => onChange(drafts.filter((x) => x.id !== d.id))}>
                   <XIcon aria-hidden="true" />
                 </Button>
               </div>
+              {info && !categorical && typedTicks(info) && sliderFor.has(d.metric) && firstOfMetric(drafts, d) ? (
+                <SliderRange
+                  ticks={typedTicks(info)!}
+                  value={rangeOf(drafts, d.metric)}
+                  onChange={(r) => onChange(setRange(drafts, d, r, nextId))}
+                  format={(v) => `${Number(v.toPrecision(3))}${unitSuffix(info.unit) === "%" ? "%" : unitSuffix(info.unit) ? ` ${unitSuffix(info.unit)}` : ""}`}
+                  label={`${info.label} range`}
+                  className="max-w-xl pl-14"
+                />
+              ) : null}
               {info ? (
                 <div className="space-y-0.5 pl-14">
                   {info.enabled ? (

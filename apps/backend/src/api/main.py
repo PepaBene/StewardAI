@@ -19,6 +19,7 @@ from api.auth import Owner
 from api.autopilot_routes import router as autopilot_router
 from api.budget_routes import router as budget_router
 from api.chat_routes import router as chat_router
+from api.check_routes import router as check_router
 from api.company_routes import router as company_router
 from api.config_history_routes import router as config_history_router
 from api.control_stake_routes import router as control_stake_router
@@ -32,6 +33,7 @@ from api.disclosure_jobs_routes import router as disclosure_jobs_router
 from api.disclosure_replay_routes import router as disclosure_replay_router
 from api.disclosure_routes import router as disclosure_router
 from api.discover_routes import router as discover_router
+from api.dividend_routes import router as dividend_router
 from api.escalation_routes import router as escalation_router
 from api.free_sources_routes import router as free_sources_router
 from api.fund_research_routes import router as fund_research_router
@@ -39,10 +41,13 @@ from api.fund_routes import router as fund_router
 from api.fundamentals_routes import router as fundamentals_router
 from api.gate_routes import router as gate_router
 from api.graph_routes import router as graph_router
+from api.holding_insight_routes import router as holding_insight_router
 from api.inbox_routes import router as inbox_router
 from api.insider_activity_routes import router as insider_activity_router
 from api.insider_routes import router as insider_router
+from api.insight_company_routes import router as insight_company_router
 from api.insight_routes import router as insight_router
+from api.insight_value_routes import router as insight_value_router
 from api.investor_routes import router as investor_router
 from api.journal_routes import router as journal_router
 from api.lookthrough_routes import router as lookthrough_router
@@ -60,8 +65,10 @@ from api.research_context_routes import router as research_context_router
 from api.research_routes import router as research_router
 from api.routes import router
 from api.screen_routes import router as screen_router
+from api.screen_template_routes import router as screen_template_router
 from api.source_routes import router as source_router
 from api.thesis_routes import router as thesis_router
+from api.updates_routes import router as updates_router
 from api.valuation_routes import router as valuation_router
 from api.verify_routes import router as verify_router
 from api.watchlist_routes import router as watchlist_router
@@ -280,6 +287,13 @@ def create_app() -> FastAPI:
     app.include_router(watchlist_router)
     app.include_router(screen_router)
     app.include_router(discover_router)
+    app.include_router(check_router)
+    app.include_router(dividend_router)
+    app.include_router(insight_value_router)
+    app.include_router(holding_insight_router)
+    app.include_router(screen_template_router)
+    app.include_router(updates_router)
+    app.include_router(insight_company_router)
     app.include_router(company_router)
     app.include_router(fund_research_router)
     app.include_router(insider_router)

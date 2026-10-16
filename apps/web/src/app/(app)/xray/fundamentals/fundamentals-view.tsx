@@ -4,6 +4,7 @@ import { useSearchParams } from "next/navigation";
 import { useMemo } from "react";
 
 import { ResourceGate } from "@/components/company/primitives";
+import { StripsPanel } from "@/components/insight/strips-panel";
 import { Blueprint, PanelHeading } from "@/components/ui/blueprint";
 import { getBrowserApiClient } from "@/lib/api/client";
 import { formatPercent } from "@/lib/format";
@@ -21,9 +22,13 @@ export function FundamentalsView() {
   );
   const { state } = useApiResource(fetcher);
   return (
-    <ResourceGate state={state} label="fundamentals">
-      {(data) => <Fundamentals data={data} />}
-    </ResourceGate>
+    <div className="flex flex-col gap-5">
+      <ResourceGate state={state} label="fundamentals">
+        {(data) => <Fundamentals data={data} />}
+      </ResourceGate>
+      {/* Strips read today's checks and fair values; they ignore the as-of date. */}
+      {asOf ? null : <StripsPanel />}
+    </div>
   );
 }
 

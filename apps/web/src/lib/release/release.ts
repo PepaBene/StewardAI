@@ -51,6 +51,12 @@ export const FEATURE_CHOICES: readonly { id: string; label: string }[] = [
   { id: "estimates", label: "Analyst estimates and revisions" },
   { id: "ownership", label: "Ownership and insiders" },
   { id: "patents", label: "Patent research" },
+  { id: "dividend_income", label: "Forward dividend income" },
+  { id: "checks", label: "Company checks and portfolio scorecard" },
+  { id: "fair_value", label: "Fair-value history and multiple path" },
+  { id: "consensus", label: "Analyst price-target consensus" },
+  { id: "risk_score", label: "Risk score and diversification" },
+  { id: "updates", label: "Typed updates feed and company insight blocks" },
 ];
 
 export type Defect = components["schemas"]["Defect"];

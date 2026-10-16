@@ -135,10 +135,28 @@ def new_matches(now: list[str], before: list[str] | None, held: set[str]) -> lis
     return [t for t in now if t not in seen and t not in held]
 
 
-def describe(screen: str, found: list[str], names: dict[str, str]) -> tuple[str, str]:
+def describe(
+    screen: str, found: list[str], names: dict[str, str], watched: set[str] | None = None
+) -> tuple[str, str]:
+    """The "Needs you" line. Watchlist names that start to pass are named first and said to be
+    on the watchlist (insight I10.6): those are the ones the owner was already waiting on."""
+    watched = watched or set()
+    watch = [t for t in found if t in watched]
+    rest = [t for t in found if t not in watched]
     n = len(found)
-    title = f"{n} new stock{'s' if n != 1 else ''} pass{'' if n != 1 else 'es'} {screen}"
-    named = ", ".join(names.get(t, t) for t in found[:MAX_NAMED])
+    if watch and not rest:
+        lead = names.get(watch[0], watch[0])
+        title = (
+            f"{lead} from your watchlist now passes {screen}"
+            if len(watch) == 1
+            else f"{len(watch)} watchlist stocks now pass {screen}"
+        )
+    else:
+        title = f"{n} new stock{'s' if n != 1 else ''} pass{'' if n != 1 else 'es'} {screen}"
+    ordered = watch + rest
+    named = ", ".join(
+        f"{names.get(t, t)}{' (watchlist)' if t in watched else ''}" for t in ordered[:MAX_NAMED]
+    )
     more = f" and {n - MAX_NAMED} more" if n > MAX_NAMED else ""
     return title, f"Newly matching your saved screen: {named}{more}. Open Discover to see why."
 
@@ -159,6 +177,9 @@ async def check_opportunities(
         MAX_SCREENS,
     )
     held = await holding_tickers(pool)
+    from steward.discovery.read import watchlist_tickers
+
+    watched = set(await watchlist_tickers(pool, owner_id))
     announced: dict[str, list[str]] = {}
     failed: dict[str, str] = {}
     for s in screens:
@@ -175,7 +196,7 @@ async def check_opportunities(
         before = (json.loads(raw) if isinstance(raw, str) else raw or {}).get("tickers")
         found = new_matches(matched, before, held)
         if found:
-            title, detail = describe(s["name"], found, names)
+            title, detail = describe(s["name"], found, names, watched)
             if backtest is not None:
                 past = await backtest_once_a_month(
                     pool,
@@ -193,7 +214,7 @@ async def check_opportunities(
                 title=title,
                 detail=detail,
                 href="/discover",
-                weight=0.3,
+                weight=0.5 if watched & set(found) else 0.3,
                 status="needs_owner",
             )
             announced[s["name"]] = found

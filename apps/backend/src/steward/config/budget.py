@@ -94,6 +94,14 @@ BudgetJobType = Literal[
     "disclosure_alerts",
     "thesis",
     "portfolio_review",
+    "dividend_forecast",
+    "yahoo_dividends",
+    "consensus_snapshot",
+    "insight_access_probe",
+    "fair_value_snapshot",
+    "checks_refresh",
+    "screen_parse",
+    "earnings_summary",
 ]
 
 AtCap = Literal["alert_only", "pause_noncritical", "downgrade_noncritical"]

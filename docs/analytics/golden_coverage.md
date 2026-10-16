@@ -37,6 +37,19 @@ Format of a row: `| family | scope | file::test |`, one test per row. Add a row 
 | rebalance | portfolio | tests/test_decision.py::test_a_sale_consumes_the_oldest_lots_first_and_flags_a_lot_near_the_time_test |
 | pre-trade checks | portfolio | tests/test_decision.py::test_buy_is_tested_against_the_return_hurdle_start_size_and_the_post_trade_cap |
 | pre-trade checks | portfolio | tests/test_decision.py::test_switch_compares_the_gap_with_tax_costs_and_margin_and_sizes_for_equal_risk |
+| dividend income | stock | tests/test_dividend_forecast.py::test_quarterly_payer_projects_four_payments_at_the_last_amount |
+| dividend income | stock | tests/test_dividend_forecast.py::test_after_a_cut_the_estimate_uses_the_cut_amount |
+| dividend income | stock | tests/test_dividend_forecast.py::test_dividend_growth_cagr |
+| company checks: value | stock | tests/test_checks.py::test_fail_states_and_sentences_use_the_figures |
+| company checks: future | stock | tests/test_checks.py::test_unknown_when_estimates_missing |
+| company checks: past | stock | tests/test_insight_golden.py::test_past_axis_scores_passes_over_applicable_checks_only |
+| company checks: health | stock | tests/test_checks.py::test_debt_to_equity_passes_when_falling |
+| company checks: dividend | stock | tests/test_checks.py::test_dividend_cut_and_payout_failures |
+| company checks: risk | stock | tests/test_checks.py::test_risk_failures |
+| portfolio scorecard | portfolio | tests/test_insight_golden.py::test_scorecard_axis_is_the_value_weighted_mean_over_scored_holdings |
+| multiple path | stock | tests/test_multiple_path.py::test_golden_hand_calculation |
+| risk score | portfolio | tests/test_risk_score.py::test_golden_portfolio |
+| realised and unrealised split | portfolio | tests/test_insight_returns.py::test_price_effect_splits_into_realised_and_unrealised |
 
 ## What is not pinned by a hand-worked example
 

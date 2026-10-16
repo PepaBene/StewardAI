@@ -8,7 +8,7 @@ from collections.abc import Iterable
 
 from steward.export import to_csv
 from steward.performance.ledger import LedgerEntry
-from steward.performance.reports import AttributionResponse, LotsResponse
+from steward.performance.reports import AttributionResponse, LotsResponse, PositionOut
 
 
 def ledger_csv(entries: Iterable[LedgerEntry]) -> str:
@@ -50,10 +50,25 @@ def realized_csv(report: LotsResponse) -> str:
 
 def attribution_csv(report: AttributionResponse) -> str:
     return to_csv(
-        ["ticker", "name", "price", "fx", "income", "fees", "total", "pct_of_start", "attributed"],
+        ["ticker", "name", "price", "price_realised", "price_unrealised", "fx", "income", "fees",
+         "total", "pct_of_start", "attributed"],
         (
-            [x.ticker, x.name, x.price, x.fx, x.income, x.fees, x.total, x.pct_of_start,
-             x.attributed]
+            [x.ticker, x.name, x.price, x.realised, x.price - x.realised, x.fx, x.income, x.fees,
+             x.total, x.pct_of_start, x.attributed]
             for x in report.holdings
+        ),
+    )  # fmt: skip
+
+
+def positions_csv(positions: Iterable[PositionOut]) -> str:
+    return to_csv(
+        ["ticker", "name", "status", "first_trade", "last_trade", "quantity", "invested",
+         "proceeds", "dividends", "fees", "realised_gain", "value", "unrealised_gain",
+         "total_gain", "annualised_return", "annualised_reason", "days_held"],
+        (
+            [x.ticker, x.name, x.status, x.first_trade, x.last_trade, x.quantity, x.invested,
+             x.proceeds, x.dividends, x.fees, x.realised_gain, x.value, x.unrealised_gain,
+             x.total_gain, x.annualised_return, x.annualised_reason, x.days_held]
+            for x in positions
         ),
     )  # fmt: skip

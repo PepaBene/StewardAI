@@ -241,3 +241,28 @@
     font-size: 46px;
   }
 }
+
+/* Dual-handle range (SliderRange, F30): two stacked native inputs; only the thumbs take input. */
+.range-thumb::-webkit-slider-thumb {
+  pointer-events: auto;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 9999px;
+  border: 2px solid var(--color-surface);
+  background: var(--color-accent);
+  cursor: pointer;
+}
+.range-thumb::-moz-range-thumb {
+  pointer-events: auto;
+  width: 14px;
+  height: 14px;
+  border-radius: 9999px;
+  border: 2px solid var(--color-surface);
+  background: var(--color-accent);
+  cursor: pointer;
+}
+.range-thumb:focus-visible::-webkit-slider-thumb {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
