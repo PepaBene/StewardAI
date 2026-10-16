@@ -46,16 +46,31 @@ def overdue_hours(
     return hours if hours > watched.cadence_hours * GRACE else None
 
 
+CADENCE_HORIZON = dt.timedelta(days=35)
+CADENCE_MAX_FIRES = 1000
+
+
 def cadence_hours(schedule: JobSchedule, now: dt.datetime) -> int | None:
-    """Hours between two runs of a scheduled job, rounded up; None when it cannot be told."""
+    """The widest gap between two runs of a scheduled job over the next five weeks, in hours
+    rounded up; None when it cannot be told. Not just the next gap: a job on the 1st-3rd of
+    the month or on weekdays runs a day apart, then waits weeks or a weekend."""
     trigger = schedule.trigger()
     first = trigger.get_next_fire_time(None, now)
     if first is None:
         return None
-    second = trigger.get_next_fire_time(first, first)
-    if second is None:
+    prev, widest = first, 0.0
+    for _ in range(CADENCE_MAX_FIRES):
+        nxt = trigger.get_next_fire_time(prev, prev)
+        if nxt is None:
+            break
+        # Wall-clock time in the schedule's zone: a daylight-saving night is not a longer gap.
+        widest = max(widest, (nxt.replace(tzinfo=None) - prev.replace(tzinfo=None)).total_seconds())
+        if nxt - first > CADENCE_HORIZON:
+            break
+        prev = nxt
+    if widest == 0:
         return None
-    return int(max(1, math.ceil((second - first).total_seconds() / 3600)))
+    return int(max(1, math.ceil(widest / 3600)))
 
 
 async def check_all(pool: asyncpg.Pool, jobs: JobsConfig, now: dt.datetime) -> dict[str, float]:

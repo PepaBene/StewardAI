@@ -91,6 +91,13 @@ def test_a_kind_with_neither_a_check_nor_a_waiver_is_refused() -> None:
 def test_job_cadence_is_read_from_its_schedule() -> None:
     assert liveness.cadence_hours(JobSchedule(cron="0 */6 * * *"), NOW) == 6
     assert liveness.cadence_hours(JobSchedule(cron="30 22 * * *"), NOW) == 24
+    # The next gap is a day; the widest is the wait for next month (or the weekend).
+    monthly = liveness.cadence_hours(JobSchedule(cron="0 7 1-3 * *"), NOW)
+    assert monthly is not None and monthly >= 27 * 24
+    assert liveness.cadence_hours(JobSchedule(cron="0 8 * * mon-fri"), NOW) == 72
+    # A daylight-saving night (Prague, 25 October 2026) is not a longer gap.
+    autumn = dt.datetime(2026, 10, 20, tzinfo=dt.UTC)
+    assert liveness.cadence_hours(JobSchedule(cron="30 22 * * *"), autumn) == 24
 
 
 def test_changed_subjects_name_the_items_that_differ() -> None:
