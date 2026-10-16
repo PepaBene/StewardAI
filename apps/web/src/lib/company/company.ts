@@ -165,3 +165,32 @@ export function sortScenarios<T extends { name: string }>(items: readonly T[]): 
 
 /** The statement line keys a reader wants first on the financials page. */
 export const HEADLINE_KEYS = new Set(["revenue", "gross_profit", "operating_income", "net_income", "total_assets", "total_liabilities", "cash_from_operations", "free_cash_flow"]);
+
+export type HeadlineSeries = {
+  key: string;
+  label: string;
+  points: { label: string; value: number | null }[];
+  /** The latest value over the latest revenue, when both are known (null for revenue itself). */
+  margin: number | null;
+};
+
+/**
+ * The statement lines worth seeing as bars, one series per line across the view's columns, in
+ * the order asked. A line the view lacks is left out; a missing cell stays null, never zero.
+ */
+export function headlineSeries(view: Pick<StatementsView, "columns" | "statements">, keys: readonly string[]): HeadlineSeries[] {
+  const lines = new Map(view.statements.flatMap((s) => s.lines).map((l) => [l.key, l]));
+  const series = (key: string) => {
+    const line = lines.get(key);
+    return line ? view.columns.map((c) => ({ label: c.label, value: toNumber(line.cells?.[c.id]?.value ?? null) })) : null;
+  };
+  const latestRevenue = series("revenue")?.at(-1)?.value ?? null;
+  return keys.flatMap((key) => {
+    const line = lines.get(key);
+    const points = series(key);
+    if (!line || !points || points.every((p) => p.value === null)) return [];
+    const last = points.at(-1)?.value ?? null;
+    const margin = key !== "revenue" && last !== null && latestRevenue ? last / latestRevenue : null;
+    return [{ key, label: line.label, points, margin }];
+  });
+}

@@ -39,6 +39,9 @@ export function unrealisedVerdict(pctOnCost: number | null): VerdictResult {
 export function incomeChangeVerdict(change: number | null): VerdictResult {
   if (change === null) return { tone: "unknown", text: "No full year of received dividends to compare with yet." };
   if (Math.abs(change) < 0.005) return { tone: "neutral", text: "About the same as the last 12 months." };
+  // Four times last year's income is new money at work, not dividend growth: say so instead
+  // of printing a four-digit percentage.
+  if (change > 3) return { tone: "neutral", text: "Mostly from positions held under a year, so the last 12 months are no fair comparison." };
   return change > 0
     ? { tone: "good", text: `${plainPct(change, 1)} more than the last 12 months.` }
     : { tone: "caution", text: `${plainPct(change, 1)} less than the last 12 months.` };

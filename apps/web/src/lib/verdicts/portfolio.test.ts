@@ -30,6 +30,7 @@ describe("portfolio verdicts", () => {
     expect(incomeChangeVerdict(0.051).text).toBe("5.1% more than the last 12 months.");
     expect(incomeChangeVerdict(-0.1).tone).toBe("caution");
     expect(incomeChangeVerdict(null).tone).toBe("unknown");
+    expect(incomeChangeVerdict(14.526)).toEqual({ tone: "neutral", text: "Mostly from positions held under a year, so the last 12 months are no fair comparison." });
   });
 
   it("scores coverage by share of holdings", () => {

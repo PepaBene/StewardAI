@@ -6,6 +6,7 @@ import {
   formatRatio,
   fractionToPercent,
   gridMatrix,
+  headlineSeries,
   percentileLabel,
   percentToFraction,
   rangePosition,
@@ -13,6 +14,36 @@ import {
   splitReason,
   toNumber,
 } from "./company";
+
+describe("headlineSeries", () => {
+  const cell = (value: number | null) => ({ value, unit: "money" }) as never;
+  const view = {
+    columns: [
+      { id: "a:2024", label: "FY 2024" },
+      { id: "a:2025", label: "FY 2025" },
+    ],
+    statements: [
+      {
+        lines: [
+          { key: "revenue", label: "Revenue", cells: { "a:2024": cell(100), "a:2025": cell(120) } },
+          { key: "net_income", label: "Net income", cells: { "a:2025": cell(30) } },
+          { key: "capex", label: "Capital expenditure", cells: { "a:2024": cell(null), "a:2025": cell(null) } },
+        ],
+      },
+    ],
+  } as never;
+
+  it("keeps the asked order, leaves gaps null and gives the latest margin", () => {
+    const out = headlineSeries(view, ["net_income", "revenue", "capex", "free_cash_flow"]);
+    expect(out.map((s) => s.key)).toEqual(["net_income", "revenue"]);
+    expect(out[0].points).toEqual([
+      { label: "FY 2024", value: null },
+      { label: "FY 2025", value: 30 },
+    ]);
+    expect(out[0].margin).toBeCloseTo(0.25);
+    expect(out[1].margin).toBeNull();
+  });
+});
 
 describe("percentileLabel", () => {
   it("uses the right ordinal suffix", () => {

@@ -4,12 +4,14 @@ import { DownloadIcon, XIcon } from "lucide-react";
 import { useCallback, useState } from "react";
 
 import { AlertMessage } from "@/components/alert-message";
+import { BarChart } from "@/components/charts/bar-chart";
 import { Absent, ResourceGate, SourceLink } from "@/components/company/primitives";
 import { Blueprint, PanelHeading } from "@/components/ui/blueprint";
 import { getBrowserApiClient } from "@/lib/api/client";
 import {
   formatFigure,
   HEADLINE_KEYS,
+  headlineSeries,
   UNIT_LABEL,
   type StatementCell,
   type StatementColumn,
@@ -292,6 +294,8 @@ export function FinancialsView({ ticker }: { ticker: string }) {
 
       <ResourceGate state={state} label="statements">
         {(view: StatementsView) => (
+          <>
+          {q.transform === "none" && !q.per_share ? <HeadlineCharts view={view} units={Number(q.units)} /> : null}
           <div className={cn("grid items-start gap-5", picked && "xl:grid-cols-[1fr_20rem]")}>
             <Blueprint aria-labelledby="statements-heading" className="space-y-4 px-[22px] py-5">
               <PanelHeading
@@ -337,8 +341,53 @@ export function FinancialsView({ ticker }: { ticker: string }) {
               </Blueprint>
             ) : null}
           </div>
+          </>
         )}
       </ResourceGate>
     </div>
+  );
+}
+
+const CHART_KEYS = ["revenue", "operating_income", "net_income", "free_cash_flow"] as const;
+
+/** "FY Dec 2025" -> "FY25", "TTM Jun 2026" -> "TTM", "Q2 2026" -> "Q2 26": room under a bar. */
+function shortColumn(label: string): string {
+  if (label.startsWith("TTM")) return "TTM";
+  const year = /(\d{2})(\d{2})$/.exec(label)?.[2];
+  if (!year) return label;
+  return label.startsWith("FY") ? `FY${year}` : `${label.split(" ")[0]} ${year}`;
+}
+
+/** Revenue, operating and net income and free cash flow as bars per period, above the table. */
+function HeadlineCharts({ view, units }: { view: StatementsView; units: number }) {
+  const series = headlineSeries(view, CHART_KEYS);
+  if (series.length === 0) return null;
+  const largest = Math.max(...series.flatMap((s) => s.points.map((p) => Math.abs((p.value ?? 0) * units))));
+  const [divisor, scale] = largest >= 1e9 ? [1e9, "bn"] : [1e6, "m"];
+  const currency = view.currency ?? "";
+  return (
+    <Blueprint aria-labelledby="headline-charts-heading" className="space-y-4 px-[22px] py-5">
+      <PanelHeading
+        kicker={`${currency} ${scale}, ${view.frequency === "annual" ? "fiscal years and the trailing twelve months" : "quarters"}`}
+        title={<span id="headline-charts-heading">Revenue and profit over time</span>}
+      />
+      <div className="grid gap-x-6 gap-y-5 sm:grid-cols-2 xl:grid-cols-4">
+        {series.map((s) => (
+          <figure key={s.key} className="min-w-0 space-y-1">
+            <figcaption className="flex items-baseline justify-between gap-2 text-sm">
+              <span className="font-medium">{s.label}</span>
+              {s.margin !== null ? <span className="num text-xs text-text-muted">{`${(s.margin * 100).toFixed(1)}% of revenue`}</span> : null}
+            </figcaption>
+            <BarChart
+              data={s.points.map((p) => ({ label: shortColumn(p.label), value: p.value === null ? null : (p.value * units) / divisor }))}
+              highlightLast
+              height={130}
+              formatValue={(v) => v.toFixed(Math.abs(v) >= 100 ? 0 : 1)}
+              label={`${s.label} by period, ${currency} ${scale}`}
+            />
+          </figure>
+        ))}
+      </div>
+    </Blueprint>
   );
 }
