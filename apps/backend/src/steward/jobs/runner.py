@@ -555,6 +555,13 @@ async def _fail_open(pool: asyncpg.Pool, job_id: int, reason: str) -> bool:
 
 
 async def _finish(pool: asyncpg.Pool, job_id: int, status: str, error: str | None) -> None:
+    # A step still open when its job ends never finishes: it would show as running forever.
+    await pool.execute(
+        "update public.job_step set status = 'failed', finished_at = clock_timestamp(),"
+        " error = 'the job ended while this step was open' where job_id = $1"
+        " and status = 'running'",
+        job_id,
+    )
     await pool.execute(
         "update public.job set status = $2, error = $3, finished_at = clock_timestamp()"
         " where id = $1",
