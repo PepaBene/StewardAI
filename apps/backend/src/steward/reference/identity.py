@@ -78,6 +78,7 @@ class HoldingResult:
     share_class_figi: str | None = None
     home_mic: str | None = None
     issuer_lei: str | None = None
+    rejected_lei: str | None = None  # a venue LEI FIRDS gave as the issuer's, cleared
     issuer_id: int | None = None
     price_symbol: str | None = None
     listings: int = 0
@@ -493,6 +494,7 @@ async def _gleif(
                 f"FIRDS names {entity.legal_name} ({lei}) as the issuer of {isin}; neither its"
                 " country nor its name fits, so it is taken for the venue's own LEI"
             )
+            result.rejected_lei = entity.lei
             entity = by_isin
             if entity is None:
                 result.problems.append("no issuer LEI (FIRDS gave the venue's, GLEIF has none)")
@@ -840,7 +842,8 @@ async def _record(
     await pool.execute(
         "update public.instrument set share_class_figi = coalesce($2, share_class_figi),"
         " security_type = coalesce($3, security_type), home_mic = coalesce($4, home_mic),"
-        " home_country = coalesce($5, home_country), issuer_lei = coalesce($6, issuer_lei),"
+        " home_country = coalesce($5, home_country),"
+        " issuer_lei = case when issuer_lei = $9 then $6 else coalesce($6, issuer_lei) end,"
         " price_symbol = coalesce($7, price_symbol),"
         " identity_resolved_at = case when $8::text is null then now()"
         "   else identity_resolved_at end,"
@@ -853,6 +856,7 @@ async def _record(
         result.issuer_lei,
         result.price_symbol,
         "; ".join(result.problems) or None,
+        result.rejected_lei,
     )
 
 
