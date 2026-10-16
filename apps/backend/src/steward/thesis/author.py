@@ -54,10 +54,13 @@ class DraftKPI(BaseModel):
     description: str = Field(max_length=300)
 
 
+_PER_SHARE = " A value per share in the position's currency, near the current price, not a return."
+
+
 class DraftScenarios(BaseModel):
-    bear: float = Field(gt=0)
-    base: float = Field(gt=0)
-    bull: float = Field(gt=0)
+    bear: float = Field(gt=0, description="The lowest of the three values." + _PER_SHARE)
+    base: float = Field(gt=0, description="Above bear and below bull." + _PER_SHARE)
+    bull: float = Field(gt=0, description="The highest of the three values." + _PER_SHARE)
     p_bear: float = Field(ge=0, le=1)
     p_base: float = Field(ge=0, le=1)
     p_bull: float = Field(ge=0, le=1)

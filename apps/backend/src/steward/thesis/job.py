@@ -41,7 +41,7 @@ logger = logging.getLogger("steward.thesis")
 Mode = Literal["held", "buy"]
 STANCE_TASK = "thesis_stance"
 MAX_OUTPUT_TOKENS = 12000
-AUTHOR_ATTEMPTS = 2
+AUTHOR_ATTEMPTS = 3
 
 
 async def _thesis_settings(ctx: JobContext) -> ThesisSettings:
