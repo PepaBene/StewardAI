@@ -16,7 +16,7 @@ from typing import Any
 import asyncpg
 
 from steward.analytics.contract import Status
-from steward.analytics.returns import DayValue
+from steward.analytics.returns import DayValue, subperiod_growth
 from steward.analytics.versions import version
 from steward.config.jobs import JobsConfig
 from steward.config.store import load_active
@@ -231,8 +231,9 @@ def _cumulative_index(days: list[DayValue]) -> list[tuple[dt.date, Decimal]]:
     index = Decimal(100)
     points = [(days[0].date, index)]
     for before, after in pairwise(days):
-        if before.value > 0:
-            index *= (after.value - after.flow) / before.value
+        growth = subperiod_growth(before.value, after.value, after.flow)
+        if growth is not None:
+            index *= growth
         points.append((after.date, index))
     return points
 
@@ -345,7 +346,9 @@ def _empty_ledger() -> r.LedgerHealth:
 
 
 PERFORMANCE_FORMULA = [
-    "Time-weighted return: chain (value - flow) / previous value over each valuation day, minus 1. "
+    "Time-weighted return: chain 1 + (value - flow - previous value) / (previous value + flow) "
+    "over each valuation day, minus 1: a deposit counts from the start of its day, so the day's "
+    "gain is measured on the money that earned it. "
     "Deposits and withdrawals are the only flows; dividends, fees and trades are inside the return.",
     "Money-weighted return (XIRR): the annual rate that makes your dated deposits and withdrawals, "
     "the opening value and the ending value sum to zero (actual/365). Under a year it is shown "

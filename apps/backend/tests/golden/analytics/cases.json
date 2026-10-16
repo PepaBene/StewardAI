@@ -149,9 +149,9 @@
           "0"
         ]
       ],
-      "expected": "0.03950000",
+      "expected": "0.01592857",
       "naive_end_over_start": "0.9395",
-      "derivation": "1.10 x ((2155-1000)/1100 = 1.05) x (1939.5/2155 = 0.90) = 1.0395; the 1000 deposit is not a return"
+      "derivation": "1.10 x (1 + (2155-1000-1100)/(1100+1000) = 1.02619048) x (1939.5/2155 = 0.90) = 1.01592857; the 1000 deposit is not a return, and the 55 it helped earn is measured on 2100, not 1100 (twr 2.0, start-of-day flows)"
     },
     {
       "name": "no_positive_base",

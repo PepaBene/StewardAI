@@ -5,7 +5,7 @@ METHOD_VERSIONS: dict[str, str] = {
     "price_return": "1.0.0",
     "total_return": "1.0.0",
     "cagr": "1.0.0",
-    "twr": "1.0.0",
+    "twr": "2.0.0",  # 2.0: flows at the start of their day (in the base), not at the close
     "xirr": "1.0.0",
     "attribution": "1.0.0",
     "look_through": "1.0.0",

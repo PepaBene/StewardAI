@@ -182,19 +182,32 @@ class DayValue:
     flow: Decimal = ZERO
 
 
+def subperiod_growth(opening: Decimal, closing: Decimal, flow: Decimal) -> Decimal | None:
+    """`1 + (V_1 - F - V_0) / (V_0 + F)`: a subperiod's growth with its flow at the start, so the
+    money that arrived is part of the base its gain is measured on. None without a positive
+    opening value or base. Measured against V_0 alone, the day CZK 10,000 landed in a CZK 109
+    account read as +46% (the CZK 50 the new money made, over CZK 109)."""
+    base = opening + flow
+    if opening <= 0 or base <= 0:
+        return None
+    return ONE + (closing - flow - opening) / base
+
+
 def twr(
     days: Sequence[DayValue],
     *,
     material_missing_weight: Decimal = ZERO,
     max_missing_weight: Decimal = ZERO,
 ) -> AnalyticsResult:
-    """Chain `r_i = (V_i - F_i) / V_{i-1} - 1` over daily subperiods: product(1 + r_i) - 1.
+    """Chain `r_i = (V_i - F_i - V_{i-1}) / (V_{i-1} + F_i)` over daily subperiods:
+    product(1 + r_i) - 1.
 
-    Convention `end_of_day_flow`: a flow lands at the close of its day, so that day's return is
-    measured on the value net of the flow. Dividends, fees and trades are internal, never flows.
-    A subperiod whose opening value is not positive has no base to measure on and is skipped,
-    counted in the coverage; a complete figure also needs `material_missing_weight` (the share
-    of portfolio value with a missing price or flow) within `max_missing_weight`.
+    Convention `start_of_day_flow`: a flow lands before its subperiod's market move (a deposit
+    is invested, a weekend deposit always before Monday), so it is part of the base. Dividends,
+    fees and trades are internal, never flows. A subperiod whose opening value (or opening value
+    plus flow) is not positive has no base to measure on and is skipped, counted in the
+    coverage; a complete figure also needs `material_missing_weight` (the share of portfolio
+    value with a missing price or flow) within `max_missing_weight`.
     """
     method = version("twr")
     inputs = {"days": list(days), "missing": material_missing_weight}
@@ -205,10 +218,11 @@ def twr(
     used = 0
     skipped: list[dt.date] = []
     for previous, current in pairwise(ordered):
-        if previous.value <= 0:
+        growth = subperiod_growth(previous.value, current.value, current.flow)
+        if growth is None:
             skipped.append(current.date)
             continue
-        chain *= (current.value - current.flow) / previous.value
+        chain *= growth
         used += 1
     total = len(ordered) - 1
     if used == 0:
