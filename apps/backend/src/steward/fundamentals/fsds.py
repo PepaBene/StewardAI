@@ -95,7 +95,8 @@ csv.field_size_limit(50_000_000)
 
 # The scheduled backfill's memory of what it loaded (`sync_state`), per data set: the CIKs it was
 # loaded for, so a holding added later gets its history from the sets already read.
-STATE_KEY = "fsds_datasets"
+# The suffix is the statement catalog it was read with: a new one reads every set again.
+STATE_KEY = "fsds_datasets_v2"
 MONTHLY_SETS = 12
 MISSING_RECHECK = dt.timedelta(days=3)
 MAX_MISSES_PER_RUN = 4

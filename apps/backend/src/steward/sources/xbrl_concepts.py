@@ -525,9 +525,19 @@ _ENTRIES: tuple[tuple[str, Statement, str, tuple[str, ...]], ...] = (
         (
             "us-gaap:DepreciationDepletionAndAmortization",
             "us-gaap:DepreciationAndAmortization",
+            "us-gaap:DepreciationAmortizationAndAccretionNet",
             "ifrs-full:DepreciationAndAmortisationExpense",
             "ifrs-full:AdjustmentsForDepreciationAndAmortisationExpense",
         ),
+    ),
+    # Many filers (Alphabet, AMD, Broadcom, Intuit, Oracle) tag the two halves separately and no
+    # combined line; the statement view adds them up when the combined one is missing.
+    ("cash_flow", "cash_flow", "depreciation", ("us-gaap:Depreciation",)),
+    (
+        "cash_flow",
+        "cash_flow",
+        "amortization_of_intangibles",
+        ("us-gaap:AmortizationOfIntangibleAssets",),
     ),
     (
         "cash_flow",

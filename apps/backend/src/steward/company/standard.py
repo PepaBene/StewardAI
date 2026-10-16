@@ -78,6 +78,15 @@ def _free_cash_flow(get: Get) -> tuple[Decimal | None, str]:
     return cfo - abs(capex), "operating cash flow − capital expenditure"
 
 
+def _depreciation_amortization(get: Get) -> tuple[Decimal | None, str]:
+    dep, amort = get("depreciation"), get("amortization_of_intangibles")
+    if dep is None:
+        return None, ""
+    if amort is None:
+        return dep, "depreciation (no amortization of intangibles filed)"
+    return dep + amort, "depreciation + amortization of intangibles"
+
+
 def _liabilities(get: Get) -> tuple[Decimal | None, str]:
     both, equity = get("total_liabilities_and_equity"), get("equity")
     if both is None or equity is None:
@@ -229,7 +238,13 @@ BALANCE: tuple[Row, ...] = (
 )
 
 CASH_FLOW: tuple[Row, ...] = (
-    Row("depreciation_amortization", "Depreciation and amortization"),
+    Row("depreciation", "Depreciation"),
+    Row("amortization_of_intangibles", "Amortization of intangibles"),
+    Row(
+        "depreciation_amortization",
+        "Depreciation and amortization",
+        fallback=_depreciation_amortization,
+    ),
     Row("share_based_compensation", "Share-based compensation"),
     Row("cash_from_operations", "Cash from operations", "total"),
     Row("capex", "Capital expenditure"),
