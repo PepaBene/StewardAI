@@ -290,9 +290,9 @@ async def market_context(
     stored = await load_active(pool, "jobs", JobsConfig)
     prices = (stored.body if stored else JobsConfig()).prices
     if prices.benchmark_symbols:
-        market_label = prices.benchmark_symbols[0]
+        market_label = prices.index_label(prices.benchmark_symbols[0])
         _ref, bars = await index_series(
-            pool, prices, market_label, today - dt.timedelta(days=HISTORY_DAYS)
+            pool, prices, prices.benchmark_symbols[0], today - dt.timedelta(days=HISTORY_DAYS)
         )
         market = bars or None
         if market is None:

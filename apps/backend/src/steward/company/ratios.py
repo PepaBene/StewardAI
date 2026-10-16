@@ -378,6 +378,16 @@ def build_ratios(
         m5 = _median(annual_known[-5:]) if len(annual_known) >= 3 else None
         m10 = _median(annual_known[-10:]) if len(annual_known) >= 5 else None
         latest = points[-1] if points else None
+        # A trailing-twelve-months column often lacks what a ratio needs (cash-flow lines, or a
+        # fiscal year a whole number of years earlier when the year ends in another month), so
+        # the latest fiscal year's value stands in, under its own column label.
+        if latest is not None and latest.value is None and pairs[-1][0].kind != "annual":
+            fiscal = next(
+                (pt for pt, (c, _) in zip(reversed(points), reversed(pairs), strict=True) if c.kind == "annual"),
+                None,
+            )  # fmt: skip
+            if fiscal is not None and fiscal.value is not None:
+                latest = fiscal
         peer = None
         if peers is not None and peer_scope is not None:
             # Peers are loaded on their last fiscal year, so a TTM company point is not compared
