@@ -42,6 +42,7 @@ Mode = Literal["held", "buy"]
 STANCE_TASK = "thesis_stance"
 MAX_OUTPUT_TOKENS = 12000
 AUTHOR_ATTEMPTS = 3
+SAVE_ATTEMPTS = 4
 
 
 async def _thesis_settings(ctx: JobContext) -> ThesisSettings:
@@ -221,24 +222,29 @@ async def _save_held(
     engine wrote for this stock: then the memo stays open for the owner to accept."""
     if await overrides.was_overruled(pool, "config", f"theses:{thesis.ticker}"):
         return None
-    stored = await load_active(pool, "theses", ThesesConfig)
-    config = stored.body if stored else ThesesConfig()
-    try:
-        async with pool.acquire() as conn:
-            saved = await save_config(
-                conn,
-                "theses",
-                replace_thesis(config, thesis),
-                created_by=None,
-                note=f"{author.MARKER} thesis for {thesis.ticker} from research report "
-                f"#{report_id}; stance {draft.stance}: {draft.stance_reason}"[:480],
-                expected_active_id=stored.id if stored else None,
-            )
-    except ConfigConflictError as exc:
-        raise JobFailed(
-            "the theses were saved by someone else while this ran; run it again"
-        ) from exc
-    return int(saved.id)
+    # Only this holding's entry is replaced, so a version another thesis job saved in between
+    # (a batch writes several at once) is read again and built on, not a reason to fail.
+    for attempt in range(SAVE_ATTEMPTS):
+        stored = await load_active(pool, "theses", ThesesConfig)
+        config = stored.body if stored else ThesesConfig()
+        try:
+            async with pool.acquire() as conn:
+                saved = await save_config(
+                    conn,
+                    "theses",
+                    replace_thesis(config, thesis),
+                    created_by=None,
+                    note=f"{author.MARKER} thesis for {thesis.ticker} from research report "
+                    f"#{report_id}; stance {draft.stance}: {draft.stance_reason}"[:480],
+                    expected_active_id=stored.id if stored else None,
+                )
+            return int(saved.id)
+        except ConfigConflictError as exc:
+            if attempt + 1 == SAVE_ATTEMPTS:
+                raise JobFailed(
+                    "the theses were saved by someone else while this ran; run it again"
+                ) from exc
+    raise AssertionError("unreachable")
 
 
 async def accept_memo(
@@ -285,7 +291,18 @@ async def thesis_handler(ctx: JobContext) -> None:
     ctx.params["ticker"] = ticker
     ctx.params.setdefault("profile", cfg.research_profile)
     ctx.params["full_data"] = True
-    report_id = await run_research_job(ctx)
+    # `report_id`: write the thesis again from a research report already paid for (after the
+    # author's instructions changed) instead of researching the holding again.
+    reuse = ctx.params.get("report_id")
+    if reuse is not None:
+        found = await ctx.pool.fetchval(
+            "select id from public.report where id = $1 and ticker = $2", int(reuse), ticker
+        )
+        if found is None:
+            raise JobFailed(f"research report {reuse} is not one of {ticker}")
+        report_id = int(found)
+    else:
+        report_id = await run_research_job(ctx)
     await author_from_report(ctx, report_id, mode, cfg)
     review_id = ctx.params.get("review_id")
     if review_id is not None:

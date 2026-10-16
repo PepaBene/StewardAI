@@ -483,3 +483,43 @@ async def test_the_thesis_author_sees_the_analyst_consensus_as_an_anchor() -> No
     assert "against the price" not in sentences[0].text
     empty: Any = _ConsensusPool(None)
     assert await consensus_anchor(empty, Registry(), "X", None, None) == ([], [])
+
+
+async def test_a_thesis_save_builds_on_a_version_another_job_saved_meanwhile(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from types import SimpleNamespace
+
+    from steward.config.store import ConfigConflictError
+    from steward.thesis import job
+
+    loads: list[int] = []
+    saves: list[int | None] = []
+
+    async def load_active(pool: Any, domain: str, model: Any) -> Any:
+        loads.append(1)
+        return SimpleNamespace(id=100 + len(loads), body=SimpleNamespace())
+
+    async def save_config(conn: Any, domain: str, body: Any, **kw: Any) -> Any:
+        saves.append(kw["expected_active_id"])
+        if len(saves) == 1:  # another thesis job saved version 102 in between
+            raise ConfigConflictError("theses", 101, 102)
+        return SimpleNamespace(id=200)
+
+    async def not_overruled(*_: Any) -> bool:
+        return False
+
+    class Pool:
+        @contextlib.asynccontextmanager
+        async def acquire(self) -> AsyncIterator[None]:
+            yield None
+
+    monkeypatch.setattr(job, "load_active", load_active)
+    monkeypatch.setattr(job, "save_config", save_config)
+    monkeypatch.setattr(job, "replace_thesis", lambda config, thesis: config)
+    monkeypatch.setattr(job.overrides, "was_overruled", not_overruled)
+    thesis: Any = SimpleNamespace(ticker="A")
+    draft: Any = SimpleNamespace(stance="keep", stance_reason="fine")
+    pool: Any = Pool()
+    assert await job._save_held(pool, thesis, draft, 7) == 200
+    assert saves == [101, 102]  # the second try builds on the newer version
