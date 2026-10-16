@@ -65,6 +65,10 @@ async def depositary_names(pool: asyncpg.Pool, cusips: dict[str, str]) -> dict[s
     return out
 
 
+STORE_BATCH = 10_000
+STORE_TIMEOUT_SECONDS = 300
+
+
 async def store_dataset(
     pool: asyncpg.Pool,
     url: str,
@@ -127,6 +131,7 @@ async def store_dataset(
                 )
                 for f in data.filings
             ],
+            timeout=STORE_TIMEOUT_SECONDS,
         )
         known_at = dt.datetime.now(dt.UTC)
         version_by_accession: dict[str, int] = {}
@@ -191,31 +196,36 @@ async def store_dataset(
                 " on conflict do nothing",
                 [(cik, url) for cik in seen_ciks],
             )
-        await conn.executemany(
-            "insert into public.institutional_holding (accession, infotable_sk, cusip, ticker,"
-            " issuer_name, title_of_class, value_usd, shares, shares_type, put_call, discretion,"
-            " voting_sole, voting_shared, voting_none) values ($1, $2, $3, $4, $5, $6, $7, $8,"
-            " $9, $10, $11, $12, $13, $14) on conflict do nothing",
-            [
-                (
-                    p.accession,
-                    p.infotable_sk,
-                    p.cusip,
-                    tickers.get(p.cusip),
-                    p.issuer_name,
-                    p.title_of_class,
-                    p.value_usd,
-                    p.shares,
-                    p.shares_type,
-                    p.put_call,
-                    p.discretion,
-                    p.voting_sole,
-                    p.voting_shared,
-                    p.voting_none,
-                )
-                for p in data.positions
-            ],
-        )
+        rows = [
+            (
+                p.accession,
+                p.infotable_sk,
+                p.cusip,
+                tickers.get(p.cusip),
+                p.issuer_name,
+                p.title_of_class,
+                p.value_usd,
+                p.shares,
+                p.shares_type,
+                p.put_call,
+                p.discretion,
+                p.voting_sole,
+                p.voting_shared,
+                p.voting_none,
+            )
+            for p in data.positions
+        ]
+        # About 120K rows a quarter: one statement outlasts the pool's 60-second command
+        # timeout, so they go in batches, each with its own longer limit.
+        for at in range(0, len(rows), STORE_BATCH):
+            await conn.executemany(
+                "insert into public.institutional_holding (accession, infotable_sk, cusip,"
+                " ticker, issuer_name, title_of_class, value_usd, shares, shares_type, put_call,"
+                " discretion, voting_sole, voting_shared, voting_none) values ($1, $2, $3, $4,"
+                " $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) on conflict do nothing",
+                rows[at : at + STORE_BATCH],
+                timeout=STORE_TIMEOUT_SECONDS,
+            )
     # No link row per position (443K rows, a third of the database): positions inherit the
     # filing's link, which `record_evidence_as_of` resolves from the accession.
     return len(data.filings), len(data.positions)
