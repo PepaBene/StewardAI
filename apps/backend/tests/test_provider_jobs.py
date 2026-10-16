@@ -6,7 +6,9 @@ be verified against a live response (no API key was available). The OPS sample i
 documentation-shaped and unverified against ops.epo.org.
 """
 
+import contextlib
 import datetime as dt
+from collections.abc import AsyncIterator
 from decimal import Decimal
 from typing import get_args
 
@@ -247,3 +249,64 @@ def test_ops_one_invention_in_two_offices_is_one_family_with_grant_date() -> Non
     assert family.priority_date == dt.date(2016, 7, 1)
     assert family.grant_date == dt.date(2019, 3, 5)
     assert ops.parse_ops_page(OPS_MULTI_OFFICE, ("Someone Else",)).families == []
+
+
+class _Step:
+    def __init__(self) -> None:
+        self.detail: dict[str, object] = {}
+
+
+class _Ctx:
+    pool = None
+
+    def __init__(self) -> None:
+        self.steps: list[_Step] = []
+
+    @contextlib.asynccontextmanager
+    async def step(self, name: str) -> AsyncIterator[_Step]:
+        self.steps.append(_Step())
+        yield self.steps[-1]
+
+
+async def test_yahoo_dividends_waits_out_the_minute_window_and_stops_at_the_day(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from steward.sources import provider_jobs, yahoo
+    from steward.sources.governor import QuotaExceeded
+
+    tickers = [f"T{i}" for i in range(9)]
+    calls: list[str] = []
+    waits: list[float] = []
+
+    async def collect(pool: object, http: object, *, listing_id: int, **_: object) -> dict:
+        calls.append(tickers[listing_id])
+        # The minute admits six; after one wait the day is used up at the eighth call.
+        if len(calls) == 7 or len(calls) >= 9:
+            raise QuotaExceeded("free quota exhausted")
+        return {"proposals": 1, "new": 0}
+
+    async def symbol(pool: object, t: str) -> tuple[int, str, str]:
+        return tickers.index(t), t, t
+
+    async def no_state(*_: object, **__: object) -> dict:
+        return {}
+
+    async def wait(seconds: float) -> None:
+        waits.append(seconds)
+
+    async def holdings(pool: object) -> list[str]:
+        return tickers
+
+    monkeypatch.setattr(provider_jobs, "holding_tickers", holdings)
+    monkeypatch.setattr(provider_jobs, "_state_times", no_state)
+    monkeypatch.setattr(provider_jobs, "_save_state", no_state)
+    monkeypatch.setattr(provider_jobs, "_sleep", wait)
+    monkeypatch.setattr(yahoo, "yahoo_symbol_for", symbol)
+    monkeypatch.setattr(yahoo, "collect_yahoo_dividends", collect)
+
+    ctx = _Ctx()
+    await provider_jobs.yahoo_dividends_handler(ctx)  # type: ignore[arg-type]
+    detail = ctx.steps[0].detail
+    assert len(waits) == 2 and all(0 < w <= 61 for w in waits)
+    assert list(detail["refreshed"]) == tickers[:7]  # type: ignore[call-overload]
+    assert "QuotaExceeded" in str(detail["stopped"])

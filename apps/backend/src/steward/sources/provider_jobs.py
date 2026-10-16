@@ -12,6 +12,7 @@ provider needs is skipped, never guessed.
 
 from __future__ import annotations
 
+import asyncio
 import datetime as dt
 import json
 from collections.abc import Callable, Sequence
@@ -577,6 +578,13 @@ async def twelve_data_corporate_actions_handler(ctx: JobContext) -> None:
 
 YAHOO_DIVIDEND_HOLDINGS_PER_RUN = 15
 YAHOO_DIVIDEND_REFRESH_HOURS = 24 * 6
+_sleep = asyncio.sleep
+
+
+async def _wait_next_minute() -> None:
+    """The per-minute window (six calls) refuses the seventh; the next minute admits it again."""
+    now = dt.datetime.now(dt.UTC)
+    await _sleep(61 - now.second - now.microsecond / 1e6)
 
 
 def yahoo_dividend_state_key(ticker: str) -> str:
@@ -614,9 +622,16 @@ async def yahoo_dividends_handler(ctx: JobContext) -> None:
             for ticker in due:
                 listing_id, symbol, ysym = targets[ticker]
                 try:
-                    results[ticker] = await collect_yahoo_dividends(
-                        ctx.pool, http, listing_id=listing_id, symbol=symbol, yahoo_symbol=ysym
-                    )
+                    try:
+                        results[ticker] = await collect_yahoo_dividends(
+                            ctx.pool, http, listing_id=listing_id, symbol=symbol, yahoo_symbol=ysym
+                        )
+                    except QuotaExceeded:
+                        # Usually the minute window; a second refusal means the day is used up.
+                        await _wait_next_minute()
+                        results[ticker] = await collect_yahoo_dividends(
+                            ctx.pool, http, listing_id=listing_id, symbol=symbol, yahoo_symbol=ysym
+                        )
                 except (QuotaExceeded, RuntimeError) as exc:
                     step.detail["stopped"] = f"{type(exc).__name__}: {exc}"[:200]
                     break
