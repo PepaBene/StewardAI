@@ -47,7 +47,9 @@ class DraftKPI(BaseModel):
     id: Slug
     metric: str = Field(description="One of the allowed metric names.")
     operator: ComparisonOperator
-    threshold: float
+    threshold: float = Field(
+        description="In the unit given: with '%', percentage points (24.2 for 24.2%, not 0.242)."
+    )
     unit: str = Field(description="'%', 'x', or a currency with a scale such as 'USD bn'.")
     basis: Literal["reported", "adjusted"] = "reported"
     period: Literal["quarter", "annual", "ttm"] = "quarter"
@@ -280,9 +282,10 @@ SYSTEM = f"""\
 Then fill the thesis:
 {_MEMO_RULES}
 - kpis: two to {MAX_KPIS} checkable conditions that would prove or break the case. Use only \
-these metric names: {", ".join(allowed_metrics())}. Margins and growth rates are fractions \
-expressed in '%'. Base each threshold on a figure in the report (the current level and the \
-trend), not on a round number you like.
+these metric names: {", ".join(allowed_metrics())}. Margins and growth rates take the unit \
+'%' with the threshold in percentage points: 24.2 for 24.2%, never the fraction 0.242 (the \
+check compares it with the reported rate times 100). Base each threshold on a figure in the \
+report (the current level and the trend), not on a round number you like.
 - exit_conditions: plain-words events that end the thesis.
 - pre_mortem: exactly three likeliest reasons the stock loses 40%.
 - scenarios: bear, base and bull value per share in the position's currency with probabilities \
