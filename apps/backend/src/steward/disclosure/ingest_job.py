@@ -34,7 +34,7 @@ from steward.disclosure.fetch import FetchFailure, FetchOutcome, extension_for
 from steward.disclosure.financials import concept_choice, metric_for
 from steward.disclosure.ingest import DocumentRecord, ingest_document_version, quarantine_review
 from steward.disclosure.note_job import extract_notes_for_document
-from steward.disclosure.parse import ParsedDocument, ParseError, parse_html
+from steward.disclosure.parse import PARSER_VERSION, ParsedDocument, ParseError, parse_html
 from steward.disclosure.registry import SourceNotEnabled, check_enable
 from steward.disclosure.sec_discovery import DiscoveredFiling
 from steward.storage import EvidenceStore, evidence_path
@@ -143,13 +143,16 @@ async def index_filing_items(
 
 
 async def _already_stored(pool: Pool, accession: str, digest: str) -> bool:
+    """These bytes, or a version this parser already read: a filing never changes."""
     found = await pool.fetchval(
         """select 1 from public.source_document d
              join public.source_document_version v on v.document_id = d.id
-            where d.regulator=$1 and d.external_id=$2 and v.content_hash=$3""",
+            where d.regulator=$1 and d.external_id=$2
+              and (v.content_hash=$3 or (not v.quarantined and v.parser_version=$4))""",
         REGULATOR,
         accession,
         digest,
+        PARSER_VERSION,
     )
     return found is not None
 

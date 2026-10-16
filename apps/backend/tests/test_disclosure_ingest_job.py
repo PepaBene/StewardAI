@@ -60,7 +60,7 @@ class Pool:
         return self.source
 
     async def fetchval(
-        self, _sql: str, _regulator: str, accession: str, _digest: str
+        self, _sql: str, _regulator: str, accession: str, _digest: str, _parser: str
     ) -> int | None:
         return 1 if accession in self.stored else None
 

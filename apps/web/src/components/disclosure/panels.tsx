@@ -134,7 +134,7 @@ export function FilingsTable({ filings, selectedId, onSelect }: { filings: reado
               <td className="py-1.5 pr-3">
                 {filingStatus(f) === "quarantined" ? <StateBadge state="parse_failed" /> : STATUS_LABEL[filingStatus(f)]}
                 {f.amends_version_id != null ? <span className="block text-xs text-text-muted">restates an earlier filing</span> : null}
-                {f.superseded_by_id != null ? <span className="block text-xs text-text-muted">replaced by an amendment</span> : null}
+                {f.superseded_by_id != null ? <span className="block text-xs text-text-muted">a later read of the same filing replaced it</span> : null}
               </td>
               <td className="py-1.5 text-right">
                 <button type="button" onClick={() => onSelect(f.version_id)} className="text-accent-ink hover:underline focus-visible:outline-2 focus-visible:outline-focus">

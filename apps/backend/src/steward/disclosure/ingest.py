@@ -21,6 +21,8 @@ import asyncpg
 from steward.disclosure.parse import ParsedDocument, section_for
 from steward.sources.documents import mark_superseded
 
+IMMUTABLE_REGULATORS = frozenset({"SEC"})
+
 
 @dataclass(frozen=True, slots=True)
 class DocumentRecord:
@@ -91,6 +93,17 @@ async def ingest_document_version(
         document_id,
         digest,
     )
+    if existing is None and parser_version and record.regulator in IMMUTABLE_REGULATORS:
+        # A filed accession never changes (a change is a new accession that amends it), so other
+        # bytes on a later fetch are the archive's own noise, not a new version. A new parser
+        # still reads it again, and so does any parser for a version it could not read.
+        existing = await pool.fetchrow(
+            "select id, quarantined from public.source_document_version"
+            " where document_id=$1 and not quarantined and parser_version=$2"
+            " order by id desc limit 1",
+            document_id,
+            parser_version,
+        )
     if existing is not None:
         await pool.execute(
             "update public.source_document_version set retrieved_at=$2 where id=$1",

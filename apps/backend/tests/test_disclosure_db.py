@@ -233,6 +233,29 @@ async def test_identical_bytes_do_not_create_a_version_and_changed_bytes_do(
     assert superseded == changed.version_id  # chain recomputed from the whole history
 
 
+async def test_a_refetched_sec_accession_with_other_bytes_is_not_a_new_version(
+    backend_pool: asyncpg.Pool,
+) -> None:
+    pool = backend_pool
+    record = DocumentRecord(
+        regulator="SEC",
+        external_id="0000000001-26-000099",
+        stable_url="https://x/acc-99",
+        form="8-K",
+        known_at=T1,
+        issuer_id=await issuer(pool),
+    )
+    unreadable = await ingest_document_version(
+        pool, record, b"<p>?</p>", parser_version="p1", quarantine_reason="no body"
+    )
+    read = await ingest_document_version(pool, record, b"<p>one</p>", parser_version="p1")
+    refetched = await ingest_document_version(pool, record, b"<p>one </p>", parser_version="p1")
+    reparsed = await ingest_document_version(pool, record, b"<p>one  </p>", parser_version="p2")
+    assert unreadable.created and read.created  # a parser may read what it once could not
+    assert not refetched.created and refetched.version_id == read.version_id
+    assert reparsed.created  # a new parser reads the filing again
+
+
 async def test_unreadable_document_is_quarantined_with_one_review(
     backend_pool: asyncpg.Pool,
 ) -> None:
