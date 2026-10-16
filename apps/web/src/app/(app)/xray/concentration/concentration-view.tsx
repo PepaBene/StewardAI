@@ -68,7 +68,7 @@ function Active({ level, benchmarkNote }: { level: ConcentrationLevel; benchmark
             <tr key={`${a.side}-${a.key}`} className="border-b border-border-soft">
               <th scope="row" className="px-3 py-1.5 text-left font-normal">
                 {a.label}
-                <span className="ml-2 text-[11px] text-text-muted">{a.side}</span>
+                <span className="ml-2 text-xs text-text-muted">{a.side}</span>
               </th>
               <td className={TD}>{formatPercent(a.portfolio_weight, { decimals: 1 })}</td>
               <td className={TD}>{formatPercent(a.benchmark_weight, { decimals: 1 })}</td>

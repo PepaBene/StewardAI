@@ -86,7 +86,6 @@ export function OwnershipPageView() {
   return (
     <div className="flex flex-col gap-5">
       <PageHeader
-        kicker="Research & Verification"
         title="Ownership"
         description="Who reports owning a company's shares, by source, with the date each figure was measured and filed. The sources are never added together."
         aside={<span>{ticker ?? SAMPLE_TICKER} · as known on {formatDay(new Date(cutoff).toISOString())}</span>}

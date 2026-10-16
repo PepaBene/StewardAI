@@ -1,5 +1,6 @@
 import type { HoldingSegments, SegmentHistoryPoint, SegmentRow } from "@/lib/api/client";
 import { formatNumber } from "@/lib/charts/format";
+import { labelIfKey } from "@/lib/labels";
 
 /*
  * Revenue by region / segment / product (`GET /holdings/{ticker}/segments`). Categories are
@@ -46,7 +47,7 @@ export function formatRevenue(value: number | string | null | undefined, currenc
 export function chartRows(rows: readonly SegmentRow[]): { label: string; value: number }[] {
   return rows
     .filter((r) => !r.subtotal)
-    .map((r) => ({ label: r.label, value: toNumber(r.value) ?? 0 }))
+    .map((r) => ({ label: labelIfKey("segment", r.label), value: toNumber(r.value) ?? 0 }))
     .filter((r) => r.value > 0)
     .sort((a, b) => b.value - a.value);
 }

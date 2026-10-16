@@ -18,17 +18,17 @@ export function OutstandingNote({ data, className }: { data: HoldingOwnership | 
   const view = outstandingView(data);
   if (!view) return null;
   if (view.kind === "not_applicable") {
-    return <p className={cn("text-[11px] text-text-muted", className)}>{view.reason}</p>;
+    return <p className={cn("text-xs text-text-muted", className)}>{view.reason}</p>;
   }
   if (view.kind === "no_denominator") {
     return (
-      <p className={cn("text-[11px] text-text-muted", className)}>
+      <p className={cn("text-xs text-text-muted", className)}>
         % of shares outstanding: no SEC shares-outstanding figure stored yet (the SEC XBRL job reads it).
       </p>
     );
   }
   return (
-    <div className={cn("space-y-0.5 text-[11px] text-text-muted", className)}>
+    <div className={cn("space-y-0.5 text-xs text-text-muted", className)}>
       <p>
         <span className="num font-semibold text-text">{formatOutstandingPct(view.pct)}</span> of shares outstanding held
         by 13F filers · {view.basis}.

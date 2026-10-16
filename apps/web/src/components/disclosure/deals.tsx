@@ -248,7 +248,7 @@ export function DealTimeline({ deal }: { deal: Deal }) {
               <text x={t.x} y={H - 8} textAnchor="middle" className={AXIS_TEXT}>{t.label}</text>
             </g>
           ))}
-          <text x={4} y={16} className="fill-text-muted text-[11px]">Where the deal stood (square = took effect, tick = became known)</text>
+          <text x={4} y={16} className="fill-text-muted text-xs">Where the deal stood (square = took effect, tick = became known)</text>
           <line x1={20} x2={W - 20} y1={RAIL} y2={RAIL} strokeWidth={1} className="stroke-border" />
           {layout.marks.map((m, i) => {
             const t = deal.transitions.find((x) => x.id === m.id)!;
@@ -261,15 +261,15 @@ export function DealTimeline({ deal }: { deal: Deal }) {
                 <path d={`M ${m.xKnown} ${RAIL + 12} l 5 9 l -10 0 Z`} className="fill-text-muted" />
                 <line x1={m.x} x2={m.x} y1={up + 4} y2={RAIL - 12} strokeWidth={1} className="stroke-border" />
                 <StateMark state={m.state} x={m.x} active={on} />
-                <text x={m.x} y={up} textAnchor={anchor(m.x)} className="fill-text text-[11px] font-medium">{STATE_LABEL[m.state]}</text>
+                <text x={m.x} y={up} textAnchor={anchor(m.x)} className="fill-text text-xs font-medium">{STATE_LABEL[m.state]}</text>
                 <text x={m.x} y={RAIL + 38} textAnchor={anchor(m.x)} className={AXIS_TEXT}>
                   {m.known === m.effective || formatDay(m.known) === formatDay(m.effective) ? formatDay(m.effective) : `known ${formatDay(m.known)}`}
                 </text>
-                {t.rumor_source ? <text x={m.x} y={RAIL + 52} textAnchor={anchor(m.x)} className="fill-text-muted text-[10px]">rumor, not confirmed</text> : null}
+                {t.rumor_source ? <text x={m.x} y={RAIL + 52} textAnchor={anchor(m.x)} className="fill-text-muted text-xs">rumor, not confirmed</text> : null}
               </g>
             );
           })}
-          <text x={4} y={TRACK - 40} className="fill-text-muted text-[11px]">What the terms said (placed where each version became known)</text>
+          <text x={4} y={TRACK - 40} className="fill-text-muted text-xs">What the terms said (placed where each version became known)</text>
           <line x1={20} x2={W - 20} y1={TRACK} y2={TRACK} strokeWidth={1} className="stroke-border" />
           {layout.versions.map((v, i) => {
             const on = active?.kind === "version" && active.id === v.id;
@@ -279,7 +279,7 @@ export function DealTimeline({ deal }: { deal: Deal }) {
               <g key={v.id} tabIndex={0} role="button" aria-pressed={on} aria-label={`Terms version ${v.versionNo}, ${ORIGIN_LABEL[v.origin]}, known ${formatDay(v.known)}: ${v.summary}`}
                 onFocus={() => setPicked({ kind: "version", id: v.id })} onMouseEnter={() => setPicked({ kind: "version", id: v.id })} onClick={() => setPicked({ kind: "version", id: v.id })} className="cursor-pointer outline-none">
                 <rect x={v.x - 6} y={TRACK - 10} width={12} height={20} strokeWidth={on ? 2 : 1} fill={proj ? "url(#deal-hatch)" : undefined} className={cn(proj ? "" : "fill-chart-line", on ? "stroke-focus" : "stroke-chart-line")} />
-                <text x={v.x} y={y + (i % 2 === 0 ? 0 : 0)} textAnchor={anchor(v.x)} className="fill-text text-[10px]">
+                <text x={v.x} y={y + (i % 2 === 0 ? 0 : 0)} textAnchor={anchor(v.x)} className="fill-text text-xs">
                   {`${proj ? "Projection" : "Terms"} v${v.versionNo}: ${v.summary.length > 46 ? `${v.summary.slice(0, 45)}…` : v.summary}`}
                 </text>
               </g>
@@ -426,14 +426,14 @@ export function ConsiderationBridge({ deal }: { deal: Deal }) {
               ) : (
                 <rect width={Math.max(2, p.w - 2)} height={30} strokeWidth={1} className="fill-surface stroke-text-muted" />
               )}
-              <text x={2} y={50} className="fill-text text-[11px] font-medium">{p.label}</text>
-              <text x={2} y={64} className={p.state === "stated" ? "fill-text num text-[11px]" : "fill-text-muted text-[11px]"}>{p.state === "stated" ? money(p.amount, b.currency) : "not stated"}</text>
+              <text x={2} y={50} className="fill-text text-xs font-medium">{p.label}</text>
+              <text x={2} y={64} className={p.state === "stated" ? "fill-text num text-xs" : "fill-text-muted text-xs"}>{p.state === "stated" ? money(p.amount, b.currency) : "not stated"}</text>
             </g>
           ))}
           {synergy ? (
             <g transform="translate(10 84)">
               <rect width={Math.max(24, Math.min(720, total > 0 ? (Number(synergy.value) / total) * 720 : 120))} height={14} strokeWidth={1} fill="url(#deal-hatch)" className="stroke-chart-line" />
-              <text x={0} y={30} className="fill-text-muted text-[11px]">Management projection, not part of the price: expected synergies {impactValue(synergy)}</text>
+              <text x={0} y={30} className="fill-text-muted text-xs">Management projection, not part of the price: expected synergies {impactValue(synergy)}</text>
             </g>
           ) : null}
         </svg>

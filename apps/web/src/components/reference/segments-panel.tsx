@@ -62,7 +62,7 @@ function Switch<T extends string>({
           className={cn(
             "px-2.5 py-1.5",
             i > 0 && "border-l border-border",
-            value === o.id ? "bg-accent text-accent-foreground" : "text-text hover:bg-border-soft",
+            value === o.id ? "bg-accent text-accent-foreground" : "text-text hover:bg-surface-muted",
           )}
         >
           {o.label}
@@ -163,7 +163,7 @@ export function SegmentsPanel({ ticker }: { ticker: string }) {
                   />
                   <span className="truncate" title={r.member ?? undefined}>
                     {r.label}
-                    {r.subtotal ? <span className="ml-1 text-[11px]">(subtotal, not drawn)</span> : null}
+                    {r.subtotal ? <span className="ml-1 text-xs">(subtotal, not drawn)</span> : null}
                   </span>
                   <span className="num text-right" title={`${r.value} ${data.currency ?? ""}`}>
                     {formatRevenue(r.value, data.currency)}
@@ -191,7 +191,7 @@ function FootNotes({
   filingUrl: string | null;
 }) {
   return (
-    <div className="space-y-0.5 text-[11px] text-text-muted">
+    <div className="space-y-0.5 text-xs text-text-muted">
       {data.total_revenue !== null && data.total_revenue !== undefined ? (
         <p>
           Total revenue {formatRevenue(data.total_revenue, data.currency)}; shares are of the breakdown&rsquo;s sum.

@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import type { ActionOut, ChatSentence, MessageOut, Source } from "@/lib/api/client";
+import { redirectTarget } from "@/lib/nav";
 import { reportHitHref } from "@/lib/reports/search";
 
 import {
@@ -25,9 +26,12 @@ import {
 
 const APP = join(__dirname, "..", "..", "app");
 
-/** The page file a path renders in the App Router (route groups and [dynamic] segments), or null. */
+/**
+ * The page file a path renders in the App Router (route groups and [dynamic] segments), or
+ * null. Moved URLs follow `REDIRECTS` first, as next.config.ts does at runtime.
+ */
 function pageFor(path: string): string | null {
-  const segments = path.split(/[?#]/)[0].split("/").filter(Boolean);
+  const segments = (redirectTarget(path) ?? path).split(/[?#]/)[0].split("/").filter(Boolean);
   const walk = (dir: string, rest: string[]): string | null => {
     const entries = readdirSync(dir).filter((e) => statSync(join(dir, e)).isDirectory());
     if (rest.length === 0) {

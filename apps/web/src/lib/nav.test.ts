@@ -1,75 +1,104 @@
+import { readdirSync, statSync } from "node:fs";
+import { join } from "node:path";
+
 import { describe, expect, it } from "vitest";
 
-import { CLUSTER_PAGES, CLUSTERS, isClusterActive, isPageActive } from "./nav";
+import { DESTINATIONS, GLOBAL_ROUTES, NAV_PAGES, REDIRECTS, redirectTarget, resolveNav } from "./nav";
 
-function cluster(id: (typeof CLUSTERS)[number]["id"]) {
-  const c = CLUSTERS.find((c) => c.id === id);
-  if (!c) throw new Error(`no such cluster: ${id}`);
-  return c;
+const APP_DIR = join(__dirname, "..", "app", "(app)");
+
+/** Every page route under app/(app), with dynamic segments filled by a sample value. */
+function appRoutes(dir = APP_DIR, prefix = ""): string[] {
+  const out: string[] = [];
+  for (const entry of readdirSync(dir)) {
+    const full = join(dir, entry);
+    if (statSync(full).isDirectory()) {
+      const segment = entry.startsWith("[") ? "sample" : entry;
+      out.push(...appRoutes(full, `${prefix}/${segment}`));
+    } else if (entry === "page.tsx") {
+      out.push(prefix || "/");
+    }
+  }
+  return out;
 }
 
-describe("cluster highlighting", () => {
-  it("marks Portfolio active on the overview, holdings and transactions, not on Config", () => {
-    const portfolio = cluster("portfolio");
-    expect(isClusterActive(portfolio, "/")).toBe(true);
-    expect(isClusterActive(portfolio, "/holdings")).toBe(true);
-    expect(isClusterActive(portfolio, "/holdings/AAPL_US_EQ")).toBe(true);
-    expect(isClusterActive(portfolio, "/transactions")).toBe(true);
-    expect(isClusterActive(portfolio, "/transactionsx")).toBe(false);
-    expect(isClusterActive(portfolio, "/theses")).toBe(false);
-    expect(isClusterActive(cluster("config"), "/theses")).toBe(false);
+const owner = (path: string) => resolveNav(path);
+const destinationOf = (path: string) => owner(path)?.destination.id;
+const tabOf = (path: string) => owner(path)?.tab.label;
+
+describe("information architecture", () => {
+  it("gives every route in app/(app) exactly one home: a tab, a redirect or a global route", () => {
+    const homeless = appRoutes().filter(
+      (path) =>
+        !owner(path) &&
+        !redirectTarget(path) &&
+        !GLOBAL_ROUTES.some((g) => path === g || path.startsWith(`${g}/`)),
+    );
+    expect(homeless).toEqual([]);
   });
 
-  it("groups Theses, Review, Research, News and fact-evidence pages under Research & Verification", () => {
-    const research = cluster("research");
-    expect(isClusterActive(research, "/theses")).toBe(true);
-    expect(isClusterActive(research, "/review")).toBe(true);
-    // "/reviews" (monthly compliance) must never match "/review" (the fact review queue).
-    expect(isClusterActive(research, "/reviews")).toBe(false);
-    expect(isClusterActive(research, "/research/4")).toBe(true);
-    expect(isClusterActive(research, "/news/disputed")).toBe(true);
-    expect(isClusterActive(research, "/evidence/123")).toBe(true);
-    expect(isClusterActive(research, "/escalations")).toBe(false);
-  });
-
-  it("groups Escalations, Reports, Reviews, Activity, job runs and API status under Oversight", () => {
-    const oversight = cluster("oversight");
-    expect(isClusterActive(oversight, "/escalations")).toBe(true);
-    expect(isClusterActive(oversight, "/escalations/12")).toBe(true);
-    expect(isClusterActive(oversight, "/reports")).toBe(true);
-    expect(isClusterActive(oversight, "/reviews")).toBe(true);
-    expect(isClusterActive(oversight, "/reviews/3")).toBe(true);
-    expect(isClusterActive(oversight, "/activity")).toBe(true);
-    expect(isClusterActive(oversight, "/jobs/42")).toBe(true);
-    expect(isClusterActive(oversight, "/jobsx")).toBe(false);
-    expect(isClusterActive(oversight, "/status")).toBe(true);
-  });
-
-  it("marks Config active on every sub-editor and its history, not on other clusters' pages", () => {
-    const config = cluster("config");
-    expect(isClusterActive(config, "/config")).toBe(true);
-    expect(isClusterActive(config, "/config/verification")).toBe(true);
-    expect(isClusterActive(config, "/config/history/strategy")).toBe(true);
-    expect(isClusterActive(config, "/config/research-profiles")).toBe(true);
-    expect(isClusterActive(cluster("research"), "/config/research-profiles")).toBe(false);
-  });
-
-  it("has no cluster for Chat: it stays a global slide-over, never a nav destination", () => {
-    for (const c of CLUSTERS) {
-      expect(isClusterActive(c, "/chat")).toBe(false);
+  it("points every tab and every redirect at a route that exists", () => {
+    const routes = new Set(appRoutes());
+    for (const p of NAV_PAGES) expect(routes, p.href).toContain(p.href);
+    for (const r of REDIRECTS) {
+      const target = r.destination.split("?")[0].replace(/:\w+/g, "sample");
+      expect(routes, r.source).toContain(target);
     }
   });
 
-  it("checks one page at a time, e.g. for a dropdown menu's current-page highlight", () => {
-    expect(isPageActive("/holdings", "/holdings")).toBe(true);
-    expect(isPageActive("/holdings", "/transactions")).toBe(false);
+  it("has seven destinations plus Settings, and no destination for Chat", () => {
+    expect(DESTINATIONS.map((d) => d.label)).toEqual([
+      "Portfolio",
+      "Companies",
+      "Research",
+      "Markets",
+      "Briefings",
+      "Inbox",
+      "System",
+      "Settings",
+    ]);
+    expect(owner("/chat")).toBeNull();
   });
 
-  it("flattens every cluster's pages with its cluster label attached", () => {
-    const byHref = new Map(CLUSTER_PAGES.map((p) => [p.href, p]));
-    expect(byHref.get("/")?.cluster).toBe("Portfolio");
-    expect(byHref.get("/theses")?.cluster).toBe("Research & Verification");
-    expect(byHref.get("/reports")?.cluster).toBe("Oversight");
-    expect(byHref.get("/config")?.cluster).toBe("Config");
+  it("lets the most specific tab win", () => {
+    expect(tabOf("/")).toBe("Overview");
+    expect(tabOf("/holdings")).toBe("Holdings");
+    expect(tabOf("/transactions")).toBe("Holdings");
+    expect(destinationOf("/holdings/AAPL_US_EQ")).toBe("companies");
+    expect(tabOf("/risk")).toBe("Risk");
+    expect(tabOf("/risk/tail")).toBe("Risk");
+    expect(tabOf("/risk/whatif")).toBe("Decide");
+    expect(tabOf("/xray/proposed")).toBe("Decide");
+    expect(tabOf("/xray/overlap")).toBe("Allocation");
+    expect(tabOf("/funds")).toBe("Holdings");
+    expect(destinationOf("/funds/IE00B5BMR087")).toBe("companies");
+    expect(tabOf("/disclosures/coverage")).toBe("Data quality");
+    expect(tabOf("/disclosures/insiders")).toBe("Filings");
+    expect(tabOf("/jobs/42")).toBe("Activity");
+    expect(destinationOf("/jobsx")).toBeUndefined();
+  });
+
+  it("never confuses /reviews (monthly reviews) with /review (the figures queue)", () => {
+    expect(destinationOf("/reviews")).toBe("briefings");
+    expect(destinationOf("/review")).toBe("inbox");
+  });
+
+  it("sends the old queue pages to the Inbox with their kind chip selected", () => {
+    expect(redirectTarget("/escalations")).toBe("/inbox?kind=escalations");
+    expect(redirectTarget("/escalations/12")).toBe("/inbox?kind=escalations&item=12");
+    expect(redirectTarget("/review")).toBe("/inbox?kind=figures");
+    expect(redirectTarget("/config")).toBe("/config/strategy");
+    expect(redirectTarget("/reviews")).toBeNull();
+  });
+
+  it("groups Settings into its four menus, covering every editor", () => {
+    const settings = DESTINATIONS.find((d) => d.id === "settings");
+    expect(settings?.groups?.map((g) => g.label)).toEqual([
+      "Investment rules",
+      "Sources and data",
+      "Automation",
+      "History and export",
+    ]);
+    expect(destinationOf("/config/history/strategy")).toBe("settings");
   });
 });

@@ -47,14 +47,14 @@ function Chart({ v }: { v: PerformanceView }) {
         {[lo, 100, hi].filter((t, i, a) => a.indexOf(t) === i).map((t) => (
           <g key={t}>
             <line x1={pad.l} x2={W - pad.r} y1={y(t)} y2={y(t)} className={t === 100 ? "stroke-border" : "stroke-border-soft"} strokeDasharray={t === 100 ? "" : "2 3"} />
-            <text x={pad.l - 6} y={y(t) + 3} textAnchor="end" className="fill-text-muted text-[10px]">{Math.round(t)}</text>
+            <text x={pad.l - 6} y={y(t) + 3} textAnchor="end" className="fill-text-muted text-xs">{Math.round(t)}</text>
           </g>
         ))}
         {hasBench ? <path d={line((p) => toNumber(p.benchmark))} fill="none" className="stroke-chart-benchmark" strokeWidth="1.25" /> : null}
         {hasTotal ? <path d={line((p) => toNumber(p.fund_total))} fill="none" className="stroke-chart-line" strokeWidth="1.25" strokeDasharray="4 3" /> : null}
         <path d={line((p) => toNumber(p.fund))} fill="none" className="stroke-chart-line" strokeWidth="2.25" />
-        <text x={pad.l} y={H - 6} className="fill-text-muted text-[10px]">{formatDate(pts[0].date)}</text>
-        <text x={W - pad.r} y={H - 6} textAnchor="end" className="fill-text-muted text-[10px]">{formatDate(pts[pts.length - 1].date)}</text>
+        <text x={pad.l} y={H - 6} className="fill-text-muted text-xs">{formatDate(pts[0].date)}</text>
+        <text x={W - pad.r} y={H - 6} textAnchor="end" className="fill-text-muted text-xs">{formatDate(pts[pts.length - 1].date)}</text>
       </svg>
       <figcaption className="flex flex-wrap gap-x-5 text-xs text-text-muted">
         <span><span className="mr-1.5 inline-block h-0.5 w-5 bg-chart-line align-middle" />Fund listing price</span>
@@ -75,7 +75,7 @@ function DifferenceCell({ p }: { p: PeriodReturn }) {
     return (
       <span className="num">
         {signedPct(p.difference)}
-        {p.difference_annualised !== null && p.difference_annualised !== undefined ? <span className="block text-[11px] text-text-muted">{signedPct(p.difference_annualised)} a year</span> : null}
+        {p.difference_annualised !== null && p.difference_annualised !== undefined ? <span className="block text-xs text-text-muted">{signedPct(p.difference_annualised)} a year</span> : null}
       </span>
     );
   }
@@ -201,7 +201,7 @@ function NavPanel({ isin, v, onSaved }: { isin: string; v: PerformanceView; onSa
                       {p.listing_close !== null && p.listing_close !== undefined ? (
                         <>
                           {formatFigure(p.listing_close, "per_share")}
-                          {p.listing_date && p.listing_date !== p.as_of ? <span className="block text-[11px] text-text-muted">on {formatDate(p.listing_date)}</span> : null}
+                          {p.listing_date && p.listing_date !== p.as_of ? <span className="block text-xs text-text-muted">on {formatDate(p.listing_date)}</span> : null}
                         </>
                       ) : (
                         <span className="text-text-muted">—</span>
@@ -326,7 +326,7 @@ export function PerformanceTab({ isin }: { isin: string }) {
                         <tr key={p.label} className="border-t border-border-soft align-top">
                           <th scope="row" className="px-3 py-1.5 text-left font-normal">
                             {p.label}
-                            {p.start ? <span className="block text-[11px] text-text-muted">from {formatDate(p.start)}</span> : null}
+                            {p.start ? <span className="block text-xs text-text-muted">from {formatDate(p.start)}</span> : null}
                           </th>
                           <td className="px-2 py-1.5 text-right"><Cell r={p.fund_price} /></td>
                           <td className="px-2 py-1.5 text-right"><Cell r={p.fund_total} /></td>

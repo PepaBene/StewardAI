@@ -13,7 +13,7 @@ describe("holdings treemap tiles", () => {
   it("sizes by weight and colours by today's move, leaving positions without value out", () => {
     const items = treemapItems(holdings, "day", (t) => moves[t]);
     expect(items.map((i) => i.id)).toEqual(["VWCEd_EQ", "ASMLa_EQ"]);
-    expect(items[0]).toMatchObject({ label: "VWCE", weight: 0.3, change: 0.004, href: "/holdings/VWCEd_EQ" });
+    expect(items[0]).toMatchObject({ label: "VWCE", weight: 0.3, change: 0.004, href: "/companies/VWCEd_EQ" });
     // No close-to-close move: a neutral tile, never an invented 0.
     expect(items[1].change).toBeNull();
   });

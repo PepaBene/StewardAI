@@ -26,9 +26,10 @@ import {
   type JobCapRow,
   type PriceRow,
 } from "./budget-form";
+import { MoreSettings } from "@/components/config/summary";
 import { BlueprintCorners } from "@/components/ui/blueprint";
 
-const SECTION = "blueprint space-y-3 p-5";
+const SECTION = "space-y-3 rounded-card bg-surface p-5";
 const JOB_OPTIONS = JOB_TYPES.map((t) => ({
   value: t,
   label: JOB_TYPE_LABELS[t],
@@ -50,7 +51,7 @@ export function BudgetEditor() {
     onLoaded: (body) => {
       const loaded = budgetFromBody(body);
       setForm(loaded);
-      setBaseline(body ? JSON.stringify(budgetToBody(loaded)) : "");
+      setBaseline(JSON.stringify(budgetToBody(loaded)));
     },
   });
 
@@ -112,7 +113,7 @@ export function BudgetEditor() {
         <>
           <section aria-labelledby="cap-heading" className={SECTION}>
             <BlueprintCorners />
-            <h2 id="cap-heading" className="text-[22px] leading-tight font-semibold">
+            <h2 id="cap-heading" className="panel-title">
               Monthly cap
             </h2>
             <p className="max-w-prose text-sm text-text-muted">
@@ -169,10 +170,11 @@ export function BudgetEditor() {
             />
           </section>
 
+          <MoreSettings title="More settings" hint="Per-run caps, critical jobs and the price table">
           <section aria-labelledby="run-caps-heading" className={SECTION}>
 
             <BlueprintCorners />
-            <h2 id="run-caps-heading" className="text-[22px] leading-tight font-semibold">
+            <h2 id="run-caps-heading" className="panel-title">
               Caps per run
             </h2>
             <p className="max-w-prose text-sm text-text-muted">
@@ -217,7 +219,7 @@ export function BudgetEditor() {
           <section aria-labelledby="prices-heading" className={SECTION}>
 
             <BlueprintCorners />
-            <h2 id="prices-heading" className="text-[22px] leading-tight font-semibold">
+            <h2 id="prices-heading" className="panel-title">
               Prices
             </h2>
             <p className="max-w-prose text-sm text-text-muted">
@@ -228,7 +230,7 @@ export function BudgetEditor() {
               {form.prices.map((row, i) => (
                 <li
                   key={row.key}
-                  className="flex flex-wrap items-start gap-3 rounded-md border border-border p-3"
+                  className="flex flex-wrap items-start gap-3 rounded-card bg-surface p-3"
                   aria-label={`Price ${i + 1}`}
                 >
                   <TextField
@@ -323,6 +325,7 @@ export function BudgetEditor() {
             ))}
           </datalist>
 
+          </MoreSettings>
           <SaveBar
             dirty={dirty}
             savedVersionId={editor.version?.id ?? null}
@@ -358,7 +361,7 @@ function JobCapItem({
   ];
   const options: { value: JobType | ""; label: string }[] = [{ value: "", label: "Choose a job type" }, ...JOB_OPTIONS];
   return (
-    <li className="flex flex-wrap items-start gap-3 rounded-md border border-border p-3" aria-label={`Run cap ${index + 1}`}>
+    <li className="flex flex-wrap items-start gap-3 rounded-card bg-surface p-3" aria-label={`Run cap ${index + 1}`}>
       <SelectField
         className="w-64"
         label="Job type"

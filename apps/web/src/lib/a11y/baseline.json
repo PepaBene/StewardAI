@@ -47,14 +47,6 @@
   "app/(app)/holdings/[ticker]/holding-view.tsx": {
     "table-name": 1
   },
-  "app/(app)/investors/investors-view.tsx": {
-    "table-name": 1,
-    "th-scope": 1
-  },
-  "app/(app)/investors/[cik]/investor-view.tsx": {
-    "table-name": 1,
-    "th-scope": 2
-  },
   "app/(app)/reports/[id]/digest-view.tsx": {
     "table-name": 1
   },

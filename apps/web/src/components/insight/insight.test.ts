@@ -61,13 +61,15 @@ describe("insight components", () => {
     const html = render(CheckList, { checks: [check("a", "pass"), check("b", "fail"), check("c", "na"), check("d", "unknown")], ticker: "AAA_US_EQ", failedFirst: true });
     clean(html);
     expect(html).toContain("1 of 2");
-    expect(html).toContain("1 unknown, 1 not applicable");
+    expect(html).toContain("1 couldn&#x27;t run");
+    expect(html).toContain("1 doesn&#x27;t apply");
     expect(html.indexOf("Sentence b")).toBeLessThan(html.indexOf("Sentence a"));
     expect(html).toContain("/companies/AAA_US_EQ/ratios");
   });
 
   it("forecast bars carry a table twin with every period", () => {
     const bars = monthBars([
+      { month: "2026-08", phase: "history", received: 10, declared: 0, estimated: 0, payments: [] },
       { month: "2026-09", phase: "history", received: 12, declared: 0, estimated: 0, payments: [] },
       { month: "2026-11", phase: "forecast", received: 0, declared: 3, estimated: 4, payments: [] },
     ]);
@@ -105,7 +107,9 @@ describe("insight components", () => {
   });
 
   it("dot strip, gauge, chain, grouped table, slider and verdict render cleanly", () => {
-    clean(render(DotStrip, { dots: [{ key: "a", label: "A", value: 1, highlight: true }, { key: "b", label: "B", value: null }], refs: [{ label: "Median", value: 0.5 }], format: String, label: "x" }));
+    clean(render(DotStrip, { dots: [{ key: "a", label: "A", value: 1, highlight: true }, { key: "b", label: "B", value: 0.4 }, { key: "c", label: "C", value: 0.8 }, { key: "d", label: "D", value: null }], refs: [{ label: "Median", value: 0.5 }], format: String, label: "x" }));
+    expect(render(DotStrip, { dots: [{ key: "a", label: "A", value: 1 }, { key: "b", label: "B", value: null }], format: String, label: "x" })).toContain("Only 1 holding has this figure");
+    expect(render(BandGauge, { value: null, min: -0.5, max: 0.5, zones: [], marker: "", format: String, label: "DCF" })).toContain("no value to place");
     clean(render(BandGauge, { value: 0.1, min: -0.5, max: 0.5, zones: [{ label: "Under", to: -0.2, tone: "gain" }, { label: "About right", to: 0.2, tone: "neutral" }, { label: "Over", to: 0.5, tone: "loss" }], marker: "10% over", format: String, label: "DCF" }));
     expect(formatStep("0.125", "fraction")).toBe("12.5%");
     expect(formatStep(1500, "USD")).toContain("USD");

@@ -1,6 +1,7 @@
 "use client";
 
 import { ResourceGate } from "@/components/company/primitives";
+import { EntityName } from "@/components/entity-name";
 import { Blueprint, PanelHeading } from "@/components/ui/blueprint";
 import { getBrowserApiClient } from "@/lib/api/client";
 import { formatDate, formatPercent } from "@/lib/format";
@@ -81,7 +82,7 @@ function Area({ area, items }: { area: ChangeItem["area"]; items: ChangeItem[] }
           {shown.map((c, i) => (
             <tr key={`${c.subject}-${c.what}-${i}`} className="border-t border-border-soft align-top">
               <th scope="row" className="py-1.5 pr-3 text-left font-normal">
-                <span className="font-semibold">{c.subject}</span> <span className="text-text-muted">{KIND_LABEL[c.kind]}</span>
+                <EntityName id={c.subject} chip={false} className="font-semibold" /><span className="text-text-muted">{KIND_LABEL[c.kind]}</span>
                 <div className="text-xs text-text-muted">{c.what}</div>
                 <div className="text-xs text-text-muted" title={c.relevance_reason}>
                   Relevance {c.relevance ?? 0} of 100

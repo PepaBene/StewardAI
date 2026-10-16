@@ -35,7 +35,7 @@ function RuleItem({ row }: { row: ComplianceRow }) {
       />
       <div className="min-w-0">
         <div className="text-[13px] leading-tight font-medium">{row.label}</div>
-        <div className={cn("flex items-center gap-1 text-[11px]", s.cls)}>
+        <div className={cn("flex items-center gap-1 text-xs", s.cls)}>
           <s.Icon aria-hidden="true" className={cn("size-3", row.status === "breach" && "text-warning-signal")} />
           <span className="sr-only">{s.text}: </span>
           <span className="truncate">{row.detail}</span>
@@ -91,7 +91,7 @@ export function ConcentrationCompliance({
               ariaLabel="Effective number of holdings"
               className="mx-auto w-full max-w-64"
             />
-            <p className="text-[11px] leading-snug text-text-faint">
+            <p className="text-xs leading-snug text-text-faint">
               As concentrated as {formatNumber(effective, 1)} equal positions (1 / Herfindahl index of invested weights, cash excluded). How spread
               out the positions are, not whether that&rsquo;s good or bad.
             </p>
@@ -126,7 +126,7 @@ export function ConcentrationCompliance({
           <p className="text-xs text-text-muted">Strategy rules could not be loaded ({strategy.title}); bands shown from drift only.</p>
         ) : null}
         {rows.length ? (
-          <p className="text-[11px] leading-snug text-text-faint">
+          <p className="text-xs leading-snug text-text-faint">
             Rules evaluated against today&rsquo;s weights, as the monthly review does. Ring = share of checks passed.
           </p>
         ) : null}

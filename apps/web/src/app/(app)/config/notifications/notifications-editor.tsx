@@ -30,7 +30,7 @@ import {
 import { formatTime } from "@/lib/format";
 import { configSaveQuery, useConfigEditor } from "@/lib/hooks/use-config-editor";
 import { EVENT_LABELS, EVENT_TYPES, SEVERITY } from "@/lib/news/labels";
-import { BlueprintCorners } from "@/components/ui/blueprint";
+import { SummaryPanel, TabBar } from "@/components/config/summary";
 
 const api = () => getBrowserApiClient();
 const EVENT_OPTIONS = EVENT_TYPES.map((t) => ({ value: t, label: EVENT_LABELS[t] }));
@@ -44,6 +44,7 @@ const SYSTEM_LEVELS = ([3, 2, 1, 0] as const).map((s) => ({
 export function NotificationsEditor() {
   const [form, setForm] = useState<NotificationsForm | null>(null);
   const [baseline, setBaseline] = useState("");
+  const [tab, setTab] = useState<"rules" | "quiet" | "test">("rules");
 
   const editor = useConfigEditor<NotificationsConfig>({
     load: () => api().GET("/config/notifications"),
@@ -52,7 +53,7 @@ export function NotificationsEditor() {
     onLoaded: (body) => {
       const loaded = notificationsFromBody(body);
       setForm(loaded);
-      setBaseline(body ? JSON.stringify(notificationsToBody(loaded)) : "");
+      setBaseline(JSON.stringify(notificationsToBody(loaded)));
     },
   });
 
@@ -107,8 +108,24 @@ export function NotificationsEditor() {
 
       {form ? (
         <>
-          <section aria-labelledby="rules-heading" className="space-y-3">
-            <h2 id="rules-heading" className="text-[22px] leading-tight font-semibold">
+          <SummaryPanel
+            title="Which alerts reach you"
+            reading="Read from the rules below, first match wins. Rules narrowed to event types or holdings are not counted."
+          >
+            <AlertReach rules={form.rules} />
+          </SummaryPanel>
+          <TabBar
+            label="Notification settings"
+            value={tab}
+            onChange={setTab}
+            tabs={[
+              { id: "rules", label: "Rules", badge: String(form.rules.length) },
+              { id: "quiet", label: "Quiet hours and limits" },
+              { id: "test", label: "Test alert" },
+            ]}
+          />
+          <section aria-labelledby="rules-heading" hidden={tab !== "rules"} className="space-y-3">
+            <h2 id="rules-heading" className="text-lg leading-tight font-semibold">
               Rules
             </h2>
             {form.rules.map((rule, index) => (
@@ -129,9 +146,8 @@ export function NotificationsEditor() {
             </Button>
           </section>
 
-          <section aria-labelledby="quiet-heading" className="space-y-3 blueprint p-5">
-            <BlueprintCorners />
-            <h2 id="quiet-heading" className="text-[22px] leading-tight font-semibold">
+          <section aria-labelledby="quiet-heading" hidden={tab !== "quiet"} className="space-y-3 rounded-card bg-surface-muted p-5">
+            <h2 id="quiet-heading" className="text-lg leading-tight font-semibold">
               Quiet hours and limits
             </h2>
             <CheckboxField label="Quiet hours" checked={form.quiet_enabled} onChange={(v) => set({ quiet_enabled: v })} />
@@ -213,7 +229,9 @@ export function NotificationsEditor() {
             />
           </section>
 
-          <TestAlertPanel dirty={dirty} />
+          <div hidden={tab !== "test"}>
+            <TestAlertPanel dirty={dirty} />
+          </div>
 
           <SaveBar
             dirty={dirty}
@@ -229,6 +247,47 @@ export function NotificationsEditor() {
         </>
       ) : null}
     </div>
+  );
+}
+
+/** Severity by channel: which alerts go out at once under the first enabled rule that covers them. */
+function AlertReach({ rules }: { rules: readonly RuleForm[] }) {
+  const broad = rules.filter((r) => r.enabled && r.event_types.length === 0 && !r.tickers.trim());
+  const decide = (sev: 1 | 2 | 3) => broad.find((r) => r.severities.length === 0 || (r.severities as readonly number[]).includes(sev));
+  return (
+    <table className="w-full text-left text-sm">
+      <caption className="sr-only">Channels each severity is sent to at once</caption>
+      <thead className="text-text-muted">
+        <tr>
+          <th scope="col" className="py-1 pr-3 font-medium">Severity</th>
+          {CHANNELS.map((c) => (
+            <th key={c} scope="col" className="px-2 py-1 font-medium">{CHANNEL_LABELS[c]}</th>
+          ))}
+          <th scope="col" className="px-2 py-1 font-medium">Decided by</th>
+        </tr>
+      </thead>
+      <tbody>
+        {([3, 2, 1] as const).map((sev) => {
+          const rule = decide(sev);
+          return (
+            <tr key={sev} className="border-t border-border/50">
+              <th scope="row" className="py-1.5 pr-3 font-normal">{SEVERITY[sev].label}</th>
+              {CHANNELS.map((c) => {
+                const on = (rule?.channels.includes(c) ?? false) && rule?.during_quiet_hours !== "digest_only";
+                return (
+                  <td key={c} className="px-2 py-1">
+                    <span className={on ? "inline-block rounded-control bg-accent/20 px-2 py-0.5 font-medium text-accent-ink" : "inline-block px-2 py-0.5 text-text-muted"}>
+                      {on ? (rule?.during_quiet_hours === "hold_until_end" ? "Instant, held at night" : "Instant") : "Digest only"}
+                    </span>
+                  </td>
+                );
+              })}
+              <td className="px-2 py-1 text-text-muted">{rule ? rule.id || "Unnamed rule" : "No rule"}</td>
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
   );
 }
 
@@ -251,11 +310,9 @@ function RuleCard({
 }) {
   const path = `rules.${index}`;
   return (
-    <div className="space-y-3 blueprint p-5" aria-label={`Rule ${index + 1}`} role="group">
-      <BlueprintCorners />
+    <div className="space-y-3 rounded-card bg-surface-muted p-5" aria-label={`Rule ${index + 1}`} role="group">
       <div className="flex flex-wrap items-start gap-3">
-        <span className="mt-7 font-mono text-sm text-text-muted">{index + 1}.</span>
-        <TextField className="w-60" label="Rule id" path={`${path}.id`} errors={errors} value={rule.id} onChange={(v) => onChange({ id: v })} placeholder="instant-severity-3" />
+        <TextField className="w-60" label="Rule name" path={`${path}.id`} errors={errors} value={rule.id} onChange={(v) => onChange({ id: v })} placeholder="instant-severity-3" />
         <CheckboxField className="mt-7" label="Enabled" checked={rule.enabled} onChange={(v) => onChange({ enabled: v })} />
         <div className="ml-auto flex gap-1">
           <Button variant="ghost" size="icon" aria-label="Move rule up" disabled={index === 0} onClick={() => onMove(-1)}>
@@ -274,7 +331,7 @@ function RuleCard({
         <CheckboxGroup label="Channels" path={`${path}.channels`} errors={errors} values={rule.channels} options={CHANNEL_OPTIONS} onChange={(v) => onChange({ channels: v })} />
         <SelectField label="During quiet hours" path={`${path}.during_quiet_hours`} errors={errors} value={rule.during_quiet_hours} options={QUIET_MODES} onChange={(v) => onChange({ during_quiet_hours: v })} />
       </div>
-      <details className="rounded-md border border-border p-3">
+      <details className="rounded-card bg-surface p-3">
         <summary className="cursor-pointer text-sm font-medium">
           Narrow to event types or holdings
           {rule.event_types.length || rule.tickers.trim() ? " (narrowed)" : " (any)"}
@@ -310,9 +367,8 @@ function TestAlertPanel({ dirty }: { dirty: boolean }) {
   }
 
   return (
-    <section aria-labelledby="test-heading" className="space-y-3 blueprint p-5">
-      <BlueprintCorners />
-      <h2 id="test-heading" className="text-[22px] leading-tight font-semibold">
+    <section aria-labelledby="test-heading" className="space-y-3 rounded-card bg-surface-muted p-5">
+      <h2 id="test-heading" className="text-lg leading-tight font-semibold">
         Send a test alert
       </h2>
       <p className="max-w-prose text-sm text-text-muted">

@@ -30,7 +30,6 @@ export function ContributionCard() {
   return (
     <Blueprint className="flex min-w-0 flex-col gap-4 px-6 py-5.5" aria-label="Contribution to return">
       <PanelHeading
-        kicker="Contribution"
         title="Why the portfolio moved"
         action={
           <RangeButtons
@@ -41,7 +40,7 @@ export function ContributionCard() {
           />
         }
       />
-      <p className="-mt-2 text-xs text-text-muted">Each holding&rsquo;s contribution to the return, its own trading netted out.</p>
+      <p className="-mt-2 text-xs text-text-muted">The biggest lifts and drags on the return, each holding&rsquo;s own trading netted out.</p>
       {state.kind === "loading" ? (
         <p className="flex items-center gap-2 text-sm text-text-muted" role="status">
           <LoaderCircleIcon aria-hidden="true" className="size-4 animate-spin" />

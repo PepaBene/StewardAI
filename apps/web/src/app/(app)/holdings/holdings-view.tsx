@@ -17,6 +17,7 @@ import { EmptyState } from "@/components/empty-state";
 import { PageHeader } from "@/components/page-header";
 import { FreshnessLabel } from "@/components/portfolio/freshness-label";
 import { HoldingsTabs } from "@/components/portfolio/holdings-tabs";
+import { DriftAndComplianceSection } from "@/components/portfolio/moved-sections";
 import { PortfolioTreemap, TreemapModeSwitch } from "@/components/portfolio/portfolio-treemap";
 import { Blueprint, PanelHeading } from "@/components/ui/blueprint";
 import { Button } from "@/components/ui/button";
@@ -121,7 +122,7 @@ function ViewSwitch({ value, onChange }: { value: HoldingsViewKind; onChange: (v
           className={cn(
             "inline-flex items-center gap-1.5 px-3 py-1.5",
             i > 0 && "border-l border-border",
-            value === key ? "bg-accent text-accent-foreground" : "text-text hover:bg-border-soft",
+            value === key ? "bg-accent text-accent-foreground" : "text-text hover:bg-surface-muted",
           )}
         >
           <Icon aria-hidden="true" className="size-3.5" />
@@ -287,7 +288,7 @@ function KpiTiles({
             label={k === "best" ? "Best today" : "Worst today"}
             value={
               m ? (
-                <Link href={`/holdings/${encodeURIComponent(m.holding.ticker)}`} className="hover:text-accent-ink">
+                <Link href={`/companies/${encodeURIComponent(m.holding.ticker)}`} className="hover:text-accent-ink">
                   {displayTicker(m.holding.ticker)}{" "}
                   <span className={TONE_CLASS[gainLossTone(m.change)]}>{formatPercent(m.change, { signed: true })}</span>
                 </Link>
@@ -384,7 +385,7 @@ function ChartsGrid({
           return (
             <Blueprint as="li" key={h.ticker} className="flex flex-col gap-2 p-4">
               <div className="flex items-start justify-between gap-2">
-                <Link href={`/holdings/${encodeURIComponent(h.ticker)}`} className="group min-w-0">
+                <Link href={`/companies/${encodeURIComponent(h.ticker)}`} className="group min-w-0">
                   <span className="block font-mono text-xs font-medium">{displayTicker(h.ticker)}</span>
                   <span className="block truncate text-sm font-semibold group-hover:text-accent-ink group-hover:underline">
                     {h.name ?? h.ticker}
@@ -541,6 +542,9 @@ function HoldingsPresets({
         onClose={() => setDrawer(null)}
         onNotes={onNotes}
       />
+      <div className="pt-2">
+        <DriftAndComplianceSection />
+      </div>
     </section>
   );
 }

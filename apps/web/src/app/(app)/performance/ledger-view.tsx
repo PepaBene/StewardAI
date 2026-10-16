@@ -1,5 +1,6 @@
 "use client";
 
+import { PortfolioDataContextSection } from "@/components/portfolio/data-context-section";
 import { AlertMessage } from "@/components/alert-message";
 import { ResourceGate } from "@/components/company/primitives";
 import { Blueprint, PanelHeading } from "@/components/ui/blueprint";
@@ -145,6 +146,7 @@ export function LedgerView() {
       <ResourceGate state={performance.state} label="ledger health">
         {(data: PerformanceData) => <Health data={data} />}
       </ResourceGate>
+      <PortfolioDataContextSection />
       <Blueprint className="px-[22px] py-4">
         <PanelHeading kicker="Saved as a new version each time" title="Settings" />
         <div className="mt-4">

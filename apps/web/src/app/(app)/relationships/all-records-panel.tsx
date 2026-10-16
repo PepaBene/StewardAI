@@ -86,7 +86,7 @@ function RowCard({ view, r }: { view: GraphKind; r: GraphListRow }) {
   return (
     <li className="space-y-2 border border-border bg-surface-raised p-3">
       <div className="flex flex-wrap items-center gap-2">
-        {r.status ? <StatusMark status={r.status} /> : <span className="border border-border px-1.5 py-0.5 text-[11px]">Unrecognised status: {r.rawStatus}</span>}
+        {r.status ? <StatusMark status={r.status} /> : <span className="border border-border px-1.5 py-0.5 text-xs">Unrecognised status: {r.rawStatus}</span>}
         <span className="num text-sm font-semibold">{r.ticker}</span>
         <span className="text-sm">{titleCase(r.kind)}</span>
         {r.counterparty ? <span className="text-sm text-text-muted">{r.counterparty}</span> : null}

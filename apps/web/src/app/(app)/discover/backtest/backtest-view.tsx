@@ -125,7 +125,6 @@ export function BacktestView() {
   return (
     <div className="flex flex-col gap-5">
       <PageHeader
-        kicker="Research & Verification"
         title="Test a screen on the past"
         description="Replays a set of conditions on each past rebalance date, using only the companies listed then (delisted ones included) and only facts known by then, and charges an explicit trading cost. It describes what the rule would have done with the stored data. It is not a forecast."
         aside={<Link href="/discover" className="text-accent-ink hover:underline">Back to Discover</Link>}
@@ -228,7 +227,7 @@ function Figure({ label, value, hint }: { label: string; value: string | null; h
     <div className="space-y-0.5">
       <dt className="text-xs text-text-muted">{label}</dt>
       <dd className="num text-xl font-semibold">{value ?? <span className="text-base font-normal text-text-muted">not available</span>}</dd>
-      {hint ? <dd className="max-w-[28ch] text-[11px] text-text-faint">{hint}</dd> : null}
+      {hint ? <dd className="max-w-[28ch] text-xs text-text-faint">{hint}</dd> : null}
     </div>
   );
 }

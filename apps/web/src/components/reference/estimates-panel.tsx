@@ -60,7 +60,7 @@ export function EstimatesPanel({ ticker }: { ticker: string }) {
                   className={cn(
                     "num px-2.5 py-1.5",
                     i > 0 && "border-l border-border",
-                    shown === p ? "bg-accent text-accent-foreground" : "text-text hover:bg-border-soft",
+                    shown === p ? "bg-accent text-accent-foreground" : "text-text hover:bg-surface-muted",
                   )}
                 >
                   {p}

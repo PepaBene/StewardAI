@@ -101,7 +101,7 @@ export function ClaimLedger({
               Strategy and thesis checks. A formal check comes from a stored verdict; the others read the report&apos;s text.
             </caption>
             <thead>
-              <tr className="border-b border-border text-left text-[11px] tracking-wide text-text-muted uppercase">
+              <tr className="border-b border-border text-left text-xs text-text-muted">
                 <th scope="col" className="py-1 pr-2 font-medium">Rule</th>
                 <th scope="col" className="py-1 pr-2 font-medium">Status</th>
                 <th scope="col" className="py-1 font-medium">Evidence</th>

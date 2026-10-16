@@ -62,7 +62,7 @@ export function AskScreen({
     <section aria-labelledby="ask-heading" className="space-y-3 border border-border bg-surface-muted px-4 py-4">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h3 id="ask-heading" className="text-base font-semibold">
-          Ask for a screen
+          Describe a screen
         </h3>
         <label className="flex items-center gap-2 text-xs text-text-muted">
           <input type="checkbox" checked={autoRun} onChange={(e) => setAutoRun(e.target.checked)} />
@@ -100,7 +100,7 @@ export function AskScreen({
         </Button>
       </form>
       <p className="text-xs text-text-muted">
-        One AI call turns the sentence into conditions below. Nothing runs until you press Run{autoRun ? " (or right away, as you chose)" : ""}.
+        The sentence becomes filters you can change. Nothing runs until you press Show matches{autoRun ? " (or right away, as you chose)" : ""}.
       </p>
       {error ? (
         <p role="alert" className="text-sm text-loss">
@@ -117,7 +117,7 @@ export function AskScreen({
           ) : (
             <>
               <p className="text-sm">
-                {chips.length ? "Filled in below. Change any condition before running:" : "No condition could be read from that sentence."}
+                {chips.length ? "Added to your filters. Remove a chip below the box to change it:" : "No condition could be read from that sentence. Try naming a number, such as a yield or margin."}
               </p>
               {chips.length ? (
                 <ul className="flex flex-wrap gap-1.5" aria-label="Conditions read from the request">
@@ -151,7 +151,7 @@ export function AskScreen({
           {d.keywords?.length ? (
             <p className="text-xs text-text-muted">Names and themes are not a filter yet: {d.keywords.join(", ")}.</p>
           ) : null}
-          <p className="flex items-center justify-between gap-2 text-[11px] text-text-faint">
+          <p className="flex items-center justify-between gap-2 text-xs text-text-faint">
             <span>
               {result?.cached ? "Answered from the cache. " : ""}
               {result?.evaluation}

@@ -38,7 +38,7 @@ export function AskView() {
             <button
               type="button"
               onClick={() => setSeed(q)}
-              className="rounded-md border border-border px-3 py-1.5 text-left text-sm text-text-muted hover:bg-border-soft hover:text-text"
+              className="rounded-md border border-border px-3 py-1.5 text-left text-sm text-text-muted hover:bg-surface-muted hover:text-text"
             >
               {q}
             </button>

@@ -22,7 +22,7 @@ export type WaterfallChartProps = {
 
 /**
  * Waterfall from a starting total through signed steps to an ending total. Totals are solid
- * accent, increases a lighter accent, decreases hatched outlines, and a derived (balancing) step is
+ * accent, increases gain, decreases loss-outlined, and a derived (balancing) step is
  * dashed. Direction is also spelled out in the hidden table, so colour is never the only cue.
  */
 export function WaterfallChart({ steps, width = 520, height = 200, formatValue = formatCompact, label, className }: WaterfallChartProps) {
@@ -56,8 +56,8 @@ export function WaterfallChart({ steps, width = 520, height = 200, formatValue =
                 width={w}
                 height={h}
                 className={cn(
-                  b.kind === "total" ? "fill-accent" : up ? "fill-accent-300" : "fill-surface",
-                  down && "stroke-text-muted",
+                  b.kind === "total" ? "fill-accent" : up ? "fill-gain" : "fill-loss-subtle",
+                  down && "stroke-loss",
                   derived.has(b.id) && "stroke-text-muted",
                 )}
                 strokeWidth={down || derived.has(b.id) ? 1.25 : 0}

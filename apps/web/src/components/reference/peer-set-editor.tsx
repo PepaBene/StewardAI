@@ -2,6 +2,7 @@
 
 import { useCallback, useMemo, useState } from "react";
 
+import { EntityName } from "@/components/entity-name";
 import { useMutation } from "@/components/reference/action-bits";
 import { Field, FormFrame, OwnerTag, SaveNote, SELECT_CLASS } from "@/components/reference/form-bits";
 import { Button } from "@/components/ui/button";
@@ -81,14 +82,14 @@ function PeerRow({ ticker, peer, onChanged }: { ticker: string; peer: PeerEntry;
   return (
     <li className="space-y-2 px-3 py-2">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-        <span className="font-mono text-sm font-medium">{peer.ticker}</span>
+        <EntityName id={peer.ticker} className="text-sm font-medium" />
         <span
           className={
             peer.status === "confirmed"
-              ? "border border-accent px-1.5 py-0.5 text-[11px] font-medium text-accent-ink"
+              ? "border border-accent px-1.5 py-0.5 text-xs font-medium text-accent-ink"
               : peer.status === "rejected"
-                ? "border border-border px-1.5 py-0.5 text-[11px] font-medium text-text-muted line-through"
-                : "border border-dashed border-border px-1.5 py-0.5 text-[11px] font-medium text-text-muted"
+                ? "border border-border px-1.5 py-0.5 text-xs font-medium text-text-muted line-through"
+                : "border border-dashed border-border px-1.5 py-0.5 text-xs font-medium text-text-muted"
           }
         >
           {STATUS_LABEL[peer.status]}

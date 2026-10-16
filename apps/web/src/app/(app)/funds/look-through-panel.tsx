@@ -66,7 +66,7 @@ export function LookThroughPanel() {
             <table className="w-full min-w-[36rem] border-collapse text-sm">
               <caption className="sr-only">Largest underlying companies, share of total portfolio value</caption>
               <thead>
-                <tr className="border-b border-border text-left text-[11px] text-text-muted uppercase">
+                <tr className="border-b border-border text-left text-xs text-text-muted">
                   <th scope="col" className="py-1.5 pr-3 font-medium">Company</th>
                   <th scope="col" className="w-[40%] py-1.5 pr-3 font-medium">Of total portfolio value</th>
                   <th scope="col" className="py-1.5 pr-3 font-medium">Sector</th>
@@ -78,7 +78,7 @@ export function LookThroughPanel() {
                   <tr key={t.key} className="border-b border-border-soft">
                     <th scope="row" className="py-1.5 pr-3 text-left font-normal">
                       {t.name}
-                      {t.country ? <span className="num ml-2 text-[11px] text-text-muted">{t.country}</span> : null}
+                      {t.country ? <span className="num ml-2 text-xs text-text-muted">{t.country}</span> : null}
                     </th>
                     <td className="py-1.5 pr-3">
                       <HBar value={t.weight} max={maxWeight || 1} label={`${t.name} share of total portfolio value`} formatValue={(v) => formatPct(v, 2)} />

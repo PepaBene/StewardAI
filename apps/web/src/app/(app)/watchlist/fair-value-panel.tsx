@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 import { ResourceGate } from "@/components/company/primitives";
 import { StepSparkline } from "@/components/insight/step-line";
@@ -35,8 +35,9 @@ function loadChoices(): Record<string, string> {
  */
 export function WatchlistFairValue() {
   const { state } = useApiResource(fetchFairValues);
-  const [choice, setChoice] = useState<Record<string, string>>({});
-  useEffect(() => setChoice(loadChoices()), []);
+  // Read once on mount. The server render (no window) gets {}, and nothing that depends on the
+  // choice renders until the fetch lands, so the first paint matches.
+  const [choice, setChoice] = useState<Record<string, string>>(loadChoices);
   const choose = (ticker: string, basis: string) => {
     const next = { ...choice, [ticker]: basis };
     setChoice(next);
@@ -102,7 +103,7 @@ export function WatchlistFairValue() {
                           </td>
                           <td className="num px-3 py-1.5 text-right">
                             {money(r.price, r.price_currency)}
-                            {r.price_date ? <span className="block text-[11px] text-text-faint">{formatDay(r.price_date)}</span> : null}
+                            {r.price_date ? <span className="block text-xs text-text-faint">{formatDay(r.price_date)}</span> : null}
                           </td>
                           <td className="num px-3 py-1.5 text-right">
                             {b ? (

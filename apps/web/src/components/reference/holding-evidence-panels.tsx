@@ -9,6 +9,7 @@ import { Field, OwnerTag, SaveNote, type SaveState } from "@/components/referenc
 import { Blueprint, PanelHeading } from "@/components/ui/blueprint";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { EntityName } from "@/components/entity-name";
 import { getBrowserApiClient } from "@/lib/api/client";
 import { formatPct } from "@/lib/charts/format";
 import { formatDate, formatDateTime } from "@/lib/format";
@@ -178,7 +179,7 @@ export function DealsPanel({ ticker }: { ticker: string }) {
         const deals = listIn(d, ["deals"]);
         return (
           <>
-            {deals.length === 0 ? <Empty>No deals are recorded for {ticker}.</Empty> : <RecordTable rows={deals} caption="Deals" />}
+            {deals.length === 0 ? <Empty>No deals are recorded for <EntityName id={ticker} chip={false} />.</Empty> : <RecordTable rows={deals} caption="Deals" />}
             <Limits items={arr(isRecord(d) ? d.limitations : null).filter((x): x is string => typeof x === "string")} />
           </>
         );
@@ -193,7 +194,7 @@ export function ThesisKpiLinksPanel({ ticker }: { ticker: string }) {
     <ReadPanel id="kpi-links" kicker="Thesis" title="Events linked to your thesis KPIs" fetcher={fetcher}>
       {(d) => {
         const links = listIn(d, ["links"]);
-        return links.length === 0 ? <Empty>No event is linked to a thesis KPI for {ticker}.</Empty> : <RecordTable rows={links} caption="Events linked to thesis KPIs" />;
+        return links.length === 0 ? <Empty>No event is linked to a thesis KPI for <EntityName id={ticker} chip={false} />.</Empty> : <RecordTable rows={links} caption="Events linked to thesis KPIs" />;
       }}
     </ReadPanel>
   );
@@ -204,7 +205,7 @@ export function CompanyObservationsPanel({ ticker }: { ticker: string }) {
   return (
     <ReadPanel id="observations" kicker="Company research · vendor-reported" title="Company research observations" fetcher={fetcher} intro="Facts a research provider reported about the company. They are the provider's claims, not filings, and are kept apart from your own entries.">
       {(d) => {
-        return d.observations.length === 0 ? <Empty>No provider has reported observations for {ticker}. Fetch them under Fetch more data.</Empty> : <RecordTable rows={d.observations} caption="Company research observations" />;
+        return d.observations.length === 0 ? <Empty>No provider has reported observations for <EntityName id={ticker} chip={false} />. Fetch them under Fetch more data.</Empty> : <RecordTable rows={d.observations} caption="Company research observations" />;
       }}
     </ReadPanel>
   );
@@ -220,7 +221,7 @@ export function PdmrPanel({ ticker }: { ticker: string }) {
             Parsed {d.status.parsed} of {d.status.attempted} attempted. {d.status.detail ?? ""}
           </p>
           {d.notifications.length === 0 ? (
-            <Empty>No notifications are stored for {ticker}.</Empty>
+            <Empty>No notifications are stored for <EntityName id={ticker} chip={false} />.</Empty>
           ) : (
             <ul className="divide-y divide-border border border-border">
               {d.notifications.map((n) => (
@@ -331,7 +332,7 @@ export function ReferenceHistoryPanel({ ticker }: { ticker: string }) {
       <section className="space-y-2">
         <h3 className="text-base font-semibold">Identity decisions</h3>
         {dec.state.kind === "loading" && !all ? <p className="text-sm text-text-muted">Loading…</p> : null}
-        {all && mine.length === 0 ? <Empty>No identity decision is recorded for {ticker}.</Empty> : <RecordTable rows={mine} caption="Identity decisions" max={6} />}
+        {all && mine.length === 0 ? <Empty>No identity decision is recorded for <EntityName id={ticker} chip={false} />.</Empty> : <RecordTable rows={mine} caption="Identity decisions" max={6} />}
         <p className="text-xs text-text-muted">
           Decisions you made carry the <OwnerTag>Entered by you</OwnerTag> mark where the record says who made them.
         </p>

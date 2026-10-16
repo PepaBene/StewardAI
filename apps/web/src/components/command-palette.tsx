@@ -160,12 +160,14 @@ export function CommandPalette() {
         type="button"
         onClick={open}
         aria-keyshortcuts="Control+K Meta+K"
-        className="flex h-[34px] items-center gap-2.5 border border-border px-2.5 text-[13px] text-text-muted transition-colors hover:bg-border-soft md:w-[340px]"
+        aria-label="Search"
+        className="flex h-[34px] shrink-0 items-center gap-2.5 rounded-control border border-border px-2.5 text-[13px] text-text-muted transition-colors hover:bg-surface-muted md:w-[150px] lg:w-auto xl:w-[150px] 2xl:w-[240px]"
       >
         <SearchIcon aria-hidden="true" className="size-[15px] shrink-0" />
-        <span className="hidden flex-1 text-left md:inline">Search holdings, reports, jobs…</span>
-        <span className="sr-only md:hidden">Search</span>
-        <kbd className="hidden items-center border border-border px-1.5 font-mono text-[11px] md:inline-flex">
+        <span aria-hidden="true" className="hidden min-w-0 flex-1 truncate text-left md:inline lg:hidden xl:inline">
+          Search…
+        </span>
+        <kbd className="hidden shrink-0 items-center rounded-mark border border-border px-1.5 text-xs md:inline-flex lg:hidden xl:inline-flex">
           <CommandIcon aria-hidden="true" className="size-3" />K
         </kbd>
       </button>
@@ -195,7 +197,7 @@ export function CommandPalette() {
             onKeyDown={onKeyDown}
             className="h-13 flex-1 bg-transparent text-base outline-none placeholder:text-text-muted"
           />
-          <kbd className="hidden border border-border px-1.5 font-mono text-[11px] text-text-muted sm:inline">Esc</kbd>
+          <kbd className="hidden border border-border px-1.5 font-mono text-xs text-text-muted sm:inline">Esc</kbd>
         </div>
         <ul id={listId} role="listbox" aria-label="Commands" className="max-h-[50vh] overflow-y-auto p-1">
           {results.length === 0 ? <li className="px-3 py-6 text-center text-sm text-text-muted">No matches.</li> : null}
@@ -214,7 +216,7 @@ export function CommandPalette() {
             >
               {c.ui ? <MessageSquareIcon aria-hidden="true" className="size-4" /> : c.action ? <PlayIcon aria-hidden="true" className="size-4" /> : <ArrowRightIcon aria-hidden="true" className="size-4" />}
               <span className="flex-1 text-text">{c.label}</span>
-              <span className="font-mono text-[10px] tracking-[0.08em] text-text-faint uppercase">{c.group}</span>
+              <span className="text-xs text-text-faint">{c.group}</span>
             </li>
           ))}
         </ul>
@@ -236,13 +238,13 @@ export function CommandPalette() {
           ) : (
             <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
               <span>
-                <kbd className="border border-border px-1 font-mono text-[10px]">↑↓</kbd> to move
+                <kbd className="border border-border px-1 font-mono text-xs">↑↓</kbd> to move
               </span>
               <span>
-                <kbd className="border border-border px-1 font-mono text-[10px]">Enter</kbd> to open or run
+                <kbd className="border border-border px-1 font-mono text-xs">Enter</kbd> to open or run
               </span>
               <span>
-                <kbd className="border border-border px-1 font-mono text-[10px]">Esc</kbd> to close
+                <kbd className="border border-border px-1 font-mono text-xs">Esc</kbd> to close
               </span>
             </span>
           )}

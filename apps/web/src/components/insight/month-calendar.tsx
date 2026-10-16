@@ -74,7 +74,7 @@ export function MonthCalendar({
                 const events = byDate.get(day.iso) ?? [];
                 return (
                   <td key={day.iso} className={cn("h-24 border border-border-soft p-1 align-top", !day.inMonth && "bg-surface-muted/40")}>
-                    <div className={cn("num mb-1 text-[11px]", day.inMonth ? "text-text-muted" : "text-text-faint", day.iso === today && "font-semibold text-accent-ink")}>
+                    <div className={cn("num mb-1 text-xs", day.inMonth ? "text-text-muted" : "text-text-faint", day.iso === today && "font-semibold text-accent-ink")}>
                       {day.day}
                       {day.iso === today ? <span className="sr-only"> (today)</span> : null}
                     </div>
@@ -148,7 +148,7 @@ export function MonthCalendar({
           </Button>
         </div>
       </div>
-      <ul className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-text-muted">
+      <ul className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-text-muted">
         {kinds.map((k) => (
           <li key={k.key} className="inline-flex items-center gap-1.5">
             <Dot kind={k} />

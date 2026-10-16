@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 
 import { ResourceGate } from "@/components/company/primitives";
+import { KpiStrip } from "@/components/insight/kpi-tile";
 import { Field, Problem, problemText, SELECT, TEXTAREA } from "@/components/risk/common";
 import { Blueprint, PanelHeading } from "@/components/ui/blueprint";
 import { Button } from "@/components/ui/button";
@@ -23,6 +24,7 @@ import {
   type EntryForm,
   type JournalEntry,
 } from "@/lib/journal/journal";
+import { journalSummary } from "@/lib/journal/summary";
 import { cn } from "@/lib/utils";
 
 // The most the server returns in one request; a full page means older entries exist.
@@ -76,6 +78,7 @@ export function JournalView() {
 
   return (
     <div className="flex flex-col gap-5">
+      {state.kind === "ok" ? <JournalStrip entries={[...state.data, ...older]} /> : null}
       <div ref={formRef}>
         <EntryFormPanel form={form} setForm={setForm} onSaved={saved} />
       </div>
@@ -94,6 +97,30 @@ export function JournalView() {
         )}
       </ResourceGate>
     </div>
+  );
+}
+
+function JournalStrip({ entries }: { entries: readonly JournalEntry[] }) {
+  const s = journalSummary(entries, new Date().toISOString().slice(0, 10));
+  return (
+    <KpiStrip
+      label="Journal summary"
+      tiles={[
+        { label: "Decisions written down", value: s.decisions },
+        {
+          label: "Reviews due",
+          value: s.reviewsDue,
+          signed: s.reviewsDue > 0 ? "loss" : undefined,
+          note: s.reviewsDue > 0 ? "Past their review date" : "None overdue",
+        },
+        { label: "Last 90 days", value: s.recent, note: "Decisions recorded" },
+        {
+          label: "With a conviction score",
+          value: s.recentWithConviction === null ? "–" : `${Math.round(s.recentWithConviction * 100)}%`,
+          note: "Of the last 90 days' decisions",
+        },
+      ]}
+    />
   );
 }
 

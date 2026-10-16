@@ -184,7 +184,8 @@ export function DivergingBar({
   );
 }
 
-export type StackedSegment = { label: string; value: number };
+/** `fill` replaces the categorical colour when the parts carry meaning (an outcome, a status) rather than identity. */
+export type StackedSegment = { label: string; value: number; fill?: string };
 
 export type StackedBarProps = {
   /** Parts in display order; non-positive values are dropped, more than 8 fold into "Other". */
@@ -232,22 +233,22 @@ export function StackedBar({
       ) : null}
       {total > 0 ? (
         <>
-          <div role="img" aria-label={title ? `${title}: ${summary}` : summary} className="flex h-5.5 gap-0.5">
+          <div role="img" aria-label={title ? `${title}: ${summary}` : summary} className="flex h-5.5 gap-0.5 overflow-hidden rounded-mark">
             {parts.map((p, i) => (
               <div
                 key={i}
-                className={cn("min-w-px", CATEGORICAL_BG[i])}
+                className={cn("min-w-px", ("fill" in p && p.fill) || CATEGORICAL_BG[i])}
                 style={{ flexGrow: p.value, flexBasis: 0 }}
                 title={`${p.label} · ${formatShare(p.value / total)}`}
               />
             ))}
           </div>
           {legend ? (
-            <ul className="m-0 flex list-none flex-wrap gap-x-3.5 gap-y-1 p-0 text-[11px] text-text-muted" aria-hidden="true">
+            <ul className="m-0 flex list-none flex-wrap gap-x-3.5 gap-y-1 p-0 text-xs text-text-muted" aria-hidden="true">
               {parts.map((p, i) => (
                 <li key={i} className="inline-flex items-center gap-1.5">
-                  <span className={cn("size-2", CATEGORICAL_BG[i])} />
-                  <b className="font-semibold text-text">{p.label}</b>
+                  <span className={cn("size-2 rounded-mark", ("fill" in p && p.fill) || CATEGORICAL_BG[i])} />
+                  <b className="font-medium text-text">{p.label}</b>
                   <span className="num">{formatShare(p.value / total)}</span>
                 </li>
               ))}

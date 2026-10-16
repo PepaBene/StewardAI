@@ -43,7 +43,7 @@ export function TrailPanel() {
       <BlueprintCorners />
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h2 id="trail-heading" className="text-[22px] leading-tight font-semibold">
+          <h2 id="trail-heading" className="panel-title">
             Alert decisions
           </h2>
           <p className="max-w-[68ch] text-sm text-text-muted">What each free-source alert rule decided, newest first, including the times it stayed quiet and why.</p>

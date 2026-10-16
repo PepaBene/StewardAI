@@ -61,7 +61,7 @@ export function OverlapPanel({ selectedIsin }: { selectedIsin: string | null }) 
           <table className="w-full min-w-[40rem] border-collapse text-sm">
             <caption className="sr-only">Per-fund coverage and concentration</caption>
             <thead>
-              <tr className="border-b border-border text-left text-[11px] text-text-muted uppercase">
+              <tr className="border-b border-border text-left text-xs text-text-muted">
                 <th scope="col" className="py-1.5 pr-3 font-medium">Fund</th>
                 <th scope="col" className="py-1.5 pr-3 text-right font-medium">Holdings as of</th>
                 <th scope="col" className="py-1.5 pr-3 text-right font-medium">Equity, of fund</th>
@@ -77,12 +77,12 @@ export function OverlapPanel({ selectedIsin }: { selectedIsin: string | null }) 
                     <Link href={`/funds?isin=${f.isin}#factsheet`} className="text-accent-ink hover:underline">
                       {i + 1} {f.label}
                     </Link>
-                    <span className="num block text-[11px] text-text-muted">{f.isin}</span>
+                    <span className="num block text-xs text-text-muted">{f.isin}</span>
                   </th>
                   <td className="num py-1.5 pr-3 text-right">
                     {f.asOf ?? UNKNOWN}
                     {f.stale ? (
-                      <span className="block text-[11px] text-text-muted">stale{f.lagDays !== null ? `, ${f.lagDays} d old` : ""}</span>
+                      <span className="block text-xs text-text-muted">stale{f.lagDays !== null ? `, ${f.lagDays} d old` : ""}</span>
                     ) : null}
                   </td>
                   <td className="num py-1.5 pr-3 text-right">{f.equityWeight === null ? UNKNOWN : formatPct(f.equityWeight, 1)}</td>

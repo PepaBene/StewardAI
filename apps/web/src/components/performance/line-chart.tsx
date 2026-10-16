@@ -54,7 +54,7 @@ export function LineChart({
               className={t === baseline ? "stroke-border" : "stroke-chart-grid"}
               strokeDasharray={t === baseline ? undefined : "2 3"}
             />
-            <text x={BOX.left - 6} y={y(t) + 3} textAnchor="end" className="fill-text-muted text-[10px]">
+            <text x={BOX.left - 6} y={y(t) + 3} textAnchor="end" className="fill-text-muted text-xs">
               {format(t)}
             </text>
           </g>
@@ -69,10 +69,10 @@ export function LineChart({
             strokeDasharray={s.dashed ? "4 3" : undefined}
           />
         ))}
-        <text x={BOX.left} y={H - 8} className="fill-text-muted text-[10px]">
+        <text x={BOX.left} y={H - 8} className="fill-text-muted text-xs">
           {formatDate(span.first)}
         </text>
-        <text x={BOX.right} y={H - 8} textAnchor="end" className="fill-text-muted text-[10px]">
+        <text x={BOX.right} y={H - 8} textAnchor="end" className="fill-text-muted text-xs">
           {formatDate(span.last)}
         </text>
       </svg>

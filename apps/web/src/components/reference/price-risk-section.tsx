@@ -333,7 +333,7 @@ function Correlations({ data }: { data: PriceHistory }) {
             {rows.map((r) => (
               <tr key={r.ticker} className="border-b border-border last:border-0">
                 <th scope="row" className="py-1 text-left font-normal">
-                  <Link href={`/holdings/${encodeURIComponent(r.ticker)}`} className="font-mono hover:text-accent-ink hover:underline">
+                  <Link href={`/companies/${encodeURIComponent(r.ticker)}`} className="font-mono hover:text-accent-ink hover:underline">
                     {r.ticker}
                   </Link>
                 </th>

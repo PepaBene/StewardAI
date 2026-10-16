@@ -11,6 +11,7 @@ import {
   NotebookPenIcon,
   XIcon,
 } from "lucide-react";
+import Link from "next/link";
 import { Fragment, useMemo, useState, type ReactNode } from "react";
 
 import { HBar, Sparkline } from "@/components/charts";
@@ -81,6 +82,8 @@ export type CellContext = {
   prices: HoldingPrices | undefined;
   baseCcy: string;
   scale: number;
+  /** False when no holding has a target weight: the cell then says nothing about targets. */
+  hasTargets?: boolean;
   onOpen: (tab?: "overview" | "notes") => void;
   expand?: { open: boolean; onToggle: () => void; controls: string };
 };
@@ -102,10 +105,10 @@ export function cellContent(id: ColumnId, x: CellContext): ReactNode {
       return (
         <>
           {formatPrice(h.current_price, h.instrument_currency)}
-          <span className="block text-[11px]" title={move.title}>
+          <span className="block text-xs" title={move.title}>
             {move.value === null ? <span className="text-text-muted">—</span> : <Change value={move.value} />}
             {move.kind === "intraday" && move.stamp ? (
-              <span className="ml-1 font-mono text-[10px] text-text-faint">
+              <span className="ml-1 font-mono text-xs text-text-faint">
                 <span className="sr-only">intraday, </span>
                 {move.stamp}
               </span>
@@ -139,7 +142,9 @@ export function cellContent(id: ColumnId, x: CellContext): ReactNode {
         <>
           <span className="num mb-1 flex justify-between gap-2 text-xs">
             <span>{formatPercent(h.weight)}</span>
-            <span className="text-text-muted">{h.target_weight !== null ? `target ${formatPercent(h.target_weight)}` : "no target"}</span>
+            {x.hasTargets === false ? null : (
+              <span className="text-text-muted">{h.target_weight !== null ? `target ${formatPercent(h.target_weight)}` : "no target"}</span>
+            )}
           </span>
           <HBar value={h.weight} max={x.scale} target={h.target_weight} size="sm" label={`${short} weight`} className="h-1.5" />
         </>
@@ -174,7 +179,7 @@ export function cellContent(id: ColumnId, x: CellContext): ReactNode {
       return (
         <span className={cn(up < 0 ? "text-loss" : "text-gain")} title={row?.fair_basis ?? undefined}>
           {up < 0 ? `${formatPercent(-up, { decimals: 0 })} above` : `${formatPercent(up, { decimals: 0 })} below`}
-          {row?.fair_stale ? <span className="block text-[11px] text-text-muted">stale</span> : null}
+          {row?.fair_stale ? <span className="block text-xs text-text-muted">stale</span> : null}
         </span>
       );
     }
@@ -193,7 +198,7 @@ export function cellContent(id: ColumnId, x: CellContext): ReactNode {
       return (
         <>
           {formatDate(n.date)}
-          <span className="block text-[11px] text-text-muted">
+          <span className="block text-xs text-text-muted">
             {amt !== null ? formatMoney(amt, n.currency ?? x.baseCcy) : formatPrice(toNum(n.per_share), n.currency ?? h.instrument_currency)} · {n.kind}
           </span>
         </>
@@ -250,14 +255,14 @@ function HoldingHeader({ x }: { x: CellContext }) {
   return (
     <div className="flex items-center justify-between gap-2">
       <button type="button" onClick={() => x.onOpen()} className="group flex min-w-0 items-center gap-2.5 text-left">
-        <span aria-hidden="true" className="grid size-[34px] shrink-0 place-items-center border border-border font-mono text-[10px] font-medium">
+        <span aria-hidden="true" className="grid size-[34px] shrink-0 place-items-center border border-border font-mono text-xs font-medium">
           {short.slice(0, 4)}
         </span>
         <span className="min-w-0">
           <span className="block max-w-[16rem] truncate font-semibold text-text group-hover:text-accent-ink group-hover:underline">
             {x.h.name ?? x.h.ticker}
           </span>
-          <span className="block font-mono text-[11px] text-text-muted" title={x.h.ticker}>
+          <span className="block font-mono text-xs text-text-muted" title={x.h.ticker}>
             {short}
             {cls ? ` · ${cls}` : ""}
           </span>
@@ -293,7 +298,7 @@ export function PresetPicker({
             className={cn(
               "px-3 py-1.5",
               i > 0 && "border-l border-border",
-              value === p.key ? "bg-accent text-accent-foreground" : "text-text hover:bg-border-soft",
+              value === p.key ? "bg-accent text-accent-foreground" : "text-text hover:bg-surface-muted",
             )}
           >
             {p.label}
@@ -372,7 +377,7 @@ export function ColumnEditor({ columns, onChange }: { columns: readonly ColumnId
                     />
                     <span>
                       {COLUMNS[id].label}
-                      <span className="block text-[11px] text-text-muted">{COLUMNS[id].help}</span>
+                      <span className="block text-xs text-text-muted">{COLUMNS[id].help}</span>
                     </span>
                   </label>
                 </li>
@@ -385,9 +390,12 @@ export function ColumnEditor({ columns, onChange }: { columns: readonly ColumnId
   );
 }
 
+/** Rows shown before "Show more": long tables paginate past this. */
+const PAGE_SIZE = 50;
+
 export function PresetTable({
   data,
-  columns,
+  columns: requestedColumns,
   insight,
   insightNote,
   priceMap,
@@ -403,6 +411,10 @@ export function PresetTable({
   onOpen: (ticker: string, tab?: "overview" | "notes") => void;
 }) {
   const [sort, setSort] = useState<SortState>({ id: "value", dir: "desc" });
+  const [limit, setLimit] = useState(PAGE_SIZE);
+  // With no target weights set the drift column says nothing: hide it and say so once.
+  const hasTargets = data.holdings.some((h) => h.target_weight !== null);
+  const columns = useMemo(() => (hasTargets ? requestedColumns : requestedColumns.filter((c) => c !== "drift")), [hasTargets, requestedColumns]);
   const active = useMemo<SortState>(
     () => (columns.includes(sort.id) ? sort : columns.includes("value") ? { id: "value", dir: "desc" } : { id: "holding", dir: "asc" }),
     [columns, sort],
@@ -430,6 +442,7 @@ export function PresetTable({
       prices: priceMap.get(h.ticker),
       baseCcy,
       scale,
+      hasTargets,
       onOpen: (tab) => onOpen(h.ticker, tab),
       expand: expandable ? { open: open.has(h.ticker), onToggle: () => toggle(h.ticker), controls: `look-through-${h.ticker}` } : undefined,
     };
@@ -450,6 +463,18 @@ export function PresetTable({
     return null;
   };
   const sortLabel = COLUMNS[active.id].label;
+  const shownRows = rows.slice(0, limit);
+  const more =
+    rows.length > limit ? (
+      <p className="flex items-center justify-between gap-3 text-sm text-text-muted">
+        <span>
+          Showing {shownRows.length} of {rows.length} positions.
+        </span>
+        <button type="button" onClick={() => setLimit((n) => n + PAGE_SIZE)} className="font-medium text-accent-ink hover:underline">
+          Show {Math.min(PAGE_SIZE, rows.length - limit)} more
+        </button>
+      </p>
+    ) : null;
 
   return (
     <>
@@ -458,6 +483,15 @@ export function PresetTable({
           {insightNote}
         </p>
       ) : null}
+      {hasTargets || data.holdings.length === 0 ? null : (
+        <p className="text-sm text-text-muted" role="note">
+          No target weights set.{" "}
+          <Link href="/config/strategy" className="font-medium text-accent-ink hover:underline">
+            Set targets
+          </Link>{" "}
+          to see how far each position drifts.
+        </p>
+      )}
       <Blueprint className="hidden overflow-visible md:block">
         <div className="relative overflow-x-auto">
           <table className="w-full text-sm" style={{ minWidth: `${Math.max(48, 16 + rest.length * 8)}rem` }}>
@@ -465,7 +499,7 @@ export function PresetTable({
               Open positions, sorted by {sortLabel} {active.dir === "asc" ? "ascending" : "descending"}
             </caption>
             <thead className="bg-surface-muted">
-              <tr className="border-b border-border text-[11px] tracking-[0.08em] text-text-muted uppercase">
+              <tr className="border-b border-border text-xs text-text-muted">
                 {columns.map((id) => {
                   const def = COLUMNS[id];
                   const on = active.id === id;
@@ -488,7 +522,7 @@ export function PresetTable({
                         <button
                           type="button"
                           onClick={() => setSort(nextSortState(active, id))}
-                          className={cn("inline-flex items-center gap-1 uppercase hover:text-text", on && "text-text", def.align === "right" && "flex-row-reverse")}
+                          className={cn("inline-flex items-center gap-1 hover:text-text", on && "text-text", def.align === "right" && "flex-row-reverse")}
                         >
                           <SortIcon aria-hidden="true" className="size-3" />
                           {label}
@@ -502,11 +536,11 @@ export function PresetTable({
               </tr>
             </thead>
             <tbody>
-              {rows.map((h) => {
+              {shownRows.map((h) => {
                 const x = ctx(h);
                 return (
                   <Fragment key={h.ticker}>
-                    <tr className="border-b border-border-soft align-middle hover:bg-border-soft">
+                    <tr className="border-b border-border-soft align-middle hover:bg-surface-muted">
                       <th scope="row" className="py-2.5 pr-3 pl-5 text-left font-normal">
                         <HoldingHeader x={x} />
                       </th>
@@ -554,7 +588,8 @@ export function PresetTable({
           </table>
         </div>
       </Blueprint>
-      <MobileCards rows={rows} rest={rest} ctx={ctx} />
+      <MobileCards rows={shownRows} rest={rest} ctx={ctx} />
+      {more}
     </>
   );
 }
@@ -571,7 +606,7 @@ function MobileCards({ rows, rest, ctx }: { rows: Holding[]; rest: ColumnId[]; c
             <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2">
               {rest.map((id) => (
                 <div key={id} className={cn("min-w-0", (id === "thesis" || id === "last_event" || id === "weight") && "col-span-2")}>
-                  <dt className="text-[11px] text-text-muted">{COLUMNS[id].label}</dt>
+                  <dt className="text-xs text-text-muted">{COLUMNS[id].label}</dt>
                   <dd className="num text-sm">{cellContent(id, x)}</dd>
                 </div>
               ))}

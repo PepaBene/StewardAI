@@ -105,7 +105,7 @@ export function RecordFactsForm({
               className="w-full border border-border bg-surface px-2 py-1.5"
             />
           )}
-          {f.hint ? <span className="mt-0.5 block text-[11px] text-text-muted">{f.hint}</span> : null}
+          {f.hint ? <span className="mt-0.5 block text-xs text-text-muted">{f.hint}</span> : null}
         </label>
       ))}
       <label className="text-sm sm:col-span-2">

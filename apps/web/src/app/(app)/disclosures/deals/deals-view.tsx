@@ -110,7 +110,6 @@ export function DealsPageView() {
     <div className="flex flex-col gap-5">
       <DealDefs />
       <PageHeader
-        kicker="Research & Verification"
         title="Deals and financing"
         description="Acquisitions, sales, spin-offs, offerings, debt and buybacks a holding has made public: what stage each is at, what the terms said and when that was known, and what the stated terms would change. Terms that are not stated stay unknown."
         aside={<span>{ticker ?? SAMPLE_DEAL_TICKER} · as known on {formatDay(asOf)}</span>}

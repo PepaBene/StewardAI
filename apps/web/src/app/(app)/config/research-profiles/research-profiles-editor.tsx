@@ -3,6 +3,7 @@
 import {
   ArrowDownIcon,
   ArrowUpIcon,
+  ChevronRightIcon,
   CopyIcon,
   FlaskConicalIcon,
   LoaderCircleIcon,
@@ -23,6 +24,7 @@ import {
   TextField,
 } from "@/components/config/fields";
 import { SaveBar } from "@/components/config/save-bar";
+import { MoreSettings } from "@/components/config/summary";
 import { Button } from "@/components/ui/button";
 import {
   getBrowserApiClient,
@@ -105,7 +107,7 @@ export function ResearchProfilesEditor() {
     onLoaded: (body) => {
       const loaded = researchProfilesFromBody(body);
       setForm(loaded);
-      setBaseline(body ? JSON.stringify(researchProfilesToBody(loaded)) : "");
+      setBaseline(JSON.stringify(researchProfilesToBody(loaded)));
     },
   });
   const body = useMemo(
@@ -341,10 +343,7 @@ export function ResearchProfilesEditor() {
 
           <section aria-labelledby="templates-heading" className="space-y-4">
             <div className="space-y-1">
-              <h2
-                id="templates-heading"
-                className="text-[22px] leading-tight font-semibold"
-              >
+              <h2 id="templates-heading" className="panel-title">
                 Report templates
               </h2>
               <p className="text-sm text-text-muted">
@@ -472,6 +471,8 @@ function ProfileCard({
   const listId = useId();
   const path = `profiles.${i}`;
   const own = errorsAt(errors, path);
+  const needsAttention =
+    own.length > 0 || Object.keys(errors).some((k) => k.startsWith(`${path}.`));
   const label = p.name || p.id || `profile ${i + 1}`;
   const templateOptions = [
     { value: "", label: "None (the profile's own section list)" },
@@ -484,28 +485,39 @@ function ProfileCard({
       : []),
   ];
   return (
-    <section aria-labelledby={headingId} className="space-y-4 blueprint p-5">
-      <BlueprintCorners />
-      <div className="flex flex-wrap items-start justify-between gap-2">
-        <h2
-          id={headingId}
-          className="flex flex-wrap items-center gap-2 text-[22px] leading-tight font-semibold"
-        >
-          <FlaskConicalIcon
-            aria-hidden="true"
-            className="size-4 text-text-muted"
-          />
-          {p.name || "(no name)"}{" "}
-          <span className="font-mono text-sm font-normal text-text-muted">
-            {p.id}
+    <details aria-labelledby={headingId} className="group rounded-card bg-surface-muted">
+      <summary className="flex cursor-pointer list-none items-start gap-3 rounded-card px-5 py-4 outline-none focus-visible:ring-2 focus-visible:ring-focus/30">
+        <ChevronRightIcon
+          aria-hidden="true"
+          className="mt-1 size-4 shrink-0 transition-transform group-open:rotate-90"
+        />
+        <span className="min-w-0 flex-1 space-y-0.5">
+          <span
+            id={headingId}
+            className="flex flex-wrap items-center gap-2 text-base font-semibold"
+          >
+            <FlaskConicalIcon
+              aria-hidden="true"
+              className="size-4 text-text-muted"
+            />
+            {p.name || "(no name)"}
+            {isDefault ? (
+              <span className="inline-flex items-center gap-1 rounded-control bg-surface px-1.5 py-0.5 text-xs font-medium">
+                <StarIcon aria-hidden="true" className="size-3" />
+                Default
+              </span>
+            ) : null}
+            {needsAttention ? (
+              <span className="text-xs font-medium text-warning-signal">Needs attention</span>
+            ) : null}
           </span>
-          {isDefault ? (
-            <span className="inline-flex items-center gap-1 rounded-sm border border-border px-1.5 py-0.5 text-xs font-medium">
-              <StarIcon aria-hidden="true" className="size-3" />
-              Default
-            </span>
-          ) : null}
-        </h2>
+          <span className="block text-sm font-normal text-text-muted">
+            {profileSummary(p)}
+          </span>
+        </span>
+      </summary>
+      <div className="space-y-4 px-5 pb-5">
+      <div className="flex flex-wrap items-start justify-end gap-2">
         <div className="flex flex-wrap gap-1">
           {!isDefault ? (
             <Button
@@ -744,8 +756,9 @@ function ProfileCard({
         </div>
       </fieldset>
 
+      <MoreSettings title="Research workers" hint="Engine, worker models and lenses" className="bg-surface">
       <fieldset className="space-y-3">
-        <legend className="text-sm font-medium">Research workers</legend>
+        <legend className="sr-only">Research workers</legend>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <SelectField
             label="Engine"
@@ -817,9 +830,11 @@ function ProfileCard({
           />
         ) : null}
       </fieldset>
+      </MoreSettings>
 
+      <MoreSettings title="Cost of a run" hint="Writing order, search mode and cheaper models" className="bg-surface">
       <fieldset className="space-y-3">
-        <legend className="text-sm font-medium">Cost of a run</legend>
+        <legend className="sr-only">Cost of a run</legend>
         <p className="text-xs text-text-muted">
           None of these lowers a search, step, section or sentence limit. Turn
           one on only after comparing a report written with and without it.
@@ -908,9 +923,11 @@ function ProfileCard({
           hint="A draft with fewer cited sentences than the minimum above is rewritten by the main model."
         />
       </fieldset>
+      </MoreSettings>
 
+      <MoreSettings title="Source policy" hint="Trusted, blocked and forum domains; staleness" className="bg-surface">
       <fieldset className="space-y-3">
-        <legend className="text-sm font-medium">Source policy</legend>
+        <legend className="sr-only">Source policy</legend>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <TextAreaField
             label="Trusted domains"
@@ -978,8 +995,24 @@ function ProfileCard({
           ) : null}
         </fieldset>
       </fieldset>
-    </section>
+      </MoreSettings>
+      </div>
+    </details>
   );
+}
+
+const sentenceCase = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+
+/** One line on what a profile does: depth, sections, searching, sources and when it runs. */
+function profileSummary(p: ProfileForm): string {
+  const parts = [
+    `${sentenceCase(p.depth)} depth`,
+    `${p.sections.length} section${p.sections.length === 1 ? "" : "s"}`,
+    `up to ${p.max_searches || "no"} web searches`,
+    `${p.source_tiers.length} source tier${p.source_tiers.length === 1 ? "" : "s"}`,
+  ];
+  if (p.iterate) parts.push(`searches again for thin sections, up to ${p.max_rounds || "a few"} rounds`);
+  return `${parts.join(", ")}. Runs when you start a research run; no schedule.`;
 }
 
 /**
@@ -1018,7 +1051,7 @@ function SectionPicker({
           return (
             <li
               key={sectionId}
-              className="flex flex-wrap items-center gap-2 rounded-md border border-border px-2 py-1 text-sm"
+              className="flex flex-wrap items-center gap-2 rounded-control bg-surface px-2 py-1 text-sm"
             >
               <label className="inline-flex flex-1 items-center gap-2">
                 <input

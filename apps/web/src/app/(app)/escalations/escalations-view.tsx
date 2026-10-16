@@ -130,7 +130,6 @@ export function EscalationsView() {
   return (
     <div className="flex flex-col gap-5">
       <PageHeader
-        kicker="Oversight"
         title="Escalations"
         description="What needs your attention: an impact note for each confirmed severity-2+ story and each large price move, with the thesis KPIs or exit conditions it touches."
         aside={
@@ -163,7 +162,7 @@ export function EscalationsView() {
                     onClick={() => replaceQuery({ status: t === "open" ? null : t })}
                     className={cn(
                       "border-l border-border px-3 py-1.5 text-xs first:border-l-0",
-                      tab === t ? "bg-accent text-accent-foreground" : "text-text hover:bg-border-soft",
+                      tab === t ? "bg-accent text-accent-foreground" : "text-text hover:bg-surface-muted",
                     )}
                   >
                     {t === "all" ? "All" : ESCALATION_STATE_LABELS[t]}
@@ -243,7 +242,7 @@ function EscalationRow({ escalation: e, now, onUpdated }: { escalation: Escalati
   const sev = e.body.severity;
   return (
     <li className="border-b border-border-soft last:border-0">
-      <div className="grid grid-cols-[3rem_4px_minmax(0,1fr)] items-start gap-x-4 gap-y-1 px-5 py-3.5 hover:bg-border-soft md:grid-cols-[3.5rem_4px_6.5rem_minmax(0,1fr)_auto_auto]">
+      <div className="grid grid-cols-[3rem_4px_minmax(0,1fr)] items-start gap-x-4 gap-y-1 px-5 py-3.5 hover:bg-surface-muted md:grid-cols-[3.5rem_4px_6.5rem_minmax(0,1fr)_auto_auto]">
         <span className="num pt-0.5 font-mono text-xs text-text-muted">E-{e.id}</span>
         <span
           aria-hidden="true"
@@ -288,7 +287,7 @@ function EscalationRow({ escalation: e, now, onUpdated }: { escalation: Escalati
                 </span>
               ) : null}
               <span className="num">cost {e.cost_usd === null ? "none recorded" : formatCost(e.cost_usd)}</span>
-              <span className="font-mono text-[11px]">{e.models.length > 0 ? e.models.join(", ") : "no model called"}</span>
+              <span className="font-mono text-xs">{e.models.length > 0 ? e.models.join(", ") : "no model called"}</span>
             </p>
           </details>
           <EscalationActions escalation={e} onUpdated={onUpdated} className="mt-2 md:hidden" />
@@ -339,7 +338,7 @@ function WeeklyPanel({ stats }: { stats: EscalationStats | null }) {
               );
             })}
           </div>
-          <div aria-hidden="true" className="flex justify-between font-mono text-[10px] text-text-faint">
+          <div aria-hidden="true" className="flex justify-between font-mono text-xs text-text-faint">
             <span>{shortDay(new Date(`${weeks[0].start}T12:00:00Z`))}</span>
             <span>{shortDay(new Date(`${weeks[weeks.length - 1].start}T12:00:00Z`))}</span>
           </div>

@@ -59,7 +59,7 @@ export function StripsPanel() {
                   }
                 />
               ))}
-              <p className="text-[11px] text-text-faint">{d.note}</p>
+              <p className="text-xs text-text-faint">{d.note}</p>
             </div>
           )}
         </ResourceGate>

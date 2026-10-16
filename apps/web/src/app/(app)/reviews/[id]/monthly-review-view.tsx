@@ -8,7 +8,9 @@ import { AlertMessage } from "@/components/alert-message";
 import { Ring } from "@/components/charts";
 import { VerdictStatusBadge } from "@/components/evidence/verdict-status-badge";
 import { AsOfLabel } from "@/components/freshness/as-of-label";
-import { SourceChips, SourceSidebar } from "@/components/sources/source-list";
+import { TocRail } from "@/components/research/toc-rail";
+import { SourcesByDomain } from "@/components/research/sources-by-domain";
+import { SourceCard, SourceChips } from "@/components/sources/source-list";
 import { ReviewShell } from "@/components/reports/review-shell";
 import { BlueprintCorners } from "@/components/ui/blueprint";
 import { Button } from "@/components/ui/button";
@@ -124,7 +126,7 @@ function Review({ report }: { report: ReviewReportOut }) {
       <section aria-labelledby="review-headline" className="blueprint flex flex-wrap items-end justify-between gap-4 px-6 py-5">
         <BlueprintCorners />
         <div className="min-w-0">
-          <p className="kicker">Monthly review · {monthLabel(body.month)}</p>
+          <p className="text-sm text-text-muted">Monthly review for {monthLabel(body.month)}</p>
           <h2 id="review-headline" className="mt-1 text-[32px] leading-[1.05] font-semibold">{body.headline || report.title}</h2>
           <p className="num mt-1 text-sm text-text-muted">
             {body.as_of ? <>Judged on the snapshot of {formatDate(body.as_of)}</> : "No portfolio snapshot"}
@@ -167,7 +169,18 @@ function Review({ report }: { report: ReviewReportOut }) {
         </AlertMessage>
       ) : null}
 
-      <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_18rem]">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[9rem_minmax(0,1fr)] xl:grid-cols-[9rem_minmax(0,1fr)_18rem]">
+        <TocRail
+          items={[
+            { id: "compliance-heading", label: "Strategy compliance" },
+            { id: "review-holding-heading", label: "Holding periods" },
+            { id: "review-kpis-heading", label: "Thesis KPIs" },
+            { id: "review-flags-heading", label: "Flags" },
+            { id: "review-risk-heading", label: "Portfolio risk" },
+            { id: "review-bench-heading", label: "Bench" },
+            { id: "review-actions-heading", label: "Proposed actions" },
+          ]}
+        />
         <article className="flex flex-col gap-5">
           <section aria-labelledby="compliance-heading" className={SECTION}>
             <BlueprintCorners />
@@ -290,7 +303,7 @@ function Review({ report }: { report: ReviewReportOut }) {
                           <VerdictStatusBadge status={k.status} />
                         </td>
                         <td className="py-1.5 pr-3">
-                          <Link href={`/holdings/${encodeURIComponent(k.ticker)}`} className="font-mono text-xs text-accent-ink hover:underline">
+                          <Link href={`/companies/${encodeURIComponent(k.ticker)}`} className="font-mono text-xs text-accent-ink hover:underline">
                             {k.ticker}
                           </Link>
                         </td>
@@ -370,7 +383,23 @@ function Review({ report }: { report: ReviewReportOut }) {
           <ActionsSection report={report} />
         </article>
 
-        <SourceSidebar index={index} />
+        <aside aria-labelledby="review-sources" className="space-y-2">
+          <h2 id="review-sources" className="scroll-mt-24 font-heading text-lg font-semibold">
+            Sources ({index.cards.length})
+          </h2>
+          {index.unresolved.length > 0 ? (
+            <p role="alert" className="rounded-card bg-warning-signal-subtle px-3 py-2 text-xs">
+              Cited but not in the source list: {index.unresolved.join(", ")}.
+            </p>
+          ) : null}
+          {index.cards.length === 0 ? <p className="text-sm text-text-muted">No sources stored.</p> : null}
+          <SourcesByDomain
+            items={index.cards}
+            urlOf={(entry) => entry.source.url ?? "In the app"}
+            renderItem={(entry) => <SourceCard entry={entry} />}
+            itemIsListItem
+          />
+        </aside>
       </div>
     </div>
   );
@@ -440,7 +469,7 @@ function ActionsSection({ report }: { report: ReviewReportOut }) {
                 {a.ticker ? (
                   <>
                     {" "}
-                    <Link href={`/holdings/${encodeURIComponent(a.ticker)}`} className="font-mono text-xs font-normal text-accent-ink hover:underline">
+                    <Link href={`/companies/${encodeURIComponent(a.ticker)}`} className="font-mono text-xs font-normal text-accent-ink hover:underline">
                       {a.ticker}
                     </Link>
                   </>

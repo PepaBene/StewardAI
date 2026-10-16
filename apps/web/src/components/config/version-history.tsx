@@ -141,21 +141,6 @@ export function VersionHistory({
   return (
     <div className="space-y-6">
       <PageHeader
-        kicker={
-          <>
-            <Link href="/config" className="hover:underline">
-              Config
-            </Link>
-            {info.editor ? (
-              <>
-                {" · "}
-                <Link href={info.editor} className="hover:underline">
-                  {info.label}
-                </Link>
-              </>
-            ) : null}
-          </>
-        }
         title={`${info.label}: version history`}
         description={
           <p className="max-w-prose">
@@ -209,7 +194,7 @@ export function VersionHistory({
           {current ? (
             <div className="space-y-4">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <h2 className="text-[22px] leading-tight font-semibold">
+                <h2 className="panel-title">
                   Version <span className="num">#{current.id}</span>
                   {current.active ? <ActiveBadge className="ml-2 align-middle" /> : null}
                 </h2>
@@ -336,7 +321,7 @@ function VersionList({
       <BlueprintCorners />
       <table className="w-full table-fixed text-sm">
         <caption className="sr-only">Saved versions, newest first. Choose one to see its changes.</caption>
-        <thead className="bg-surface-muted text-[11px] tracking-[0.08em] uppercase">
+        <thead className="bg-surface-muted text-xs">
           <tr className="border-b border-border text-text-muted">
             <th scope="col" className="px-3 py-2 text-left font-medium">
               Version
@@ -546,7 +531,7 @@ function DiffPanel({
           No differences between #{diff.data.from_id} and #{diff.data.to_id}.
         </p>
       ) : (
-        <div className="relative overflow-x-auto border border-border">
+        <div className="relative overflow-x-auto rounded-card bg-surface-muted">
           <table className="w-full min-w-[36rem] text-sm">
             <caption className="sr-only">
               {diff.data.changes.length} changes from version {diff.data.from_id} to version {diff.data.to_id}
@@ -640,7 +625,7 @@ function JsonPanel({ domain, id }: { domain: ConfigDomainSlug; id: number }) {
         Saved {formatDateTime(state.data.created_at)} · schema version {state.data.schema_version}
         {state.data.parent_id !== null ? ` · parent #${state.data.parent_id}` : ""}
       </p>
-      <pre className="num max-h-[36rem] overflow-auto rounded-lg border border-border bg-surface-muted p-3 font-mono text-xs text-text">
+      <pre className="num max-h-[36rem] overflow-auto rounded-card bg-surface-muted p-3 font-mono text-xs text-text">
         {JSON.stringify(state.data.body, null, 2)}
       </pre>
     </div>

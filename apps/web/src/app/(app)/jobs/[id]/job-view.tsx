@@ -53,12 +53,12 @@ export function JobView({ id }: { id: number }) {
     <div className="space-y-6">
       {!job ? (
         <PageHeader
-          kicker={
-            <Link href="/activity#job-log" className="hover:underline">
-              Oversight · Activity
+          title={<>Job run <span className="num">#{id}</span></>}
+          description={
+            <Link href="/activity#job-log" className="text-accent-ink underline underline-offset-2">
+              Back to Activity
             </Link>
           }
-          title={<>Job <span className="num">#{id}</span></>}
         />
       ) : null}
       {state.kind === "loading" ? (
@@ -91,20 +91,18 @@ function Job({ job, running, onReload }: { job: JobDetail; running: boolean; onR
   return (
     <>
       <PageHeader
-        kicker={
-          <Link href="/activity#job-log" className="hover:underline">
-            Oversight · Activity · Job <span className="num">#{job.id}</span>
-          </Link>
-        }
         title={
           <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
             {jobTypeLabel(job.job_type)} <span className="num font-normal text-text-muted">#{job.id}</span>
-            <JobStatusBadge status={job.status} className="font-sans text-sm tracking-normal" />
+            <JobStatusBadge status={job.status} className="font-sans text-sm" />
           </span>
         }
         description={
           <>
-            <span className="font-mono">{job.job_type}</span> · {job.trigger === "manual" ? "started by hand" : `trigger: ${job.trigger}`}
+            {job.trigger === "manual" ? "Started by hand" : "Started on schedule"} ·{" "}
+            <Link href="/activity#job-log" className="text-accent-ink underline underline-offset-2">
+              Back to Activity
+            </Link>
           </>
         }
         aside={
@@ -134,17 +132,21 @@ function Job({ job, running, onReload }: { job: JobDetail; running: boolean; onR
       </Blueprint>
 
       {failure ? (
-        <AlertMessage title={failure.step ? `Failed at step “${failure.step}”` : "The run failed"}>
-          <p className="font-mono text-xs whitespace-pre-wrap">{failure.error}</p>
+        <AlertMessage title={failure.step ? `This run stopped at the step “${failure.step}”` : "This run stopped with an error"}>
+          <p>Nothing was lost; the next scheduled run tries again, or reload the page and start it by hand from Data sources.</p>
+          <details className="mt-1 text-xs">
+            <summary className="cursor-pointer">Details</summary>
+            <p className="mt-1 font-mono break-words whitespace-pre-wrap">{failure.error}</p>
+          </details>
         </AlertMessage>
       ) : null}
 
       {params ? (
-        <Blueprint aria-labelledby="params-heading" className="space-y-3 p-5">
-          <h2 id="params-heading" className="text-[22px] leading-tight font-semibold">
-            Parameters
-          </h2>
-          <pre className="overflow-x-auto border border-border bg-surface-muted p-3 font-mono text-xs">{params}</pre>
+        <Blueprint as="div" className="p-5">
+          <details>
+            <summary className="cursor-pointer text-lg font-semibold">Settings this run started with</summary>
+            <pre className="mt-3 overflow-x-auto rounded-control bg-surface-muted p-3 font-mono text-xs">{params}</pre>
+          </details>
         </Blueprint>
       ) : null}
 
@@ -173,14 +175,13 @@ function Step({ step, now }: { step: JobStepOut; now: Date }) {
     <li className="space-y-2 py-3 text-sm">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="flex flex-wrap items-center gap-2">
-          <span className="num font-mono text-xs text-text-muted">{String(step.step_index + 1).padStart(2, "0")}</span>
-          <span className="font-medium">{step.name}</span>
+          <span className="font-medium">{step.name.replaceAll("_", " ")}</span>
           <JobStatusBadge status={step.status} />
         </p>
         <p className="num flex flex-wrap gap-x-3 text-text-muted">
           <time dateTime={step.started_at}>{formatDateTime(step.started_at)}</time>
           <span>{duration === null ? "—" : formatDuration(duration)}</span>
-          {step.model ? <span className="font-mono text-xs">{step.model}</span> : null}
+          {step.model ? <span className="text-xs">{step.model}</span> : null}
           <span title={step.cost_usd === null ? "No model cost recorded" : `${step.cost_usd} USD`}>
             {step.cost_usd === null ? "no cost" : formatCost(step.cost_usd)}
           </span>

@@ -22,7 +22,7 @@ import {
 } from "@/lib/config/news-forms";
 import { configSaveQuery, useConfigEditor } from "@/lib/hooks/use-config-editor";
 import { TIERS } from "@/lib/news/labels";
-import { BlueprintCorners } from "@/components/ui/blueprint";
+import { MoreSettings, ShareBar, SummaryPanel } from "@/components/config/summary";
 
 const api = () => getBrowserApiClient();
 const TIER_OPTIONS = ([1, 2, 3] as const).map((t) => ({ value: t, label: `${TIERS[t].label}` }));
@@ -37,7 +37,7 @@ export function SourcesEditor() {
     onLoaded: (body) => {
       const loaded = sourcesFromBody(body, DEFAULT_SOURCES);
       setForm(loaded);
-      setBaseline(body ? JSON.stringify(sourcesToBody(loaded)) : "");
+      setBaseline(JSON.stringify(sourcesToBody(loaded)));
     },
   });
   const body = useMemo(() => (form ? sourcesToBody(form) : null), [form]);
@@ -72,16 +72,36 @@ export function SourcesEditor() {
 
       {form ? (
         <>
+          <SummaryPanel
+            title="How far each tier is trusted"
+            reading="Sources that are read, by trust tier. Tier 1 confirms a story alone, tier 2 needs a second outlet, tier 3 is sentiment only."
+          >
+            <ShareBar
+              label="Sources by trust tier"
+              segments={([1, 2, 3] as const).map((t) => ({
+                label: TIERS[t].label,
+                value: form.sources.filter((s) => s.enabled && s.tier === t).length,
+                tone: t === 1 ? "accent" : t === 2 ? "warning" : "muted",
+              }))}
+            />
+          </SummaryPanel>
           <section aria-labelledby="sources-heading" className="space-y-3">
-            <h2 id="sources-heading" className="text-[22px] leading-tight font-semibold">
+            <h2 id="sources-heading" className="text-lg font-semibold">
               Sources
             </h2>
             {form.sources.map((s, i) => {
               const perHolding = PER_HOLDING.includes(s.type);
               const path = `sources.${i}`;
               return (
-                <div key={s.key} role="group" aria-label={`Source ${s.name || i + 1}`} className="space-y-3 blueprint p-5">
-                  <BlueprintCorners />
+                <details key={s.key} open={!s.name || undefined} aria-label={`Source ${s.name || i + 1}`} className="group rounded-card bg-surface-muted">
+                  <summary className="flex cursor-pointer list-none flex-wrap items-center gap-x-3 gap-y-1 px-5 py-3 outline-none focus-visible:ring-2 focus-visible:ring-focus/30">
+                    <span className="font-medium">{s.name || "New source"}</span>
+                    <span className="text-sm text-text-muted">
+                      {TIERS[s.tier].label} · {SOURCE_TYPES.find((t) => t.value === s.type)?.label ?? s.type}
+                    </span>
+                    <span className="ml-auto text-sm">{s.enabled ? "✓ Reading" : "Paused"}</span>
+                  </summary>
+                  <div className="space-y-3 px-5 pb-5">
                   <div className="grid items-start gap-3 sm:grid-cols-2 lg:grid-cols-[1fr_1.4fr_0.8fr_1.4fr_auto_auto]">
                     <TextField label="Id" path={`${path}.id`} errors={editor.errors} value={s.id} onChange={(v) => setSource(s.key, { id: v })} placeholder="apple-ir" />
                     <TextField label="Name" path={`${path}.name`} errors={editor.errors} value={s.name} onChange={(v) => setSource(s.key, { name: v })} />
@@ -108,7 +128,8 @@ export function SourcesEditor() {
                     onChange={(v) => setSource(s.key, { macro: v })}
                     hint="Its items are kept without matching a holding and appear under Markets and macro in the digest."
                   />
-                </div>
+                  </div>
+                </details>
               );
             })}
             <Button variant="outline" onClick={() => set({ sources: [...form.sources, newSource()] })}>
@@ -117,9 +138,9 @@ export function SourcesEditor() {
             </Button>
           </section>
 
-          <section aria-labelledby="trust-heading" className="space-y-3 blueprint p-5">
-            <BlueprintCorners />
-            <h2 id="trust-heading" className="text-[22px] leading-tight font-semibold">
+          <MoreSettings title="More settings" hint="Outlet tiers, topics, blocked outlets and freshness">
+          <section aria-labelledby="trust-heading" className="space-y-3">
+            <h2 id="trust-heading" className="text-lg font-semibold">
               Outlet trust and freshness
             </h2>
             <div className="grid gap-3 lg:grid-cols-2">
@@ -176,6 +197,7 @@ export function SourcesEditor() {
               </div>
             </div>
           </section>
+          </MoreSettings>
 
           <SaveBar dirty={dirty} savedVersionId={editor.version?.id ?? null} busy={editor.busy} errors={editor.errors} message={editor.message} onValidate={() => body && void editor.validate(body)} onSave={(note) => void save(note)} />
         </>

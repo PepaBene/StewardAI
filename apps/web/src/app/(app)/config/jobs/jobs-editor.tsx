@@ -1,6 +1,6 @@
 "use client";
 
-import { CalendarDaysIcon, ClockIcon, InfoIcon, LoaderCircleIcon, PlusIcon, Trash2Icon } from "lucide-react";
+import { CalendarDaysIcon, ChevronRightIcon, ClockIcon, InfoIcon, LoaderCircleIcon, PlusIcon, Trash2Icon } from "lucide-react";
 import Link from "next/link";
 import { useId, useMemo, useState, type ReactNode } from "react";
 
@@ -40,6 +40,8 @@ import {
 } from "@/lib/config/jobs-form";
 import { configSaveQuery, useConfigEditor } from "@/lib/hooks/use-config-editor";
 import { SEVERITY } from "@/lib/news/labels";
+import { JOB_GROUPS, jobGroup } from "@/lib/activity/overview";import { MoreSettings, SummaryPanel } from "@/components/config/summary";
+import { WeekTimeline } from "@/components/config/week-timeline";
 import { BlueprintCorners } from "@/components/ui/blueprint";
 
 const api = () => getBrowserApiClient();
@@ -65,7 +67,7 @@ export function JobsEditor() {
     onLoaded: (body) => {
       const loaded = jobsFromBody(body);
       setForm(loaded);
-      setBaseline(body ? JSON.stringify(jobsToBody(loaded)) : "");
+      setBaseline(JSON.stringify(jobsToBody(loaded)));
     },
   });
   const body = useMemo(() => (form ? jobsToBody(form) : null), [form]);
@@ -118,8 +120,18 @@ export function JobsEditor() {
 
       {form ? (
         <>
+          <SummaryPanel
+            title="Next 7 days"
+            reading={`${form.schedules.filter((s) => s.enabled).length} of ${form.schedules.length} schedules are on. Times are in each schedule's time zone.`}
+          >
+            <div className="max-h-[28rem] overflow-y-auto pr-1">
+              <WeekTimeline
+                jobs={form.schedules.map((s) => ({ name: s.name, label: scheduleLabel(s.name), cron: s.cron, timezone: s.timezone, enabled: s.enabled }))}
+              />
+            </div>
+          </SummaryPanel>
           <section aria-labelledby="schedules-heading" className="space-y-3">
-            <h2 id="schedules-heading" className="text-[22px] leading-tight font-semibold">
+            <h2 id="schedules-heading" className="text-lg leading-tight font-semibold">
               Schedules
             </h2>
             <CheckboxField
@@ -128,11 +140,31 @@ export function JobsEditor() {
               onChange={(v) => setForm((f) => (f ? { ...f, catchUpOnStart: v } : f))}
               hint="On start, the worker runs the data jobs (sync, reference data, prices, holidays, macro, earnings calendar, 13F, news, reconciliation) that never succeeded or missed their last scheduled run, one at a time in that order, so a new or long-stopped install fills itself without waiting for each schedule. Disabled schedules are skipped."
             />
-            {form.schedules.map((s) => (
-              <ScheduleCard key={s.name} schedule={s} errors={editor.errors} onChange={(change) => setSchedule(s.name, change)} />
-            ))}
+            {scheduleGroups(form.schedules).map((g) => {
+              const on = g.schedules.filter((s) => s.enabled).length;
+              const hasError = g.schedules.some((s) => Object.keys(editor.errors).some((k) => k.includes(s.name)));
+              return (
+                <details key={g.name} open={hasError || undefined} className="group rounded-card bg-surface-muted px-4 py-3">
+                  <summary className="flex cursor-pointer list-none flex-wrap items-center justify-between gap-x-3 text-sm [&::-webkit-details-marker]:hidden">
+                    <span className="flex items-center gap-2 font-medium">
+                      <ChevronRightIcon aria-hidden="true" className="size-4 text-text-muted transition-transform group-open:rotate-90" />
+                      {g.name}
+                    </span>
+                    <span className="text-xs text-text-muted">
+                      {on} of {g.schedules.length} on{hasError ? ", needs attention" : ""}
+                    </span>
+                  </summary>
+                  <div className="mt-3 space-y-2">
+                    {g.schedules.map((s) => (
+                      <ScheduleCard key={s.name} schedule={s} errors={editor.errors} onChange={(change) => setSchedule(s.name, change)} />
+                    ))}
+                  </div>
+                </details>
+              );
+            })}
           </section>
 
+          <MoreSettings title="More settings" hint="Per-job options, closures, managers and macro series">
           {SETTINGS_KEYS.map((section) => (
             <SettingsCard
               key={section}
@@ -166,6 +198,7 @@ export function JobsEditor() {
               ) : null}
             </SettingsCard>
           ))}
+          </MoreSettings>
 
           <SaveBar
             dirty={dirty}
@@ -180,6 +213,17 @@ export function JobsEditor() {
       ) : null}
     </div>
   );
+}
+
+/** Schedules under the same job groups as the Activity page's run grid, in its order, "Other" last. */
+function scheduleGroups<S extends { name: string }>(schedules: readonly S[]): { name: string; schedules: S[] }[] {
+  const order = [...JOB_GROUPS.map((g) => g.name), "Other"];
+  const out = new Map<string, S[]>();
+  for (const s of schedules) {
+    const g = jobGroup(s.name, scheduleLabel(s.name));
+    out.set(g, [...(out.get(g) ?? []), s]);
+  }
+  return order.filter((n) => out.has(n)).map((name) => ({ name, schedules: out.get(name)! }));
 }
 
 function ScheduleCard({
@@ -197,15 +241,19 @@ function ScheduleCard({
   // A model-level error (bad cron or time zone) is reported on the schedule itself.
   const own = errors[schedule.name] ?? [];
   return (
-    <div aria-labelledby={headingId} role="group" className="space-y-3 blueprint p-5">
-      <BlueprintCorners />
+    <details aria-labelledby={headingId} className="group rounded-card bg-surface-muted">
+      <summary className="flex cursor-pointer list-none flex-wrap items-baseline gap-x-3 gap-y-1 px-5 py-3 outline-none focus-visible:ring-2 focus-visible:ring-focus/30">
+        <h3 id={headingId} className="font-medium">
+          {scheduleLabel(schedule.name)}
+        </h3>
+        <span className="text-sm text-text-muted">
+          {schedule.enabled ? reading.text : "Not on a schedule"}
+        </span>
+        <span className="ml-auto text-sm">{schedule.enabled ? "✓ On" : "Off"}</span>
+      </summary>
+      <div className="space-y-3 px-5 pb-5">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <div>
-          <h3 id={headingId} className="font-medium">
-            {scheduleLabel(schedule.name)} <span className="font-mono text-xs text-text-muted">{schedule.name}</span>
-          </h3>
-          {known ? <p className="text-sm text-text-muted">{known.description}</p> : null}
-        </div>
+        {known ? <p className="text-sm text-text-muted">{known.description}</p> : <span />}
         <CheckboxField label="Enabled" checked={schedule.enabled} onChange={(v) => onChange({ enabled: v })} />
       </div>
       <div className="grid gap-3 sm:grid-cols-2">
@@ -241,7 +289,8 @@ function ScheduleCard({
           Disabled: it does not run on a schedule; you can still start it by hand.
         </p>
       ) : null}
-    </div>
+      </div>
+    </details>
   );
 }
 
@@ -265,7 +314,7 @@ function SettingsCard({
     <section aria-labelledby={headingId} className="space-y-3 blueprint p-5">
       <BlueprintCorners />
       <div>
-        <h2 id={headingId} className="text-[22px] leading-tight font-semibold">
+        <h2 id={headingId} className="panel-title">
           {info.title}
         </h2>
         <p className="text-sm text-text-muted">{info.description}</p>
@@ -524,7 +573,7 @@ function MacroSeriesEditor({
               const path = `${listPath}.${i}`;
               const refPath = `${path}.${MACRO_REF[source]}`;
               return (
-                <div key={r.rowKey} role="group" aria-label={`${label} series ${r.key || i + 1}`} className="space-y-2 rounded-md border border-border p-3">
+                <div key={r.rowKey} role="group" aria-label={`${label} series ${r.key || i + 1}`} className="space-y-2 rounded-card bg-surface p-3">
                   <div className="grid items-start gap-2 sm:grid-cols-2 lg:grid-cols-[1fr_2fr_1.5fr_0.7fr_auto]">
                     <TextField label="Key" path={`${path}.key`} errors={errors} value={r.key} spellCheck={false} placeholder="hicp" onChange={(v) => set(r.rowKey, { key: v })} />
                     <TextField label="Label" path={`${path}.label`} errors={errors} value={r.label} maxLength={100} onChange={(v) => set(r.rowKey, { label: v })} />

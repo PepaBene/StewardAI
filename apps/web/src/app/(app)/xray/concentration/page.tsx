@@ -9,3 +9,5 @@ export default function ConcentrationPage() {
     </Suspense>
   );
 }
+
+export const metadata = { title: "Concentration · X-Ray" };

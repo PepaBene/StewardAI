@@ -155,7 +155,7 @@ export function AdjudicationPageView() {
 
   return (
     <div className="flex flex-col gap-5">
-      <PageHeader kicker="Research & Verification" title="Accuracy checks" description="Label a sample of what the machine read and see whether it is accurate enough to rely on." />
+      <PageHeader title="Accuracy checks" description="Label a sample of what the machine read and see whether it is accurate enough to rely on." />
 
       <Panel id="identifiers" title="Suggested identifiers" description="Company and share-class identifiers found for companies that lack them. Each stays a suggestion until you confirm or reject it.">
         <IdentifierSuggestions />

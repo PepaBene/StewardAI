@@ -22,7 +22,7 @@ export function ReturnsHeatmap({ points, loading }: { points: readonly { date: s
         <ChartEmpty minHeight={140} label={loading ? "Loading history…" : "Not enough history for monthly returns yet"} />
       )}
       {rows.length ? (
-        <p className="text-[11px] text-text-faint">
+        <p className="text-xs text-text-faint">
           Each month is its last value over the previous month&rsquo;s; the first month runs from the first snapshot. Deposits and withdrawals
           excluded.
         </p>

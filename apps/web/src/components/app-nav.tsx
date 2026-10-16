@@ -1,77 +1,39 @@
 "use client";
 
-import { ChevronDownIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { CLUSTERS, isClusterActive, isPageActive } from "@/lib/nav";
+import { DESTINATIONS, resolveNav } from "@/lib/nav";
 import { cn } from "@/lib/utils";
 
-const TAB =
-  "inline-flex h-11 items-center gap-[5px] border-b-2 px-3.5 text-sm transition-colors";
-const TAB_ACTIVE = "border-accent font-semibold text-text";
-const TAB_INACTIVE = "border-transparent font-normal text-text-muted hover:text-text";
+/** Destinations shown as text links in the top bar; Inbox and Settings have their own icons. */
+const TOP = DESTINATIONS.filter((d) => d.id !== "settings" && d.id !== "inbox");
 
 /**
- * The five-cluster IA (Ledger_Design_System_Redesign_Proposal.md section 3): Portfolio,
- * Research & Verification, Oversight and Config each open a menu of their pages; a
- * single-page cluster (Config) is a plain link. Chat and the command palette are ambient,
- * reached from the header, never a tab here.
+ * The top bar's destinations (visual spec C.0): text links, the active one in full text
+ * colour with an accent underline. Hidden below lg, where the bottom bar takes over.
  */
 export function AppNav() {
   const pathname = usePathname();
+  const active = resolveNav(pathname)?.destination.id;
 
   return (
-    <nav aria-label="Sections" className="-mb-px overflow-x-auto">
-      <ul className="flex min-w-max gap-1">
-        {CLUSTERS.map((cluster) => {
-          const active = isClusterActive(cluster, pathname);
-          if (cluster.pages.length === 1) {
-            return (
-              <li key={cluster.id}>
-                <Link
-                  href={cluster.href}
-                  aria-current={active ? "page" : undefined}
-                  className={cn(TAB, active ? TAB_ACTIVE : TAB_INACTIVE)}
-                >
-                  {cluster.label}
-                </Link>
-              </li>
-            );
-          }
+    <nav aria-label="Main" className="hidden h-full lg:block">
+      <ul className="flex h-full items-stretch gap-6">
+        {TOP.map((d) => {
+          const on = d.id === active;
           return (
-            <li key={cluster.id}>
-              <DropdownMenu>
-                <DropdownMenuTrigger
-                  aria-current={active ? "page" : undefined}
-                  className={cn(TAB, active ? TAB_ACTIVE : TAB_INACTIVE)}
-                >
-                  {cluster.label}
-                  <ChevronDownIcon aria-hidden="true" className="size-3.5" />
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="start">
-                  {cluster.pages.map((page) => {
-                    const pageActive = isPageActive(page.href, pathname);
-                    return (
-                      <DropdownMenuItem key={page.href} asChild>
-                        <Link
-                          href={page.href}
-                          aria-current={pageActive ? "page" : undefined}
-                          className={pageActive ? "font-semibold text-text" : undefined}
-                        >
-                          {page.label}
-                        </Link>
-                      </DropdownMenuItem>
-                    );
-                  })}
-                </DropdownMenuContent>
-              </DropdownMenu>
+            <li key={d.id} className="flex">
+              <Link
+                href={d.href}
+                aria-current={on ? "page" : undefined}
+                className={cn(
+                  "inline-flex items-center border-b-2 pt-0.5 text-[13px] font-medium transition-colors",
+                  on ? "border-accent text-text" : "border-transparent text-text-muted hover:text-text",
+                )}
+              >
+                {d.label}
+              </Link>
             </li>
           );
         })}

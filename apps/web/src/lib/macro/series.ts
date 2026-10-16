@@ -1,3 +1,4 @@
+import { labelIfKey } from "@/lib/labels";
 import { toNumber } from "@/lib/reference/peers";
 
 /** One period of a macro series as the API returns it (decimals arrive as strings). */
@@ -87,7 +88,7 @@ export function seriesView(s: SeriesInput): SeriesView {
   const change = known.length >= 2 ? known[known.length - 1].latest! - known[0].latest! : null;
   return {
     key: `${s.source}:${s.series_id}:${s.geography}`,
-    title: s.label ?? s.series_id,
+    title: labelIfKey("macro", s.label ?? s.series_id),
     unit: s.unit,
     source: s.source,
     geography: s.geography,

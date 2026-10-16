@@ -31,7 +31,7 @@ export function researchForTicker(ticker: string): string {
 }
 
 export function holdingHref(ticker: string): string {
-  return `/holdings/${encodeURIComponent(ticker)}`;
+  return `/companies/${encodeURIComponent(ticker)}`;
 }
 
 /** Every section a profile can ask for, in the backend's order, and who writes it. */

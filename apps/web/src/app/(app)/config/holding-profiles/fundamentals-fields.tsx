@@ -41,7 +41,7 @@ export function FundamentalsFields({
     onChange((f) => ({ ...f, segments: f.segments.map((s) => (s.key === key ? { ...s, ...change } : s)) }));
 
   return (
-    <details className="rounded-md border border-border p-3" open={form.segments.length > 0 || undefined}>
+    <details className="rounded-card bg-surface p-3" open={form.segments.length > 0 || undefined}>
       <summary className="cursor-pointer text-sm font-medium">Shares outstanding and revenue breakdown</summary>
       <fieldset className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <legend className="mb-2 text-sm font-medium">13F share basis</legend>

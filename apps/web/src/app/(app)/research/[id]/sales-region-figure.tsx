@@ -51,7 +51,7 @@ export function SalesRegionFigureView({ figure, number }: { figure: SalesRegionF
         <line x1={0} x2={W} y1={H - PAD.bottom} y2={H - PAD.bottom} className="stroke-border" strokeWidth={1} />
       </svg>
       <Legend items={names.map((n) => ({ label: n, className: CATEGORICAL_BG[slot(n)] }))} />
-      <p className="text-[11px] text-text-muted">
+      <p className="text-xs text-text-muted">
         {figure.source ? `Source: ${figure.source}. ` : ""}
         {AS_REPORTED_NOTE}
       </p>

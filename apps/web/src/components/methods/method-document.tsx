@@ -66,6 +66,7 @@ export function MethodDocument({ blocks }: { blocks: Block[] }) {
         return (
           <div key={i} className="mt-3 max-w-full overflow-x-auto border border-border">
             <table className="w-full text-sm">
+              <caption className="sr-only">{b.head.join(", ")}</caption>
               <thead>
                 <tr className="bg-surface-muted text-left">
                   {b.head.map((h, k) => (

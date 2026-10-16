@@ -1,5 +1,6 @@
 "use client";
 
+import { KnockOnSection } from "@/components/portfolio/knock-on-section";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useMemo, useState } from "react";
@@ -34,6 +35,7 @@ export function SupplyChainView() {
       </ResourceGate>
       <EventFeed />
       <EventPaths />
+      <KnockOnSection />
       <EdgeForm onSaved={() => setVersion((v) => v + 1)} />
     </div>
   );
@@ -82,7 +84,7 @@ function Diagram({ data }: { data: SupplyChainData }) {
                 strokeWidth={n.held ? 2 : 1}
               />
               <text x={8} y={16} className="fill-text text-[12px] font-semibold">{n.symbol}</text>
-              <text x={8} y={31} className="fill-text-muted text-[11px]">
+              <text x={8} y={31} className="fill-text-muted text-xs">
                 {n.held ? `${(n.weight * 100).toFixed(1)}% of portfolio` : "not held"}
               </text>
             </g>

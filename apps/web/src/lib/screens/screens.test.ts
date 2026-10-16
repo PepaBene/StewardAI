@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { buildRequest, cellFor, describeFilter, funnel, nextMetric, PRESETS, type FilterDraft, type ScreenResult, type ScreenRow } from "./screens";
+import { activePreset, buildRequest, cellFor, describeDraft, describeFilter, funnel, nextMetric, PRESETS, type FilterDraft, type ScreenResult, type ScreenRow } from "./screens";
 
 const draft = (o: Partial<FilterDraft>): FilterDraft => ({ id: 1, metric: "gross_margin", op: "gte", value: "40", ...o });
 
@@ -73,5 +73,17 @@ describe("results", () => {
   it("describes a filter in words", () => {
     expect(describeFilter({ metric: "gross_margin", op: "gte", value: "0.4" } as never)).toBe("Gross margin at least 40%");
     expect(describeFilter({ metric: "net_debt_to_equity", op: "lte", value: "1.5" } as never)).toBe("Net debt to equity at most 1.5×");
+  });
+});
+
+describe("draft sentences and presets", () => {
+  it("reads a draft as a sentence and marks a blank value", () => {
+    expect(describeDraft({ metric: "gross_margin", op: "gte", value: "40" })).toBe("Gross margin at least 40%");
+    expect(describeDraft({ metric: "net_debt_to_equity", op: "lte", value: "" })).toBe("Net debt to equity at most …");
+  });
+
+  it("recognises a preset regardless of order and number spelling", () => {
+    expect(activePreset([{ metric: "gross_margin", op: "gte", value: "40.0" }, { metric: "free_cash_flow_conversion", op: "gte", value: "80" }])).toBe("cash");
+    expect(activePreset([{ metric: "gross_margin", op: "gte", value: "41" }])).toBeNull();
   });
 });

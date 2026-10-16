@@ -23,7 +23,7 @@ export function ReturnCell({ figure, decimals = 1 }: { figure: Figure | null | u
   return (
     <span title={qualified ? (figure.warnings ?? []).join(" ") : undefined}>
       <Toned value={figure.value}>{formatPercent(figure.value, { signed: true, decimals })}</Toned>
-      {qualified ? <span className="ml-1 text-[11px] text-text-muted">qualified</span> : null}
+      {qualified ? <span className="ml-1 text-xs text-text-muted">qualified</span> : null}
     </span>
   );
 }

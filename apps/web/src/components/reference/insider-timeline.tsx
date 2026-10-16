@@ -72,8 +72,8 @@ export function InsiderTimeline({ data }: { data: Activity }) {
             </g>
           );
         })}
-        <text x={PAD_L} y={10} className="fill-text-muted text-[10px]">Bought</text>
-        <text x={PAD_L} y={H - 2} className="fill-text-muted text-[10px]">Sold</text>
+        <text x={PAD_L} y={10} className="fill-text-muted text-xs">Bought</text>
+        <text x={PAD_L} y={H - 2} className="fill-text-muted text-xs">Sold</text>
       </svg>
       {months.length > 0 ? (
         <svg viewBox={`0 0 ${W} ${SH + 14}`} role="img" aria-label="Value bought and sold per month" className="block h-auto w-full">
@@ -88,7 +88,7 @@ export function InsiderTimeline({ data }: { data: Activity }) {
                 {b > 0 ? <rect x={bx} y={SH / 2 - b} width={bw} height={b} className="fill-gain" rx={1} /> : null}
                 {s > 0 ? <rect x={bx} y={SH / 2} width={bw} height={s} className="fill-loss" rx={1} /> : null}
                 {i % 3 === 0 ? (
-                  <text x={bx + bw / 2} y={SH + 11} textAnchor="middle" className="fill-text-muted text-[10px]">
+                  <text x={bx + bw / 2} y={SH + 11} textAnchor="middle" className="fill-text-muted text-xs">
                     {m.month.slice(2, 7)}
                   </text>
                 ) : null}

@@ -14,13 +14,11 @@ export default function StatusPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        kicker="Oversight"
         title="API status"
         description={
           <p className="max-w-prose">
-            Calls <code className="font-mono">GET /health</code> on the StewardAI Python API through the generated, typed
-            client, opens a job run by its number, and lists the reference data gaps below. The job log, coverage gaps,
-            monitoring alerts and source trust are on the{" "}
+            Whether the server behind StewardAI is running, a lookup for one job run by its number, and the reference data gaps below. The job log,
+            coverage gaps, monitoring alerts and source trust are on the{" "}
             <Link href="/activity" className="text-accent-ink hover:underline">
               Activity
             </Link>{" "}

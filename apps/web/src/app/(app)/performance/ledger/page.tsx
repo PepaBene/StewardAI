@@ -9,3 +9,5 @@ export default function LedgerPage() {
     </Suspense>
   );
 }
+
+export const metadata = { title: "Ledger and settings · Performance" };

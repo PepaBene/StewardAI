@@ -9,3 +9,5 @@ export default function OverlapPage() {
     </Suspense>
   );
 }
+
+export const metadata = { title: "Overlap · X-Ray" };

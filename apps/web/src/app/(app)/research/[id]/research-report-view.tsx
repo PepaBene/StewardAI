@@ -20,6 +20,8 @@ import { FeedbackControl } from "@/components/feedback/feedback-control";
 import { AsOfLabel } from "@/components/freshness/as-of-label";
 import { JobStatusBadge } from "@/components/jobs/job-status-badge";
 import { TierBadge } from "@/components/news/severity-badge";
+import { SourcesByDomain } from "@/components/research/sources-by-domain";
+import { TocRail } from "@/components/research/toc-rail";
 import { SourceChips, SourceLinksLine } from "@/components/sources/source-list";
 import { Blueprint, BlueprintCorners } from "@/components/ui/blueprint";
 import { Button } from "@/components/ui/button";
@@ -222,7 +224,7 @@ function Report({ report: stored, onReload }: { report: ResearchReportOut; onRel
 
       <div className="flex flex-wrap items-end justify-between gap-6">
         <div className="max-w-[880px] min-w-0">
-          <ul className="mb-2.5 flex flex-wrap gap-1.5 text-[11px]" aria-label="Report tags">
+          <ul className="mb-2.5 flex flex-wrap gap-1.5 text-xs" aria-label="Report tags">
             <li className="bg-accent px-2 py-[3px] font-semibold text-accent-foreground capitalize">{body.depth}</li>
             <li className="bg-border-soft px-2 py-[3px] font-mono">{body.ticker}</li>
             <li className="num bg-border-soft px-2 py-[3px]">
@@ -269,7 +271,15 @@ function Report({ report: stored, onReload }: { report: ResearchReportOut; onRel
 
       {job && job.steps.length > 0 ? <Pipeline job={job} /> : null}
 
-      <div data-print-stack className="grid items-start gap-7 lg:grid-cols-[minmax(0,1fr)_380px]">
+      <div data-print-stack className="grid items-start gap-7 lg:grid-cols-[9rem_minmax(0,1fr)_320px]">
+        <TocRail
+          items={[
+            ...(conclusion ? [{ id: "research-conclusion", label: conclusion.title || "Conclusion" }] : []),
+            ...sections.map(({ section }) => ({ id: `research-${section.id}`, label: section.title })),
+            { id: "claim-ledger", label: "Claim ledger" },
+            { id: "sources-heading", label: "Sources" },
+          ]}
+        />
         <article className="flex min-w-0 flex-col gap-[22px]">
           {conclusion ? (
             <section className="blueprint border-accent-300 bg-accent-soft px-6 py-[22px]" aria-labelledby="research-conclusion">
@@ -327,12 +337,10 @@ function Report({ report: stored, onReload }: { report: ResearchReportOut; onRel
             link to the sources.
           </p>
 
-          {sections.map(({ section, s }, n) => (
+          {sections.map(({ section, s }) => (
             <section key={`${section.id}-${s}`} aria-labelledby={`research-${section.id}`} className="flex max-w-[820px] flex-col gap-3.5">
               <h2 id={`research-${section.id}`} className="flex flex-wrap items-center gap-2.5 text-[28px] leading-tight font-semibold">
-                <span>
-                  {n + 1}. {section.title}
-                </span>
+                <span>{section.title}</span>
                 <WriterTag by={writtenBy(section.written_by)} />
               </h2>
               {section.note ? <p className="text-xs text-text-muted">{section.note}</p> : null}
@@ -371,12 +379,20 @@ function Report({ report: stored, onReload }: { report: ResearchReportOut; onRel
           </div>
 
           <ThesisProposalPanel reportId={report.id} proposal={body.thesis_proposal} review={body.thesis_review} sources={body.sources} />
-          <ClaimLedger
-            reportId={report.id}
-            body={body}
-            reviews={reviews}
-            onReview={(claimId, state) => setReviews((r) => ({ ...r, [claimId]: state }))}
-          />
+          <details className="group rounded-xl border border-border bg-surface-raised">
+            <summary className="cursor-pointer rounded-xl px-5 py-3 font-heading text-lg font-semibold focus-visible:ring-2 focus-visible:ring-focus/30 focus-visible:outline-none">
+              Claim ledger
+              <span className="ml-2 text-sm font-normal text-text-muted">every sentence with its check and your review</span>
+            </summary>
+            <div className="px-3 pb-3">
+              <ClaimLedger
+                reportId={report.id}
+                body={body}
+                reviews={reviews}
+                onReview={(claimId, state) => setReviews((r) => ({ ...r, [claimId]: state }))}
+              />
+            </div>
+          </details>
           <SearchCoverage
             search_summary={body.search_summary}
             discovered_urls={body.discovered_urls}
@@ -425,7 +441,7 @@ function Pipeline({ job }: { job: JobDetail }) {
                 step.status === "failed" && "bg-loss",
               )}
             />
-            <span className="text-[11px] text-text-muted">
+            <span className="text-xs text-text-muted">
               {step.status === "failed" ? <TriangleAlertIcon aria-hidden="true" className="mr-1 inline size-3 text-loss" /> : null}
               {stepLabel(step.name)}
               <span className="sr-only">: {detail}</span>
@@ -496,8 +512,8 @@ function KeyFigures({ figures, loaded }: { figures: ReturnType<typeof keyFigures
 function SourcesPanel({ index, flaggedIds }: { index: CitationIndex; flaggedIds: readonly string[] | undefined }) {
   return (
     <Blueprint className="flex flex-col gap-2.5 px-5 py-[18px]" aria-labelledby="sources-heading">
-      <h2 id="sources-heading" className="kicker font-sans">
-        Sources · {index.cards.length}
+      <h2 id="sources-heading" className="scroll-mt-24 font-heading text-lg font-semibold">
+        Sources ({index.cards.length})
       </h2>
       {index.unresolved.length > 0 ? (
         <p role="alert" className="flex items-start gap-1.5 border border-warning-signal/40 bg-warning-signal-subtle p-2 text-xs text-text">
@@ -506,10 +522,11 @@ function SourcesPanel({ index, flaggedIds }: { index: CitationIndex; flaggedIds:
         </p>
       ) : null}
       {index.cards.length === 0 ? <p className="text-sm text-text-muted">No sources stored.</p> : null}
-      <ol>
-        {index.cards.map(({ source: s, number, anchor, citedBy }) => (
-          <li
-            key={s.id}
+      <SourcesByDomain
+        items={index.cards}
+        urlOf={(c) => (c.source.kind === "fact" ? "Stored records" : (c.source.url ?? ""))}
+        renderItem={({ source: s, number, anchor, citedBy }) => (
+          <div
             id={anchor}
             tabIndex={-1}
             className="grid scroll-mt-24 grid-cols-[28px_minmax(0,1fr)] gap-2 border-t border-border-soft py-2 text-[13px] outline-none target:bg-accent-soft focus-visible:bg-accent-soft"
@@ -517,9 +534,9 @@ function SourcesPanel({ index, flaggedIds }: { index: CitationIndex; flaggedIds:
             <span className="num font-semibold text-accent-ink">[{number}]</span>
             <div className="min-w-0 space-y-0.5">
               <p className="break-words">{s.title}</p>
-              <p className="flex flex-wrap items-center gap-x-1.5 text-[11px] text-text-muted">
+              <p className="flex flex-wrap items-center gap-x-1.5 text-xs text-text-muted">
                 <span className="font-mono">{s.id}</span>· {sourceKindLabel(s.kind)} ·{" "}
-                {typeof s.tier === "number" ? <TierBadge tier={s.tier} className="text-[11px]" /> : <span>no tier</span>}
+                {typeof s.tier === "number" ? <TierBadge tier={s.tier} className="text-xs" /> : <span>no tier</span>}
                 {s.as_of ? <span>· as of {/^\d{4}-\d{2}-\d{2}$/.test(s.as_of) ? formatDate(s.as_of) : s.as_of}</span> : null}
                 <span>· {citedBy === 0 ? "not cited in the text" : `cited ${citedBy}×`}</span>
               </p>
@@ -527,9 +544,9 @@ function SourcesPanel({ index, flaggedIds }: { index: CitationIndex; flaggedIds:
               <SourceRoleNote source={s} flaggedIds={flaggedIds} />
               <SourceLinksLine source={s} />
             </div>
-          </li>
-        ))}
-      </ol>
+          </div>
+        )}
+      />
     </Blueprint>
   );
 }
@@ -731,7 +748,7 @@ function ValuationTable({ report, index }: { report: ResearchReportOut; index: C
           Computed in code from stored figures and prices (no model involved).
         </caption>
         <thead className="bg-surface-muted">
-          <tr className="border-b border-border text-[11px] tracking-wide text-text-muted uppercase">
+          <tr className="border-b border-border text-xs text-text-muted">
             <th scope="col" className="px-3 py-2 text-left font-medium">Method</th>
             <th scope="col" className="px-3 py-2 text-right font-medium">Value</th>
             <th scope="col" className="px-3 py-2 text-left font-medium">Formula</th>

@@ -5,6 +5,9 @@ import type { Holding } from "@/lib/api/client";
 import { TREEMAP_MODES, treemapItems, type TreemapMode } from "@/lib/portfolio/treemap";
 import { cn } from "@/lib/utils";
 
+/** Where the diverging heat scale saturates (visual spec B17): +-3% for a day move, +-30% for P/L. Unknown tiles are chart-unknown. */
+const HEAT_CAP: Record<TreemapMode, number> = { day: 0.03, ppl: 0.3 };
+
 /**
  * The portfolio as a size/colour map: tile area is the position's weight, tile colour the
  * chosen move on the diverging heat scale — today's close-to-close move, or unrealised P/L
@@ -28,7 +31,7 @@ export function PortfolioTreemap({
   return (
     <Treemap
       items={treemapItems(holdings, mode, dayChange)}
-      cap={m.cap}
+      cap={HEAT_CAP[mode]}
       aspectRatio={aspectRatio}
       label={`${m.title}: ${m.description}`}
       className={cn("min-w-[36rem]", className)}
@@ -49,7 +52,7 @@ export function TreemapModeSwitch({ value, onChange }: { value: TreemapMode; onC
           className={cn(
             "px-2.5 py-1 font-medium",
             i > 0 && "border-l border-border",
-            value === mode ? "bg-accent text-accent-foreground" : "text-text-muted hover:bg-border-soft hover:text-text",
+            value === mode ? "bg-accent text-accent-foreground" : "text-text-muted hover:bg-surface-muted hover:text-text",
           )}
         >
           {TREEMAP_MODES[mode].label}

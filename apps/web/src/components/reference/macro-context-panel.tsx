@@ -149,7 +149,7 @@ function FigureCard({ card }: { card: ContextCard }) {
             <span className="absolute inset-x-0 top-1/2 h-px bg-border" />
             <span className="absolute top-1/2 size-2.5 -translate-x-1/2 -translate-y-1/2 bg-accent" style={{ left: `${range.pos}%` }} />
           </div>
-          <div className="num flex justify-between text-[11px] text-text-faint">
+          <div className="num flex justify-between text-xs text-text-faint">
             <span>{range.low}</span>
             <span>{rangeLabel} range</span>
             <span>{range.high}</span>

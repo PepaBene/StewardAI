@@ -10,7 +10,6 @@ export default function JournalLayout({ children }: { children: ReactNode }) {
   return (
     <div className="flex flex-col gap-5">
       <PageHeader
-        kicker="Research"
         title="Decision journal"
         description="Write down why you decided, while you still do not know how it turned out. Entries are never edited; a later review is a new entry that points back."
       />

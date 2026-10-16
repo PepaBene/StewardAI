@@ -9,6 +9,7 @@ import type { components } from "@/lib/api/schema";
 import { getBrowserApiClient } from "@/lib/api/client";
 import { formatMoney, formatPercent } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { decodeEntities } from "@/lib/news/entities";
 
 /*
  * F-Feed (insight I13.1): one card for every update — an inbox item, a news story, a what-changed
@@ -32,6 +33,26 @@ export const TYPE_LABEL: Record<UpdateType, string> = {
   other: "Other",
 };
 
+/** The headline without a leading instrument id ("GOOGL_US_EQ: …"); the card already names the holding. */
+export function feedHeadline(headline: string): string {
+  return decodeEntities(headline).replace(/^\S+_EQ:\s*/, "");
+}
+
+/**
+ * The items worth a card: one per key (the API can repeat a key across holdings), and no
+ * what-changed line that changed nothing ("confirmed → confirmed").
+ */
+export function feedItems<T extends { key: string; what_changed?: string | null }>(items: readonly T[]): T[] {
+  const seen = new Set<string>();
+  return items.filter((i) => {
+    if (seen.has(i.key)) return false;
+    seen.add(i.key);
+    const m = i.what_changed?.match(/([^:]+?)\s*→\s*(.+)$/);
+    if (m) m[1] = m[1].trim();
+    return !(m && m[1] === m[2]);
+  });
+}
+
 function age(days: number): string {
   if (days <= 0) return "today";
   if (days === 1) return "yesterday";
@@ -43,7 +64,7 @@ export function FeedCard({ u, onOpen }: { u: Update; onOpen?: (u: Update) => voi
   const move = u.change_1d;
   return (
     <li className={cn("border-b border-border-soft last:border-0", !u.read && "bg-surface-muted/40")}>
-      <Link href={u.href} onClick={() => onOpen?.(u)} className="grid grid-cols-[4px_minmax(0,1fr)_auto] gap-x-3 px-4 py-3 hover:bg-border-soft/40">
+      <Link href={u.href} onClick={() => onOpen?.(u)} className="grid grid-cols-[4px_minmax(0,1fr)_auto] gap-x-3 px-4 py-3 hover:bg-surface-muted/40">
         <span aria-hidden="true" className={cn("w-1 self-stretch", u.read ? "bg-transparent" : "bg-accent")} />
         <span className="min-w-0">
           <span className="flex flex-wrap items-baseline gap-x-2 text-xs text-text-muted">
@@ -52,7 +73,7 @@ export function FeedCard({ u, onOpen }: { u: Update; onOpen?: (u: Update) => voi
             <span>{age(u.age_days)}</span>
             {!u.read ? <span className="sr-only">unread</span> : null}
           </span>
-          <span className="mt-0.5 block text-sm leading-snug font-medium">{u.headline}</span>
+          <span className="mt-0.5 block text-sm leading-snug font-medium">{feedHeadline(u.headline)}</span>
           {u.what_changed ? <span className="mt-0.5 block text-xs leading-snug text-text-muted">{u.what_changed}</span> : null}
         </span>
         {u.price !== null && u.price !== undefined ? (
@@ -136,7 +157,7 @@ export function UpdatesFeedPanel({
 
   const shown = useMemo(() => {
     if (load.kind !== "ok") return [];
-    return load.feed.items
+    return feedItems(load.feed.items)
       .filter((i) => !types || types.includes(i.type))
       .filter((i) => !type || i.type === type)
       .filter((i) => !unreadOnly || !i.read)
@@ -170,7 +191,7 @@ export function UpdatesFeedPanel({
               type="button"
               aria-pressed={type === null}
               onClick={() => setType(null)}
-              className={cn("border px-2.5 py-1 text-xs", type === null ? "border-accent bg-accent text-accent-foreground" : "border-border hover:bg-border-soft")}
+              className={cn("border px-2.5 py-1 text-xs", type === null ? "border-accent bg-accent text-accent-foreground" : "border-border hover:bg-surface-muted")}
             >
               All
             </button>
@@ -180,7 +201,7 @@ export function UpdatesFeedPanel({
                 type="button"
                 aria-pressed={type === c.type}
                 onClick={() => setType(type === c.type ? null : c.type)}
-                className={cn("border px-2.5 py-1 text-xs", type === c.type ? "border-accent bg-accent text-accent-foreground" : "border-border hover:bg-border-soft")}
+                className={cn("border px-2.5 py-1 text-xs", type === c.type ? "border-accent bg-accent text-accent-foreground" : "border-border hover:bg-surface-muted")}
               >
                 {TYPE_LABEL[c.type]} <span className="num">{c.total}</span>
                 {c.unread > 0 ? <span className="num font-semibold"> · {c.unread} new</span> : null}

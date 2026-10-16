@@ -27,7 +27,7 @@ export function HoldingResearch({ ticker }: { ticker: string }) {
   return (
     <Blueprint id="research" aria-labelledby="research-heading" className="scroll-mt-6 space-y-3 px-[22px] py-5">
       <div className="flex flex-wrap items-end justify-between gap-2">
-        <PanelHeading kicker="Research" title={<span id="research-heading">Research reports</span>} />
+        <PanelHeading title={<span id="research-heading">Research reports</span>} />
         <Link href={researchForTicker(ticker)} className="text-sm text-accent-ink hover:underline">
           All research on {ticker}
         </Link>

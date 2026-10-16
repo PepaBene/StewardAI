@@ -10,9 +10,9 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { formatMoney, formatPercent } from "@/lib/format";
 
-import { budgetApi, type CostSummary } from "./budget-api";
-import { currentBudgetMonth } from "./budget-form";
-import { BlueprintCorners } from "@/components/ui/blueprint";
+import { budgetApi, type CostSummary, type JobType } from "./budget-api";
+import { currentBudgetMonth, JOB_TYPE_LABELS } from "./budget-form";
+import { BandGauge } from "@/components/insight/band-gauge";
 
 const usd = (v: number | null | undefined) => formatMoney(v, "USD", { decimals: 2 });
 /** Step costs are recorded to the millionth of a dollar; small ones show 4 decimals. */
@@ -63,12 +63,11 @@ export function CostPanel() {
     <section
       id="costs"
       aria-labelledby="costs-heading"
-      className="scroll-mt-24 space-y-3 blueprint p-5"
+      className="scroll-mt-24 space-y-3 rounded-card bg-surface-muted px-5 py-4"
     >
-      <BlueprintCorners />
       <div className="flex flex-wrap items-end justify-between gap-2">
         <div>
-          <h2 id="costs-heading" className="text-[22px] leading-tight font-semibold">
+          <h2 id="costs-heading" className="text-lg font-semibold">
             Spend by month
           </h2>
           <p className="max-w-prose text-sm text-text-muted">
@@ -129,9 +128,9 @@ export function CostPanel() {
                   <>
                     <Link
                       href={`/activity?type=${encodeURIComponent(r.job_type)}#job-log`}
-                      className="font-mono text-xs hover:text-accent-ink hover:underline"
+                      className="text-sm hover:text-accent-ink hover:underline"
                     >
-                      {r.job_type}
+                      {JOB_TYPE_LABELS[r.job_type as JobType] ?? r.job_type}
                     </Link>
                     {r.critical ? (
                       <span className="ml-1.5 rounded-sm border border-border px-1 text-xs text-text-muted">critical</span>
@@ -176,41 +175,37 @@ function CapBar({ data }: { data: CostSummary }) {
   const fraction = data.fraction ?? 0;
   const over = fraction >= 1;
   const warn = fraction >= data.warn_at_fraction;
+  const state = over ? "Cap reached" : warn ? "Past the warning threshold" : "On track";
+  const max = Math.max(1.2, Math.ceil(fraction * 10) / 10);
+  const warnPct = formatPercent(data.warn_at_fraction, { decimals: 0 });
   return (
-    <div className="space-y-1.5">
+    <div className="space-y-2">
       <p className="text-sm" role="status">
         <span className="num text-lg font-semibold">{usd(data.total_usd)}</span>{" "}
         <span className="text-text-muted">
-          of {usd(data.cap_usd)} in {data.month} ({formatPercent(fraction, { decimals: 0 })})
-          {over ? " — cap reached" : warn ? " — past the warning threshold" : ""}
+          of {usd(data.cap_usd)} in {data.month} ({formatPercent(fraction, { decimals: 0 })}). {state}.
         </span>
       </p>
-      <div
-        role="meter"
-        aria-label="Spend against the monthly cap"
-        aria-valuemin={0}
-        aria-valuemax={data.cap_usd}
-        aria-valuenow={Math.min(data.total_usd, data.cap_usd)}
-        className="relative h-2.5 overflow-hidden rounded-full bg-surface-muted"
-      >
-        <div
-          className={over || warn ? "h-full rounded-full bg-warning-signal" : "h-full rounded-full bg-accent"}
-          style={{ width: `${Math.min(fraction, 1) * 100}%` }}
-        />
-        <div
-          aria-hidden="true"
-          className="absolute inset-y-0 w-px bg-text-muted"
-          style={{ left: `${data.warn_at_fraction * 100}%` }}
-          title="Warning threshold"
-        />
-      </div>
+      <BandGauge
+        label="Spend against the monthly cap"
+        value={fraction}
+        min={0}
+        max={max}
+        zones={[
+          { label: `On track, up to ${warnPct}`, to: data.warn_at_fraction, tone: "gain" },
+          { label: "Tight, up to the cap", to: 1, tone: "neutral" },
+          { label: "Over the cap", to: max, tone: "loss" },
+        ]}
+        marker={`${usd(data.total_usd)} spent · ${state.toLowerCase()}`}
+        format={(v) => formatPercent(v, { decimals: 0 })}
+      />
     </div>
   );
 }
 
 function CostTable({ caption, head, rows }: { caption: string; head: string[]; rows: { key: string; cells: React.ReactNode[] }[] }) {
   return (
-    <div className="overflow-x-auto rounded-md border border-border">
+    <div className="overflow-x-auto rounded-card bg-surface-muted">
       <table className="w-full text-sm">
         <caption className="px-3 py-2 text-left text-sm font-medium">{caption}</caption>
         <thead className="bg-surface-muted">

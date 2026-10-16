@@ -5,12 +5,14 @@ import Link from "next/link";
 import { useCallback } from "react";
 
 import { useCompanyOverview } from "@/components/company/company-shell";
+import { MarketContextPanel } from "@/components/company/market-context";
 import { Absent, ResourceGate, SourceLink } from "@/components/company/primitives";
 import { Blueprint, PanelHeading } from "@/components/ui/blueprint";
 import { getBrowserApiClient } from "@/lib/api/client";
 import { companyHref, formatRatio, toNumber, type Overview, type RatiosView } from "@/lib/company/company";
 import { formatDate } from "@/lib/format";
 import { useApiResource } from "@/lib/hooks/use-api-resource";
+import { labelIfKey } from "@/lib/labels";
 
 import { EarningsSummaryPanel } from "./insight-panels";
 
@@ -46,7 +48,7 @@ function KeyRatios({ ticker }: { ticker: string }) {
                   <div key={id} className="min-w-0 border-l border-border pl-3">
                     <dt className="text-xs text-text-muted">{r.label}</dt>
                     <dd className="num mt-0.5 text-lg font-semibold">{text ?? <Absent reason={r.latest?.reason} />}</dd>
-                    <p className="text-[11px] text-text-muted">{r.latest?.label}</p>
+                    <p className="text-xs text-text-muted">{r.latest?.label}</p>
                   </div>
                 );
               })}
@@ -86,7 +88,7 @@ function Profile({ o }: { o: Overview }) {
         {facts.map(([k, v]) => (
           <div key={k} className="flex gap-3 border-b border-border-soft py-1 text-sm">
             <dt className="w-28 shrink-0 text-text-muted">{k}</dt>
-            <dd className="min-w-0">{v ?? <Absent reason="not stored" />}</dd>
+            <dd className="min-w-0 break-words [overflow-wrap:anywhere]">{v ?? <Absent reason="not stored" />}</dd>
           </div>
         ))}
       </dl>
@@ -107,7 +109,7 @@ function Segments({ o, ticker }: { o: Overview; ticker: string }) {
         kicker="Latest reported period"
         title={<span id="segments-heading">Revenue by segment</span>}
         action={
-          <Link href={`/holdings/${encodeURIComponent(ticker)}`} className="text-sm text-accent-ink hover:underline">
+          <Link href={`/companies/${encodeURIComponent(ticker)}/segments`} className="text-sm text-accent-ink hover:underline">
             Full segment history
           </Link>
         }
@@ -121,11 +123,11 @@ function Segments({ o, ticker }: { o: Overview; ticker: string }) {
               const v = toNumber(s.value) ?? 0;
               return (
                 <li key={s.label} className="grid grid-cols-[minmax(8rem,14rem)_1fr_auto] items-center gap-3 text-sm">
-                  <span className="truncate" title={s.label}>
-                    {s.label}
+                  <span className="truncate" title={labelIfKey("segment", s.label)}>
+                    {labelIfKey("segment", s.label)}
                   </span>
-                  <span className="h-2 bg-border-soft" aria-hidden="true">
-                    <span className="block h-full bg-chart-line" style={{ width: `${max > 0 ? Math.max(2, (v / max) * 100) : 0}%` }} />
+                  <span className="h-2 overflow-hidden rounded-mark bg-chart-track" aria-hidden="true">
+                    <span className="block h-full rounded-mark bg-chart-line" style={{ width: `${max > 0 ? Math.max(2, (v / max) * 100) : 0}%` }} />
                   </span>
                   <span className="num text-right text-xs text-text-muted">{s.share !== null && s.share !== undefined ? `${(Number(s.share) * 100).toFixed(1)}%` : ""}</span>
                 </li>
@@ -173,27 +175,54 @@ function Operations({ o }: { o: Overview }) {
   );
 }
 
+type LegalLink = NonNullable<Overview["legal_group"]>[number];
+
+function LegalRows({ links }: { links: readonly LegalLink[] }) {
+  return (
+    <ul className="space-y-1.5 text-sm">
+      {links.map((l) => (
+        <li key={`${l.relation}-${l.name}`} className="flex flex-wrap items-baseline gap-x-3 border-b border-border-soft pb-1">
+          <span className="w-32 shrink-0 text-text-muted">{l.relation === "ultimate_parent" ? "Ultimate parent" : l.relation === "parent" ? "Parent" : "Subsidiary"}</span>
+          <span className="min-w-0">{l.name}</span>
+          <span className={l.status === "confirmed" ? "text-xs text-text-muted" : "text-xs text-unconfirmed"}>
+            {l.status === "confirmed" ? "Confirmed" : "Suggested, not yet confirmed"}
+          </span>
+          <span className="text-xs text-text-muted">{l.source}{l.as_of ? `, ${formatDate(l.as_of)}` : ""}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/** Parents first, then confirmed subsidiaries; suggestions and the long tail wait behind one toggle. */
+const LEGAL_SHOWN = 8;
+
 function LegalGroup({ o }: { o: Overview }) {
   const links = o.legal_group ?? [];
+  const ordered = [...links].sort((a, b) => Number(a.relation === "subsidiary") - Number(b.relation === "subsidiary") || Number(a.status !== "confirmed") - Number(b.status !== "confirmed"));
+  const confirmed = links.filter((l) => l.relation === "subsidiary" && l.status === "confirmed").length;
+  const suggested = links.filter((l) => l.relation === "subsidiary" && l.status !== "confirmed").length;
+  const head = ordered.slice(0, LEGAL_SHOWN);
+  const rest = ordered.slice(LEGAL_SHOWN);
   return (
     <Blueprint aria-labelledby="legal-heading" className="space-y-3 px-[22px] py-5">
-      <PanelHeading kicker="Parents and subsidiaries" title={<span id="legal-heading">Legal group</span>} />
+      <PanelHeading
+        kicker={links.length ? `${confirmed} confirmed ${confirmed === 1 ? "subsidiary" : "subsidiaries"}, ${suggested} suggested` : "Parents and subsidiaries"}
+        title={<span id="legal-heading">Legal group</span>}
+      />
       {links.length === 0 ? (
         <p className="text-sm text-text-muted">{o.legal_group_note ?? "No parent or subsidiary is stored for this company."}</p>
       ) : (
         <>
-          <ul className="space-y-1.5 text-sm">
-            {links.map((l) => (
-              <li key={`${l.relation}-${l.name}`} className="flex flex-wrap items-baseline gap-x-3 border-b border-border-soft pb-1">
-                <span className="w-32 shrink-0 text-text-muted">{l.relation === "ultimate_parent" ? "Ultimate parent" : l.relation === "parent" ? "Parent" : "Subsidiary"}</span>
-                <span className="min-w-0">{l.name}</span>
-                <span className={l.status === "confirmed" ? "text-xs text-gain" : "text-xs text-unconfirmed"}>
-                  {l.status === "confirmed" ? "Confirmed" : "Suggested, not yet confirmed"}
-                </span>
-                <span className="text-xs text-text-muted">{l.source}{l.as_of ? `, ${formatDate(l.as_of)}` : ""}</span>
-              </li>
-            ))}
-          </ul>
+          <LegalRows links={head} />
+          {rest.length > 0 ? (
+            <details className="group">
+              <summary className="cursor-pointer text-sm font-medium text-accent-ink">Show {rest.length} more</summary>
+              <div className="mt-2">
+                <LegalRows links={rest} />
+              </div>
+            </details>
+          ) : null}
           {o.legal_group_note ? <p className="text-xs text-text-muted">{o.legal_group_note}</p> : null}
         </>
       )}
@@ -272,6 +301,7 @@ export function OverviewView({ ticker }: { ticker: string }) {
         {(o: Overview) => (
           <>
             <KeyRatios ticker={ticker} />
+            <MarketContextPanel ticker={ticker} />
             <EarningsSummaryPanel ticker={ticker} />
             <div className="grid gap-5 lg:grid-cols-[3fr_2fr]">
               <Profile o={o} />

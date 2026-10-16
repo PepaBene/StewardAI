@@ -7,6 +7,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import { AlertMessage } from "@/components/alert-message";
 import { EmptyState } from "@/components/empty-state";
+import { FeedList } from "@/components/feed/feed-list";
 import { NewsFeedback } from "@/components/news/news-feedback";
 import { NewsTabs } from "@/components/news/news-tabs";
 import { TierBadge } from "@/components/news/severity-badge";
@@ -26,6 +27,7 @@ import {
   type WireItem,
 } from "@/lib/news/analysis";
 import { cn } from "@/lib/utils";
+import { decodeEntities } from "@/lib/news/entities";
 
 const PAGE = 50;
 /** Wait this long after the last keystroke before the filter reaches the URL (and the API). */
@@ -121,6 +123,19 @@ export function WireView() {
 
   const set = (change: Partial<WireFilters>) => push({ ...filters, ...draft, ...change });
 
+  const loadedItems = load.kind === "ok" ? load.items : null;
+  const entries = useMemo(
+    () =>
+      (loadedItems ?? []).map((item) => ({
+        id: String(item.id),
+        at: item.published_at,
+        title: item.title_en ?? item.headline,
+        kind: item.story_id ? "holding" : "other",
+        item,
+      })),
+    [loadedItems],
+  );
+
   async function more() {
     if (load.kind !== "ok" || load.next === null || load.loadingMore) return;
     const gen = generation.current;
@@ -145,13 +160,10 @@ export function WireView() {
   return (
     <div className="flex flex-col gap-5">
       <PageHeader
-        kicker="News"
         title="Wire"
         description={
           <span className="block max-w-prose">
-            Every headline from every enabled source, in any language, whether or not it mentions a holding. The wire
-            never alerts: only a story about your holdings can. Non-English headlines show their English translation
-            beside the original.
+            Every headline from your news sources, in any language, whether or not it mentions a holding. The wire never sends alerts. Non-English headlines show an English translation.
           </span>
         }
         aside={
@@ -250,11 +262,12 @@ export function WireView() {
             <input type="checkbox" checked={showOriginal} onChange={(e) => chooseOriginal(e.target.checked)} />
             Show headlines in their original language
           </label>
-          <ul className="m-0 flex list-none flex-col divide-y divide-border border-y border-border p-0" aria-label="Wire items">
-            {load.items.map((item) => (
-              <WireRow key={item.id} item={item} showOriginal={showOriginal} />
-            ))}
-          </ul>
+          <FeedList
+            label="Wire items"
+            items={entries}
+            kindLabel={(k) => (k === "holding" ? "About a holding" : "Other news")}
+            renderItem={(e) => <WireRow item={e.item} showOriginal={showOriginal} />}
+          />
           {load.next !== null ? (
             <div>
               <Button variant="outline" onClick={() => void more()} disabled={load.loadingMore}>
@@ -285,7 +298,7 @@ function WireRow({ item, showOriginal }: { item: WireItem; showOriginal: boolean
   const hasTranslation = Boolean(item.title_en && item.title_en !== item.headline);
   const { text, translated } = wireHeadline(item, showOriginal !== flipped);
   return (
-    <li className="space-y-1 py-3">
+    <div className="space-y-1">
       <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-text-muted">
         <TierBadge tier={item.tier as 1 | 2 | 3} />
         <span>{item.outlet_name ?? item.outlet ?? "Unknown outlet"}</span>
@@ -297,7 +310,7 @@ function WireRow({ item, showOriginal }: { item: WireItem; showOriginal: boolean
         {item.paywall !== "open" ? <span>{item.paywall === "hard" ? "Paywalled" : "Metered paywall"}</span> : null}
         {item.state_media ? <span>State media</span> : null}
         {item.topics.map((t) => (
-          <Link key={t} href={`/news/wire?topic=${encodeURIComponent(t)}`} className="rounded-sm border border-border px-1.5 text-text hover:bg-border-soft">
+          <Link key={t} href={`/news/wire?topic=${encodeURIComponent(t)}`} className="rounded-sm border border-border px-1.5 text-text hover:bg-surface-muted">
             {t}
           </Link>
         ))}
@@ -312,7 +325,7 @@ function WireRow({ item, showOriginal }: { item: WireItem; showOriginal: boolean
       )}
       {translated ? (
         <p lang={item.language ?? undefined} className="text-sm text-text-muted [overflow-wrap:anywhere]">
-          Original: {item.headline}
+          Original: {decodeEntities(item.headline)}
         </p>
       ) : null}
       {item.gloss ? <p className="text-sm text-text-muted">{item.gloss}</p> : null}
@@ -332,6 +345,6 @@ function WireRow({ item, showOriginal }: { item: WireItem; showOriginal: boolean
         )}
         <NewsFeedback target="item" targetId={item.id} label={`wire item “${text}”`} />
       </div>
-    </li>
+    </div>
   );
 }

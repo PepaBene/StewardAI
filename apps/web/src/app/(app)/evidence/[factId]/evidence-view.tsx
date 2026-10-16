@@ -59,7 +59,7 @@ function Evidence({ link }: { link: EvidenceLink }) {
       <PageHeader
         kicker={
           <>
-            <Link href={`/holdings/${encodeURIComponent(link.ticker)}`} className="font-mono hover:underline">
+            <Link href={`/companies/${encodeURIComponent(link.ticker)}`} className="font-mono hover:underline">
               {link.ticker}
             </Link>{" "}
             · Evidence <span className="num">#{link.fact_id}</span>

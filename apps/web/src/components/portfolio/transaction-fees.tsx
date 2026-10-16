@@ -13,7 +13,7 @@ export function FeeCell({ row }: { row: TransactionOut }) {
   if (fees.kind === "none") return <span className="text-text-faint">—</span>;
   if (fees.kind === "not_read") {
     return (
-      <span className="text-[11px] text-text-faint" title="Stored before fee capture; the next sync re-reads Trading212's order history and fills this in.">
+      <span className="text-xs text-text-faint" title="Stored before fee capture; the next sync re-reads Trading212's order history and fills this in.">
         not read yet
       </span>
     );
@@ -22,7 +22,7 @@ export function FeeCell({ row }: { row: TransactionOut }) {
   return (
     <span className="inline-flex items-center justify-end gap-1.5 whitespace-nowrap" title={detail}>
       {fees.badges.map((b) => (
-        <span key={b} className={cn("px-1.5 py-px text-[10px] font-semibold tracking-[0.04em] uppercase", BADGE_CLASS[b])}>
+        <span key={b} className={cn("px-1.5 py-px text-xs font-semibold", BADGE_CLASS[b])}>
           {b}
         </span>
       ))}
@@ -76,7 +76,7 @@ export function FeeTotalsPanel({ fees }: { fees: FeeTotals }) {
           ) : (
             <p className="text-sm text-text-muted">No fees on the matching rows.</p>
           )}
-          <p className="text-[11px] leading-snug text-text-faint">
+          <p className="text-xs leading-snug text-text-faint">
             Trading212 per-order charges (walletImpact.taxes) and account FEE rows, each converted to {cur} at its day&rsquo;s{" "}
             {fees.fx_source === "ecb" ? "ECB" : "ČNB"} rate. {fees.fills_with_fees} of {fees.fills} orders carry a fee.
             {status ? ` ${status}` : ""}

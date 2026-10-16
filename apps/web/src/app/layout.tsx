@@ -3,13 +3,9 @@ import type { Metadata } from "next";
 import { ThemeProvider } from "@/components/theme-provider";
 import { colorModeInitScript } from "@/lib/color-mode";
 
-import "@fontsource/barlow/400.css";
-import "@fontsource/barlow/500.css";
-import "@fontsource/barlow/600.css";
-import "@fontsource/barlow/700.css";
-import "@fontsource/barlow-condensed/500.css";
-import "@fontsource/barlow-condensed/600.css";
-import "@fontsource/barlow-condensed/700.css";
+import "@fontsource/ibm-plex-sans/400.css";
+import "@fontsource/ibm-plex-sans/500.css";
+import "@fontsource/ibm-plex-sans/600.css";
 import "@fontsource/ibm-plex-serif/400.css";
 import "@fontsource/ibm-plex-serif/500.css";
 import "@fontsource/ibm-plex-serif/600.css";
@@ -34,7 +30,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       <head>
         <script dangerouslySetInnerHTML={{ __html: colorModeInitScript }} />
       </head>
-      <body className="min-h-dvh bg-surface text-text">
+      <body className="min-h-dvh bg-page text-text">
         <ThemeProvider>{children}</ThemeProvider>
       </body>
     </html>

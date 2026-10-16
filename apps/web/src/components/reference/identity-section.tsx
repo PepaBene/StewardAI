@@ -18,6 +18,7 @@ import { useCallback, useEffect, useState, type ReactNode } from "react";
 
 import { AlertMessage } from "@/components/alert-message";
 import { EmptyState } from "@/components/empty-state";
+import { EntityName } from "@/components/entity-name";
 import { Blueprint, PanelHeading } from "@/components/ui/blueprint";
 import { Button } from "@/components/ui/button";
 import {
@@ -121,7 +122,7 @@ export function IdentitySection({ ticker, resource }: { ticker: string; resource
       ) : null}
       {notFound && !data ? (
         <EmptyState title="No reference data yet">
-          {ticker} has not been resolved through OpenFIGI, ESMA and GLEIF. Use <strong>Refresh reference data</strong>{" "}
+          <EntityName id={ticker} chip={false} /> has not been resolved through OpenFIGI, ESMA and GLEIF. Use <strong>Refresh reference data</strong>{" "}
           above, or wait for the weekly reference-data job.
         </EmptyState>
       ) : null}
@@ -488,7 +489,7 @@ function RelationshipItem({ r, label }: { r: RelationshipOut; label?: string }) 
   return (
     <li className="space-y-0.5 py-1.5">
       <p className="flex flex-wrap items-baseline gap-x-2">
-        {label ? <span className="text-xs font-medium tracking-wide text-text-muted uppercase">{label}</span> : null}
+        {label ? <span className="text-xs font-medium text-text-muted">{label}</span> : null}
         <span className="font-medium">{r.object_name}</span>
         {r.object_lei ? <LeiLink lei={r.object_lei} /> : null}
       </p>
@@ -505,7 +506,7 @@ function GroupStructure({ identity }: { identity: HoldingIdentity }) {
     <Panel title="Group structure" note={CONSOLIDATION_NOTE}>
       <div className="grid gap-4 text-sm lg:grid-cols-2">
         <div>
-          <h4 className="text-xs font-medium tracking-wide text-text-muted uppercase">Parents</h4>
+          <h4 className="text-xs font-medium text-text-muted">Parents</h4>
           {parents.length > 0 ? (
             <ul className="divide-y divide-border">
               {parents.map((p) => (
@@ -526,7 +527,7 @@ function GroupStructure({ identity }: { identity: HoldingIdentity }) {
         </div>
 
         <div>
-          <h4 className="text-xs font-medium tracking-wide text-text-muted uppercase">Owners</h4>
+          <h4 className="text-xs font-medium text-text-muted">Owners</h4>
           {identity.owners.length > 0 ? (
             <ul className="divide-y divide-border">
               {identity.owners.map((o) => (
@@ -539,7 +540,7 @@ function GroupStructure({ identity }: { identity: HoldingIdentity }) {
         </div>
 
         <div className="lg:col-span-2">
-          <h4 className="text-xs font-medium tracking-wide text-text-muted uppercase">
+          <h4 className="text-xs font-medium text-text-muted">
             Subsidiaries <span className="num">({identity.subsidiary_count})</span>
           </h4>
           {identity.subsidiary_count === 0 ? (
@@ -576,7 +577,7 @@ function GroupStructure({ identity }: { identity: HoldingIdentity }) {
         </div>
 
         <div className="lg:col-span-2">
-          <h4 className="text-xs font-medium tracking-wide text-text-muted uppercase">Competitors, suppliers and customers</h4>
+          <h4 className="text-xs font-medium text-text-muted">Competitors, suppliers and customers</h4>
           {related.length === 0 ? (
             <p className="mt-1 text-text-muted">None confirmed yet.</p>
           ) : (
@@ -731,7 +732,7 @@ function DisputedItem({ r, onDecided, onStale }: { r: RelationshipOut; onDecided
   return (
     <li className="space-y-3 py-3 text-sm">
       <p className="flex flex-wrap items-center gap-2">
-        <span className="text-xs font-medium tracking-wide text-text-muted uppercase">{RELATIONSHIP_LABELS[r.type]}</span>
+        <span className="text-xs font-medium text-text-muted">{RELATIONSHIP_LABELS[r.type]}</span>
         <span className="inline-flex items-center gap-1 rounded-sm border border-disputed/40 bg-disputed-subtle px-1.5 py-0.5 text-xs font-medium">
           <ScaleIcon aria-hidden="true" className="size-3.5 text-disputed" />
           Disputed
@@ -816,7 +817,7 @@ function SuggestionItem({
     <li className="flex flex-wrap items-start justify-between gap-3 py-2">
       <div className="min-w-0 space-y-0.5 text-sm">
         <p className="flex flex-wrap items-baseline gap-x-2">
-          <span className="text-xs font-medium tracking-wide text-text-muted uppercase">{RELATIONSHIP_LABELS[r.type]}</span>
+          <span className="text-xs font-medium text-text-muted">{RELATIONSHIP_LABELS[r.type]}</span>
           <span className="font-medium">{r.object_name}</span>
           <span className="rounded-sm border border-dashed border-border px-1 text-xs text-text-muted">suggested</span>
         </p>

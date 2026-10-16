@@ -121,7 +121,7 @@ function Builder({ data }: { data: XrayData }) {
                 <tr key={h.ticker} className="border-t border-border-soft">
                   <th scope="row" className="px-3 py-1.5 text-left font-normal">
                     {h.name ?? h.ticker}
-                    <span className="block text-[11px] text-text-muted">
+                    <span className="block text-xs text-text-muted">
                       {h.ticker}
                       {h.is_fund ? (h.looked_through ? " · fund, opened up" : " · fund, holdings not stored") : ""}
                     </span>
@@ -140,7 +140,7 @@ function Builder({ data }: { data: XrayData }) {
                 <tr key={a.ticker} className="border-t border-border-soft bg-accent-soft/40">
                   <th scope="row" className="px-3 py-1.5 text-left font-normal">
                     {a.name ?? a.ticker}
-                    <span className="block text-[11px] text-text-muted">
+                    <span className="block text-xs text-text-muted">
                       {a.ticker} · added
                       {a.looked_through === false ? " · fund, holdings not stored: its weight will be unknown" : ""}
                     </span>
@@ -170,7 +170,7 @@ function Builder({ data }: { data: XrayData }) {
                 <td className={TD}>{formatPercent(data.cash_weight, { decimals: 1 })}</td>
                 <td className={`${TD} ${cash !== null && cash < -0.00005 ? "text-loss" : ""}`}>
                   {cash === null ? "—" : `${cash < 0 ? "−" : ""}${Math.abs(cash * 100).toFixed(1)}%`}
-                  {cash !== null && cash < -0.00005 ? <span className="block text-[11px]">over 100%</span> : null}
+                  {cash !== null && cash < -0.00005 ? <span className="block text-xs">over 100%</span> : null}
                 </td>
               </tr>
             </tfoot>
@@ -365,7 +365,7 @@ function Result({ data, currency }: { data: ProposalData; currency: string }) {
                   <tr key={r.label} className="border-t border-border-soft align-top">
                     <th scope="row" className="px-3 py-1.5 text-left font-normal">
                       {r.label}
-                      {"note" in r && r.note ? <span className="block text-[11px] text-text-muted">{r.note}</span> : null}
+                      {"note" in r && r.note ? <span className="block text-xs text-text-muted">{r.note}</span> : null}
                     </th>
                     <td className={TD}>{fmt(r.kind, r.b ?? null)}</td>
                     <td className={TD}>{fmt(r.kind, r.a ?? null)}</td>

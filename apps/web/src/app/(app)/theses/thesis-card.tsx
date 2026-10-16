@@ -71,7 +71,7 @@ export function ThesisCard({
           <div className="min-w-0">
             <h3 id={headingId} className="font-mono text-[13px] font-medium">
               <Link
-                href={`/holdings/${encodeURIComponent(row.ticker)}`}
+                href={`/companies/${encodeURIComponent(row.ticker)}`}
                 className="hover:text-accent-ink hover:underline"
                 title={row.ticker}
               >
@@ -153,7 +153,7 @@ export function ThesisCard({
 
       {row.held ? <PositionRisk ticker={row.ticker} /> : null}
 
-      <div className="mt-auto flex items-center justify-between gap-3 border-t border-border-soft px-[18px] py-2 text-[11px] text-text-muted">
+      <div className="mt-auto flex items-center justify-between gap-3 border-t border-border-soft px-[18px] py-2 text-xs text-text-muted">
         <span className="num">
           {lastJudged ? (
             <>
@@ -193,7 +193,7 @@ function KpiRow({
       aria-controls={expanded ? kpiPanelId(ticker, cell.kpi.id) : undefined}
       title={cell.kpi.description || undefined}
       className={cn(
-        "grid w-full grid-cols-[minmax(0,1fr)_80px] items-center gap-2.5 px-1 py-1 text-left text-xs hover:bg-border-soft",
+        "grid w-full grid-cols-[minmax(0,1fr)_80px] items-center gap-2.5 px-1 py-1 text-left text-xs hover:bg-surface-muted",
         expanded && "bg-accent-soft",
       )}
     >
@@ -217,7 +217,7 @@ function KpiRow({
 
 function CardFlags({ row }: { row: BoardRow }) {
   return (
-    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-text-muted">
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-text-muted">
       <span className="num">{row.held ? `Weight ${formatPercent(row.weight)}` : "Not held"}</span>
       {row.review_overdue && row.review_date ? (
         <span className="inline-flex items-center gap-1 border border-warning-signal/40 bg-warning-signal-subtle px-1.5 py-0.5 font-medium text-text">

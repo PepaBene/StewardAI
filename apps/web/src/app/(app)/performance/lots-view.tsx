@@ -75,7 +75,7 @@ function LotsTable({ data }: { data: LotsData }) {
               <tr key={lot.lot_id} className={cn("border-t border-border-soft align-top", lot.forfeits_exemption_warning && "bg-warning-signal-subtle")}>
                 <th scope="row" className="px-3 py-1.5 text-left font-normal">
                   {lot.name ?? lot.ticker}
-                  {lot.name ? <span className="block text-[11px] text-text-muted">{lot.ticker}</span> : null}
+                  {lot.name ? <span className="block text-xs text-text-muted">{lot.ticker}</span> : null}
                 </th>
                 <td className={TD}>{formatDate(lot.bought_on)}</td>
                 <td className={TD}>{formatQuantity(lot.quantity)}</td>
@@ -98,7 +98,7 @@ function LotsTable({ data }: { data: LotsData }) {
                   ) : (
                     <>
                       {formatQuantity(lot.sell_target)}
-                      <span className="block text-[11px] text-text-muted">
+                      <span className="block text-xs text-text-muted">
                         {lot.target_reached === null || lot.target_reached === undefined ? "no price" : lot.target_reached ? "reached" : "not reached"}
                       </span>
                     </>

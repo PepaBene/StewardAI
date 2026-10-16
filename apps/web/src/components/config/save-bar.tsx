@@ -54,7 +54,11 @@ export function SaveBar({
   useUnsavedChangesGuard(dirty);
   const noteId = useId();
   const problems = flattenErrors(errors);
-  const status = message ?? (dirty ? "Unsaved changes." : "No changes.");
+  // Nothing saved yet: the defaults on screen are not "unsaved changes", but they can be saved.
+  const neverSaved = savedVersionId === null;
+  const status = message ?? (dirty ? "Unsaved changes." : neverSaved ? "Showing defaults. Nothing saved yet." : "No changes.");
+  // Loads clean: no bar until the user changes something (or there is a result to show).
+  if (!dirty && !neverSaved && !message && problems.length === 0 && busy === null) return null;
   return (
     <div className={cn("z-10 space-y-2", dirty && "sticky bottom-3")}>
       {problems.length > 0 ? (
@@ -70,8 +74,8 @@ export function SaveBar({
       ) : null}
       <div
         className={cn(
-          "space-y-3 border bg-surface px-4 py-3",
-          dirty ? "border-accent shadow-lg" : "border-border",
+          "space-y-3 rounded-card bg-surface-muted px-4 py-3",
+          dirty && "shadow-lg ring-2 ring-accent",
         )}
       >
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
@@ -98,7 +102,7 @@ export function SaveBar({
               {busy === "validating" ? <LoaderCircleIcon aria-hidden="true" className="animate-spin" /> : <CheckIcon aria-hidden="true" />}
               Validate
             </Button>
-            <Button onClick={() => onSave(note.trim() || null)} disabled={busy !== null || !dirty || blocked}>
+            <Button onClick={() => onSave(note.trim() || null)} disabled={busy !== null || (!dirty && !neverSaved) || blocked}>
               {busy === "saving" || busy === "previewing" ? (
                 <LoaderCircleIcon aria-hidden="true" className="animate-spin" />
               ) : (

@@ -29,7 +29,7 @@ export function DigestIntradaySpark({ until }: { until: string }) {
   const data = state.kind === "ok" ? state.data : state.previous;
   const spark = portfolioSpark(data);
   if (!spark || !data) {
-    return <p className="mt-1.5 text-[11px] opacity-85">Intraday: not available, daily closes only</p>;
+    return <p className="mt-1.5 text-xs opacity-85">Intraday: not available, daily closes only</p>;
   }
   return (
     <div className="mt-2">
@@ -43,7 +43,7 @@ export function DigestIntradaySpark({ until }: { until: string }) {
           className="h-[26px]"
         />
       </div>
-      <p className="mt-1 text-[11px] opacity-85" title={data.note ?? undefined}>
+      <p className="mt-1 text-xs opacity-85" title={data.note ?? undefined}>
         {spark.caption}
         {data.change_pct != null ? ` · ${formatPct(data.change_pct, 2, true)}` : ""}
       </p>

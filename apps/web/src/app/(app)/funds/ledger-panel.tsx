@@ -139,7 +139,7 @@ function LedgerLine({ row, onEdit }: { row: LedgerRow; onEdit: () => void }) {
         <button type="button" onClick={onEdit} className="text-xs text-accent-ink hover:underline" aria-label={`Correct the entry for ${row.label}`}>
           {row.origin === "manual" ? "Correct" : "Verify by hand"}
         </button>
-        <div className="font-mono text-[11px] text-text-muted">
+        <div className="font-mono text-xs text-text-muted">
           {row.subject_kind === "fund" ? row.subject_key : `Index ${row.subject_key}`}
           {row.origin === "manual" ? " · verified by you" : ""}
         </div>

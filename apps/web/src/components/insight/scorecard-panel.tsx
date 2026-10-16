@@ -35,7 +35,7 @@ export function ScorecardPanel({ className }: { className?: string }) {
   );
 }
 
-function Lines({ title, lines }: { title: string; lines: PortfolioScorecard["axes"][number]["lifting"] }) {
+function Lines({ title, lines, tone }: { title: string; lines: PortfolioScorecard["axes"][number]["lifting"]; tone: "gain" | "loss" }) {
   return (
     <div>
       <h3 className="text-sm font-semibold">{title}</h3>
@@ -56,7 +56,7 @@ function Lines({ title, lines }: { title: string; lines: PortfolioScorecard["axe
                   </span>
                 </div>
                 <div className="mt-0.5 h-1 bg-score-mark-track">
-                  <div className="h-full bg-score-mark" style={{ width: `${score === null ? 0 : (score / 6) * 100}%` }} />
+                  <div className={cn("h-full", tone === "gain" ? "bg-gain" : "bg-loss")} style={{ width: `${score === null ? 0 : (score / 6) * 100}%` }} />
                 </div>
               </li>
             );
@@ -109,13 +109,13 @@ function Scorecard({ s }: { s: PortfolioScorecard }) {
             </p>
             <p className="mt-1 text-sm text-text-muted">{sel.explanation}</p>
             <div className="mt-3 grid gap-4 sm:grid-cols-2">
-              <Lines title="Lifting the score" lines={sel.lifting} />
-              <Lines title="Holding it back" lines={sel.holding_back} />
+              <Lines title="Lifting" lines={sel.lifting} tone="gain" />
+              <Lines title="Holding back" lines={sel.holding_back} tone="loss" />
             </div>
           </>
         ) : null}
-        {s.unchecked.length ? <p className="mt-3 text-[11px] text-text-faint">Not checked yet: {s.unchecked.join(", ")}.</p> : null}
-        <p className="mt-1 text-[11px] text-text-faint">{s.note}</p>
+        {s.unchecked.length ? <p className="mt-3 text-xs text-text-faint">Not checked yet: {s.unchecked.join(", ")}.</p> : null}
+        <p className="mt-1 text-xs text-text-faint">{s.note}</p>
       </div>
     </div>
   );

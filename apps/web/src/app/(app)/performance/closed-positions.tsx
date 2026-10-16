@@ -83,7 +83,7 @@ function Row({ p, currency }: { p: Position; currency: string | null }) {
             <ChevronRightIcon aria-hidden="true" className={cn("mt-0.5 size-3.5 shrink-0 transition-transform motion-reduce:transition-none", open && "rotate-90")} />
             <span>
               {p.name ?? p.ticker}
-              <span className="block text-[11px] text-text-muted">
+              <span className="block text-xs text-text-muted">
                 {p.first_trade && p.last_trade ? `${formatDate(p.first_trade)} to ${formatDate(p.last_trade)}` : p.ticker}
               </span>
             </span>

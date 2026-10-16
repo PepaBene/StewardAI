@@ -45,6 +45,7 @@ import {
 import { eventLabel } from "@/lib/news/labels";
 import { isExternalUrl } from "@/lib/sources/sources";
 import { cn } from "@/lib/utils";
+import { decodeEntities } from "@/lib/news/entities";
 
 type Load = { kind: "loading" } | { kind: "error"; message: string } | { kind: "ok"; stories: DisputedStory[] };
 
@@ -184,11 +185,11 @@ function StoryCard({ story, onResolved }: { story: DisputedStory; onResolved: (u
         <div className="min-w-0 flex-1 space-y-1">
           <h3 id={headingId} className="flex items-start gap-2 text-[22px] leading-tight font-semibold">
             <SeverityDot severity={story.severity} className="mt-1.5" />
-            {story.headline}
+            {decodeEntities(story.headline)}
           </h3>
           <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-text-muted">
             {story.ticker ? (
-              <Link href={`/holdings/${encodeURIComponent(story.ticker)}`} className="font-mono text-xs text-accent-ink hover:underline">
+              <Link href={`/companies/${encodeURIComponent(story.ticker)}`} className="font-mono text-xs text-accent-ink hover:underline">
                 {story.ticker}
               </Link>
             ) : (
@@ -210,7 +211,7 @@ function StoryCard({ story, onResolved }: { story: DisputedStory; onResolved: (u
         <div className="flex flex-wrap items-center justify-end gap-1.5">
           <SeverityBadge severity={story.severity} />
           <ResolutionBadge story={story} />
-          <FeedbackControl target={{ kind: "story", id: story.id }} label={`story “${story.headline}”`} />
+          <FeedbackControl target={{ kind: "story", id: story.id }} label={`story “${decodeEntities(story.headline)}”`} />
         </div>
       </div>
 
@@ -311,11 +312,11 @@ function SourceColumn({
             </p>
             {isExternalUrl(s.url) ? (
               <a href={s.url} target="_blank" rel="noreferrer" className="inline-flex items-start gap-1 hover:text-accent-ink hover:underline">
-                <span className="[overflow-wrap:anywhere]">{s.headline ?? s.url}</span>
+                <span className="[overflow-wrap:anywhere]">{decodeEntities(s.headline ?? s.url)}</span>
                 <ExternalLinkIcon aria-hidden="true" className="mt-0.5 size-3 shrink-0 text-text-muted" />
               </a>
             ) : (
-              <span className="inline-flex [overflow-wrap:anywhere]">{s.headline ?? s.url}</span>
+              <span className="inline-flex [overflow-wrap:anywhere]">{decodeEntities(s.headline ?? s.url)}</span>
             )}
             {typeof s.news_item_id === "number" ? (
               <FeedbackControl

@@ -55,7 +55,6 @@ export function CoveragePageView() {
   return (
     <div className="flex flex-col gap-5">
       <PageHeader
-        kicker="Research & Verification"
         title="Data coverage"
         description="Per dataset and jurisdiction, how much of what you hold has a stored record, how old it is, where it is blind and how accurate it was when sampled."
         aside={report ? <span>As known on {dayLabel(report.as_of)} · {report.holdings} holdings · value {money(report.denominator_value)}</span> : undefined}

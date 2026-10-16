@@ -58,7 +58,7 @@ export function KnockOnSection() {
             <table className="w-full min-w-[34rem] border-collapse text-sm">
               <caption className="sr-only">Confirmed links between holdings</caption>
               <thead>
-                <tr className="border-b border-border text-left text-[11px] text-text-muted uppercase">
+                <tr className="border-b border-border text-left text-xs text-text-muted">
                   <th scope="col" className="py-1.5 pr-3 font-medium">Link</th>
                   <th scope="col" className="py-1.5 pr-3 font-medium">Type</th>
                   <th scope="col" className="py-1.5 pr-3 text-right font-medium">Reported share</th>
@@ -69,7 +69,7 @@ export function KnockOnSection() {
                 {knock.links.map((l, i) => (
                   <tr key={`${l.source ?? i}-${i}`} className="border-b border-border-soft">
                     <td className="py-1.5 pr-3">
-                      <Link href={`/holdings/${encodeURIComponent(l.holder)}`} className="text-accent-ink hover:underline">
+                      <Link href={`/companies/${encodeURIComponent(l.holder)}`} className="text-accent-ink hover:underline">
                         {directionLabel(l)}
                       </Link>
                     </td>

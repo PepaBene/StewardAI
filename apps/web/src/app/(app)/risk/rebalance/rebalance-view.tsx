@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 
+import { Dumbbell } from "@/components/charts";
 import { Field, Problem, problemText, SaveBar, SavedList, SELECT } from "@/components/risk/common";
 import { ProposalSummary } from "@/components/risk/proposal-summary";
 import { Blueprint, PanelHeading } from "@/components/ui/blueprint";
@@ -138,6 +139,20 @@ function Plan({ data, saveBar }: { data: RebalanceResponse; saveBar: React.React
         <p className="mt-3 text-sm text-text-muted">
           {money(p.unfunded)} of buying could not be funded without breaking the cash floor, so buys were scaled back.
         </p>
+      ) : null}
+
+      {actions.length > 0 ? (
+        <div className="mt-5">
+          <h3 className="mb-2 text-sm font-medium">Weights now and after the trades</h3>
+          <Dumbbell
+            rows={actions.map((t) => ({ label: t.ticker, before: t.weight_now, after: t.weight_after }))}
+            beforeLabel="Now"
+            afterLabel="After"
+            formatValue={(v) => formatPercent(v, { decimals: 1 })}
+            formatDelta={(d) => `${d > 0 ? "+" : "−"}${Math.abs(d * 100).toFixed(1)} pts`}
+            caption="Portfolio weight of each holding a trade touches, now and after the proposed trades"
+          />
+        </div>
       ) : null}
 
       <div className="mt-4 overflow-x-auto">

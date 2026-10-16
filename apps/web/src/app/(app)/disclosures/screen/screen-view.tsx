@@ -104,7 +104,6 @@ export function ScreenPageView() {
   return (
     <div className="flex flex-col gap-5">
       <PageHeader
-        kicker="Research & Verification"
         title="Evidence screen"
         description="Screen what you hold on figures read from filings and reviewed by a person, and see how much of the portfolio is reached by confirmed relationships and deals."
         aside={shownLook ? <span>As known on {dayLabel(shownLook.as_of)} · value {money(shownLook.denominator_value)}</span> : undefined}

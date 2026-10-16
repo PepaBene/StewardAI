@@ -72,7 +72,7 @@ export function PartiesPageView() {
 
   return (
     <div className="flex flex-col gap-5">
-      <PageHeader kicker="Research & Verification" title="Deal parties to review" description="Names in deal filings that are not yet matched to an issuer. Confirm the right issuer or reject a wrong suggestion." aside={<Link href="/disclosures/deals" className="text-accent-ink hover:underline">Back to deals</Link>} />
+      <PageHeader title="Deal parties to review" description="Names in deal filings that are not yet matched to an issuer. Confirm the right issuer or reject a wrong suggestion." aside={<Link href="/disclosures/deals" className="text-accent-ink hover:underline">Back to deals</Link>} />
       {message ? (
         <p role={message.ok ? "status" : "alert"} className={message.ok ? "border border-border bg-surface-muted px-3 py-2 text-sm" : "border border-warning-signal/40 bg-warning-signal-subtle px-3 py-2 text-sm"}>
           {message.text}

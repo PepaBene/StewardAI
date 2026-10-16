@@ -73,7 +73,7 @@ function OwnershipHistoryChart({ periods }: { periods: readonly unknown[] }) {
               type="button"
               aria-pressed={metric === m.id}
               onClick={() => setMetric(m.id)}
-              className={cn("px-2.5 py-1.5", i > 0 && "border-l border-border", metric === m.id ? "bg-accent text-accent-foreground" : "text-text hover:bg-border-soft")}
+              className={cn("px-2.5 py-1.5", i > 0 && "border-l border-border", metric === m.id ? "bg-accent text-accent-foreground" : "text-text hover:bg-surface-muted")}
             >
               {m.label}
             </button>

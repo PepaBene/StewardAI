@@ -61,6 +61,9 @@ import {
 } from "@/lib/news/digest";
 import { eventLabel, TIERS } from "@/lib/news/labels";
 import { shortDay } from "@/lib/news/stats";
+import { EntityName } from "@/components/entity-name";
+import { SourcesByDomain } from "@/components/research/sources-by-domain";
+import { TocRail, type TocItem } from "@/components/research/toc-rail";
 import { edgarFilingUrl, isNewPosition, managerChangeText, OWNERSHIP_NOTE, sortManagerChanges } from "@/lib/reference/ownership";
 import {
   digestChecks,
@@ -73,6 +76,7 @@ import {
 } from "@/lib/reports/digest-overview";
 import { isExternalUrl } from "@/lib/sources/sources";
 import { cn } from "@/lib/utils";
+import { decodeEntities } from "@/lib/news/entities";
 
 /** /reports/[id]: the digest list of its period beside the digest. */
 export function DigestView({ id }: { id: number }) {
@@ -290,9 +294,9 @@ function Digest({ report }: { report: ReportOut }) {
                         numbers={numbers}
                         className="font-serif text-[15px] leading-relaxed"
                       />
-                      <p className="mt-1 flex flex-wrap items-center gap-x-2 text-[11px] text-text-muted">
+                      <p className="mt-1 flex flex-wrap items-center gap-x-2 text-xs text-text-muted">
                         {item.tickers.map((t) => (
-                          <Link key={t} href={`/holdings/${encodeURIComponent(t)}`} className="font-mono hover:text-accent-ink hover:underline">
+                          <Link key={t} href={`/companies/${encodeURIComponent(t)}`} className="font-mono hover:text-accent-ink hover:underline">
                             {t}
                           </Link>
                         ))}
@@ -324,7 +328,8 @@ function Digest({ report }: { report: ReportOut }) {
         />
       </Blueprint>
 
-      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_20rem]">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[9rem_minmax(0,1fr)_18rem]">
+        <TocRail items={tocItems(body)} />
         <AskAboutSelection>
           <article className="flex flex-col gap-5" aria-label="Stories and status">
             {(body.sections ?? []).some((s) => (s.stories ?? []).length > 0 || (s.verdicts ?? []).length > 0) ? (
@@ -333,15 +338,14 @@ function Digest({ report }: { report: ReportOut }) {
                 {(body.sections ?? []).map((section) =>
                   (section.stories ?? []).length === 0 && (section.verdicts ?? []).length === 0 ? null : (
                     <section key={section.ticker ?? "macro"} aria-labelledby={`sec-${section.ticker ?? "macro"}`} className="space-y-2">
-                      <h3 id={`sec-${section.ticker ?? "macro"}`} className="text-lg leading-tight font-semibold">
+                      <h3 id={`sec-${section.ticker ?? "macro"}`} className="scroll-mt-24 font-heading text-lg leading-tight font-semibold">
                         {section.ticker ? (
-                          <Link href={`/holdings/${encodeURIComponent(section.ticker)}`} className="hover:underline">
-                            {section.name}
+                          <Link href={`/companies/${encodeURIComponent(section.ticker)}`} className="hover:underline">
+                            <EntityName id={section.ticker} name={section.name !== section.ticker ? section.name : null} />
                           </Link>
                         ) : (
                           section.name
                         )}
-                        {section.ticker ? <span className="ml-2 font-mono text-xs font-normal text-text-muted">{section.ticker}</span> : null}
                       </h3>
                       {(section.stories ?? []).length > 0 ? (
                         <ul className="space-y-2">
@@ -353,10 +357,10 @@ function Digest({ report }: { report: ReportOut }) {
                                 <div className="min-w-0 flex-1">
                                   {lead && isExternalUrl(lead.url) ? (
                                     <a href={lead.url} target="_blank" rel="noreferrer" className="font-medium hover:text-accent-ink hover:underline">
-                                      {story.headline}
+                                      {decodeEntities(story.headline)}
                                     </a>
                                   ) : (
-                                    <span className="font-medium">{story.headline}</span>
+                                    <span className="font-medium">{decodeEntities(story.headline)}</span>
                                   )}
                                   <p className="text-xs text-text-muted">
                                     {eventLabel(story.event_type)} · {lead?.outlet ?? "source"}
@@ -369,7 +373,7 @@ function Digest({ report }: { report: ReportOut }) {
                                 <div className="flex flex-wrap items-center justify-end gap-1.5">
                                   <SeverityBadge severity={story.severity} />
                                   <ConfidenceBadge confidence={story.confidence} />
-                                  <FeedbackControl target={{ kind: "story", id: story.cluster_id }} label={`story “${story.headline}”`} />
+                                  <FeedbackControl target={{ kind: "story", id: story.cluster_id }} label={`story “${decodeEntities(story.headline)}”`} />
                                 </div>
                               </li>
                             );
@@ -402,17 +406,19 @@ function Digest({ report }: { report: ReportOut }) {
 
         <aside aria-label="Sources" className="space-y-4">
           <div className="space-y-2">
-            <h2 className="kicker">Sources ({sources.length})</h2>
+            <h2 id="digest-sources" className="scroll-mt-24 font-heading text-lg font-semibold">
+              Sources ({sources.length})
+            </h2>
             {sources.length === 0 ? <p className="text-sm text-text-muted">No news items in this period.</p> : null}
-            <ol className="space-y-2">
-              {sources.map((s, i) => (
-                <SourceCard key={s.news_item_id} source={s} number={i + 1} trust={trust.get(hostOf(s.url))} />
-              ))}
-            </ol>
+            <SourcesByDomain
+              items={sources}
+              urlOf={(s) => s.url}
+              renderItem={(s, i) => <SourceCard source={s} number={i + 1} trust={trust.get(hostOf(s.url))} />}
+            />
           </div>
           {factSources.length > 0 ? (
             <div className="space-y-2">
-              <h2 className="kicker">Cited figures ({factSources.length})</h2>
+              <h2 className="font-heading text-lg font-semibold">Cited figures ({factSources.length})</h2>
               <ul className="space-y-2">
                 {factSources.map((f) => (
                   <li key={f.fact_id} className="border border-border p-3 text-sm">
@@ -465,12 +471,12 @@ function Hero({ report, alerts }: { report: ReportOut; alerts: AlertOut[] | null
       <BlueprintCorners />
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1.5fr)_repeat(3,minmax(0,1fr))] lg:items-end">
         <div className="min-w-0">
-          <p className="text-[11px] font-semibold tracking-[0.14em] uppercase opacity-85">
+          <p className="text-xs font-semibold opacity-85">
             {label} · <span className="num">{shortDay(new Date(report.created_at))} {new Date(report.created_at).getFullYear()}</span>
           </p>
           <h2 id="digest-headline" className="mt-1.5 flex items-start gap-2 text-[32px] leading-[1.05] font-semibold">
             {body.nothing_material ? <CheckCircle2Icon aria-hidden="true" className="mt-1.5 size-6 shrink-0" /> : null}
-            {body.headline}
+            {decodeEntities(body.headline)}
           </h2>
           <p className="mt-1 text-xs opacity-85">{report.title}</p>
         </div>
@@ -507,7 +513,7 @@ function HeroStat({ label, value, sub, children }: { label: string; value: strin
       <p className="text-xs opacity-85">{label}</p>
       <p className="num mt-1 font-heading text-[34px] leading-none font-semibold">{value}</p>
       {children}
-      {sub ? <p className="mt-1.5 text-[11px] opacity-85">{sub}</p> : null}
+      {sub ? <p className="mt-1.5 text-xs opacity-85">{sub}</p> : null}
     </div>
   );
 }
@@ -539,7 +545,7 @@ function Movers({ movers }: { movers: ContributionReport | null | undefined }) {
             const w = (Math.abs(v) / max) * 50;
             return (
               <li key={h.ticker} className="grid grid-cols-[5.5rem_1fr_4.5rem] items-center gap-3 text-xs">
-                <Link href={`/holdings/${encodeURIComponent(h.ticker)}`} className="truncate font-mono text-[11px] hover:underline" title={h.name ?? h.ticker}>
+                <Link href={`/companies/${encodeURIComponent(h.ticker)}`} className="truncate font-mono text-xs hover:underline" title={h.name ?? h.ticker}>
                   {h.ticker}
                 </Link>
                 <span aria-hidden="true" className="relative h-3">
@@ -599,7 +605,7 @@ function SourceCard({
   trust: { score: number; demoted: boolean } | undefined;
 }) {
   return (
-    <li id={sourceAnchor(number)} className="scroll-mt-24 space-y-1 border border-border p-3 text-sm">
+    <div id={sourceAnchor(number)} className="scroll-mt-24 space-y-1 rounded-lg border border-border p-3 text-sm">
       <p className="flex items-center justify-between gap-2 text-xs text-text-muted">
         <span className="num">
           [{number}] {s.outlet ?? hostOf(s.url)}
@@ -610,11 +616,11 @@ function SourceCard({
       </p>
       {isExternalUrl(s.url) ? (
         <a href={s.url} target="_blank" rel="noreferrer" className="inline-flex items-start gap-1 hover:text-accent-ink hover:underline">
-          {s.headline}
+          {decodeEntities(s.headline)}
           <ExternalLinkIcon aria-hidden="true" className="mt-0.5 size-3 shrink-0 text-text-muted" />
         </a>
       ) : (
-        <p>{s.headline}</p>
+        <p>{decodeEntities(s.headline)}</p>
       )}
       <p className="num text-xs text-text-muted">
         {formatDateTime(s.published_at)} · trust {trust ? Math.round(trust.score * 100) / 100 : 1}
@@ -623,14 +629,25 @@ function SourceCard({
       {s.summary ? (
         <details className="text-xs">
           <summary className="cursor-pointer text-text-muted">Stored text</summary>
-          <p className="mt-1 break-words whitespace-pre-line text-text-muted">{s.summary}</p>
+          <p className="mt-1 break-words whitespace-pre-line text-text-muted">{decodeEntities(s.summary)}</p>
         </details>
       ) : null}
-    </li>
+    </div>
   );
 }
 
-const SECTION = "blueprint space-y-2 px-6 py-5";
+/** The contents list: one entry per company section that has stories or verdicts, then the sources. */
+function tocItems(body: DigestBody): TocItem[] {
+  const items: TocItem[] = (body.sections ?? [])
+    .filter((s) => (s.stories ?? []).length > 0 || (s.verdicts ?? []).length > 0)
+    .map((s) => ({
+      id: `sec-${s.ticker ?? "macro"}`,
+      label: s.ticker ? <EntityName id={s.ticker} name={s.name !== s.ticker ? s.name : null} chip={false} /> : s.name,
+    }));
+  return [...items, { id: "digest-sources", label: "Sources" }];
+}
+
+const SECTION ="blueprint space-y-2 px-6 py-5";
 const LINK = "text-accent-ink underline-offset-4 hover:underline";
 
 /** Portfolio flags, thesis status changes, reviews due, macro figures, tracked managers (13F) and market holidays. */
@@ -657,7 +674,7 @@ function StatusSections({ body, facts }: { body: DigestBody; facts: Map<number, 
                 <SeverityBadge severity={f.severity} />
                 <span className="font-medium">{PORTFOLIO_FLAG_LABELS[f.kind] ?? f.kind}</span>
                 {f.ticker ? (
-                  <Link href={`/holdings/${encodeURIComponent(f.ticker)}`} className="font-mono text-xs text-accent-ink hover:underline">
+                  <Link href={`/companies/${encodeURIComponent(f.ticker)}`} className="font-mono text-xs text-accent-ink hover:underline">
                     {f.ticker}
                   </Link>
                 ) : null}
@@ -687,7 +704,7 @@ function StatusSections({ body, facts }: { body: DigestBody; facts: Map<number, 
             {changes.map((c) => (
               <li key={c.verdict_id} className="flex flex-wrap items-center gap-2">
                 <VerdictStatusBadge status={c.to_status} />
-                <Link href={`/holdings/${encodeURIComponent(c.ticker)}`} className="font-mono text-xs text-accent-ink hover:underline">
+                <Link href={`/companies/${encodeURIComponent(c.ticker)}`} className="font-mono text-xs text-accent-ink hover:underline">
                   {c.ticker}
                 </Link>
                 <span>
@@ -788,7 +805,7 @@ function StatusSections({ body, facts }: { body: DigestBody; facts: Map<number, 
                     {isNewPosition(c) ? "New position" : c.change === "exited" ? "Exited" : c.change}
                   </span>
                   <span className="font-medium">{c.manager_name ?? `CIK ${c.cik}`}</span>
-                  <Link href={`/holdings/${encodeURIComponent(c.ticker)}#ownership-heading`} className="font-mono text-xs text-accent-ink hover:underline">
+                  <Link href={`/companies/${encodeURIComponent(c.ticker)}/governance#ownership-heading`} className="font-mono text-xs text-accent-ink hover:underline">
                     {c.ticker}
                   </Link>
                   <span>{managerChangeText(c)}</span>

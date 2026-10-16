@@ -44,7 +44,7 @@ export function RangeButtons<T extends string>({
                   : "text-accent-foreground hover:bg-accent-foreground/15 focus-visible:outline-accent-foreground"
                 : on
                   ? "bg-accent text-accent-foreground focus-visible:outline-focus"
-                  : "text-text hover:bg-border-soft focus-visible:outline-focus",
+                  : "text-text hover:bg-surface-muted focus-visible:outline-focus",
             )}
           >
             {o.label}

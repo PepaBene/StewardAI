@@ -8,5 +8,5 @@ export function kpiAnchorId(kpiId: string): string {
 }
 
 export function kpiHref(ticker: string, kpiId: string): string {
-  return `/holdings/${encodeURIComponent(ticker)}#${kpiAnchorId(kpiId)}`;
+  return `/companies/${encodeURIComponent(ticker)}#${kpiAnchorId(kpiId)}`;
 }

@@ -86,7 +86,7 @@ export function EventStrip({ txs, cutoffMs }: { txs: readonly InsiderTx[]; cutof
           </g>
         ))}
         {months.map((m) => (
-          <text key={m.label} x={x(m.at)} y={H - 10} className="num fill-text-muted text-[11px]">{m.label}</text>
+          <text key={m.label} x={x(m.at)} y={H - 10} className="num fill-text-muted text-xs">{m.label}</text>
         ))}
         <line x1={x((cutoffMs - from) / Math.max(to - from, 1))} x2={x((cutoffMs - from) / Math.max(to - from, 1))} y1={PAD.t - 6} y2={H - PAD.b} className="stroke-text" strokeWidth={1.5} />
         {events.map((e) => (

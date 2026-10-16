@@ -8,6 +8,7 @@ import type { SegmentBridge, StatementsOut } from "@/lib/disclosure/financials";
 import { usePageSelection } from "@/lib/chat/page-selection-store";
 import { CoverageRibbon, DatesTable, EvidencePanel, FilingsTable, ReviewPanel, SourcesPanel, ValuesTable } from "@/components/disclosure/panels";
 import { IngestFilings } from "@/components/disclosure/ingest";
+import { PortfolioSummary } from "@/components/disclosure/portfolio-summary";
 import { KnownAtRail } from "@/components/disclosure/known-at-rail";
 import { dataOf, Panel, ResourceNotice, SectionNav } from "@/components/oversight/panel";
 import { PageHeader } from "@/components/page-header";
@@ -196,16 +197,8 @@ export function DisclosuresView() {
   return (
     <div className="flex flex-col gap-5">
       <PageHeader
-        kicker="Research & Verification"
-        title="Public disclosures"
-        description="What each company had filed, and what we could have known, on any date. Every value links to the sentence it came from."
-        aside={
-          issuer ? (
-            <span>
-              {issuer.document_count} documents · latest known {formatDay(issuer.latest_known_at)}
-            </span>
-          ) : null
-        }
+        title="Filings"
+        description="What your companies have filed, and what we could have known on any date. Every value links to the sentence it came from."
       />
 
       {sample ? (
@@ -224,7 +217,7 @@ export function DisclosuresView() {
 
       {!sample && live.length > 1 ? (
         <label className="flex items-center gap-2 text-sm">
-          <span className="font-medium">Company</span>
+          <span className="font-medium">Show company</span>
           <select
             value={issuer?.issuer_id ?? ""}
             onChange={(e) => {
@@ -250,6 +243,8 @@ export function DisclosuresView() {
           <IngestFilings key={issuer.issuer_id} issuerId={issuer.issuer_id} issuerName={issuer.legal_name} onDone={() => issuers.reload()} />
         </Panel>
       ) : null}
+
+      {!sample ? <PortfolioSummary issuers={live.length} /> : null}
 
       <SectionNav sections={SECTIONS} />
 

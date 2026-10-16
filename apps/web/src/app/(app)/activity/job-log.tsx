@@ -8,8 +8,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AlertMessage } from "@/components/alert-message";
 import { EmptyState } from "@/components/empty-state";
 import { JobStatusBadge, JobStatusDot } from "@/components/jobs/job-status-badge";
+import { EntityName } from "@/components/entity-name";
 import { Button } from "@/components/ui/button";
 import { BlueprintCorners } from "@/components/ui/blueprint";
+import { CompactRow } from "@/components/ui/compact-row";
+import { ResponsiveTable } from "@/components/ui/responsive-table";
 import { getBrowserApiClient, type Holding, type JobList, type JobListItem } from "@/lib/api/client";
 import {
   EMPTY_JOB_FILTERS,
@@ -163,7 +166,7 @@ export function JobLog() {
             className="rounded-md border border-border bg-surface-raised px-2 py-1 text-sm text-text"
           >
             <option value="">All (and runs for no holding)</option>
-            {filters.ticker && !holdings.some((h) => h.ticker === filters.ticker) ? <option value={filters.ticker}>{filters.ticker}</option> : null}
+            {filters.ticker && !holdings.some((h) => h.ticker === filters.ticker) ? <option value={filters.ticker}>Another holding</option> : null}
             {holdings.map((h) => (
               <option key={h.ticker} value={h.ticker}>
                 {h.name ?? h.ticker}
@@ -179,7 +182,7 @@ export function JobLog() {
         ) : null}
         {filters.ticker ? (
           <p className="basis-full text-xs text-text-muted">
-            Only runs started for {filters.ticker} (earnings checks, verdict runs, reference refreshes, impact notes) have a holding.
+            Only runs started for <EntityName id={filters.ticker} chip={false} /> (earnings checks, verdict runs, reference refreshes, impact notes) have a holding.
           </p>
         ) : null}
       </div>
@@ -197,57 +200,67 @@ export function JobLog() {
         </EmptyState>
       ) : null}
       {load.kind === "ok" && load.jobs.length > 0 ? (
-        <div className="relative overflow-x-auto border border-border">
-          <table className="w-full min-w-[56rem] text-sm">
-            <caption className="sr-only">Job runs, newest first</caption>
-            <thead className="bg-surface-muted">
-              <tr className="border-b border-border text-[11px] tracking-[0.08em] text-text-muted uppercase">
-                <th scope="col" className="px-3 py-2 text-left font-medium">Run</th>
-                <th scope="col" className="px-3 py-2 text-left font-medium">Status</th>
-                <th scope="col" className="px-3 py-2 text-left font-medium">Queued</th>
-                <th scope="col" className="px-3 py-2 text-right font-medium">Duration</th>
-                <th scope="col" className="px-3 py-2 text-right font-medium">Cost</th>
-                <th scope="col" className="px-3 py-2 text-left font-medium">Failed step / error</th>
-              </tr>
-            </thead>
-            <tbody>
-              {load.jobs.map((j) => {
-                const summary = paramsSummary(j.params);
+        <ResponsiveTable
+          rows={load.jobs}
+          rowKey={(j) => String(j.id)}
+          caption="Job runs, newest first"
+          columns={[
+            {
+              key: "run",
+              header: "Run",
+              cell: (j) => {
+                const ticker = typeof j.params?.ticker === "string" ? j.params.ticker : null;
+                const summary = paramsSummary(Object.fromEntries(Object.entries(j.params ?? {}).filter(([k]) => k !== "ticker")));
                 return (
-                  <tr key={j.id} className="border-b border-border align-top last:border-0">
-                    <th scope="row" className="px-3 py-2 text-left font-normal">
-                      <Link href={jobHref(j.id)} className="flex items-center gap-2 font-medium hover:text-accent-ink hover:underline">
-                        <JobStatusDot status={j.status} />
-                        {jobTypeLabel(j.job_type)} <span className="num text-text-muted">#{j.id}</span>
-                      </Link>
-                      <span className="block text-xs text-text-muted">
-                        {j.trigger === "manual" ? "by hand" : j.trigger}
-                        {summary ? ` · ${summary}` : ""}
-                      </span>
-                    </th>
-                    <td className="px-3 py-2">
-                      <JobStatusBadge status={j.status} />
-                    </td>
-                    <td className="num px-3 py-2 whitespace-nowrap">
-                      <time dateTime={j.created_at} title={formatDateTime(j.created_at)}>
-                        {formatRelative(new Date(j.created_at), now)}
-                      </time>
-                    </td>
-                    <td className="num px-3 py-2 text-right whitespace-nowrap">{runDuration(j, now)}</td>
-                    <td className="num px-3 py-2 text-right whitespace-nowrap" title={j.cost_usd === null ? "No cost recorded" : `${j.cost_usd} USD`}>
-                      {formatCost(j.cost_usd)}
-                    </td>
-                    <td className="max-w-md px-3 py-2 text-xs">
-                      {j.failed_step ? <span className="font-mono font-medium">{j.failed_step}</span> : null}
-                      {j.error ? <span className="block break-words text-text-muted">{j.error}</span> : null}
-                      {!j.failed_step && !j.error ? <span className="text-text-muted">—</span> : null}
-                    </td>
-                  </tr>
+                  <>
+                    <Link href={jobHref(j.id)} className="flex items-center gap-2 font-medium hover:text-accent-ink hover:underline">
+                      <JobStatusDot status={j.status} />
+                      {jobTypeLabel(j.job_type)}
+                    </Link>
+                    <span className="block text-xs text-text-muted">
+                      {j.trigger === "manual" ? "By hand" : "Scheduled"}
+                      {ticker ? <> · <EntityName id={ticker} chip={false} /></> : null}
+                      {summary ? ` · ${summary}` : ""}
+                    </span>
+                  </>
                 );
-              })}
-            </tbody>
-          </table>
-        </div>
+              },
+            },
+            { key: "status", header: "Status", cell: (j) => <JobStatusBadge status={j.status} /> },
+            {
+              key: "queued",
+              header: "Queued",
+              cell: (j) => (
+                <time dateTime={j.created_at} title={formatDateTime(j.created_at)}>
+                  {formatRelative(new Date(j.created_at), now)}
+                </time>
+              ),
+            },
+            { key: "duration", header: "Duration", numeric: true, cell: (j) => runDuration(j, now) },
+            { key: "cost", header: "Cost", numeric: true, cell: (j) => formatCost(j.cost_usd) },
+            {
+              key: "error",
+              header: "Failed step or error",
+              className: "max-w-md text-xs",
+              cell: (j) => (
+                <>
+                  {j.failed_step ? <span className="font-medium">{j.failed_step.replaceAll("_", " ")}</span> : null}
+                  {j.error ? <span className="block break-words text-text-muted">{j.error}</span> : null}
+                  {!j.failed_step && !j.error ? <span className="text-text-muted">None</span> : null}
+                </>
+              ),
+            },
+          ]}
+          compact={(j) => (
+            <CompactRow
+              name={jobTypeLabel(j.job_type)}
+              symbol={JOB_STATUS[j.status].label}
+              primary={formatCost(j.cost_usd)}
+              secondary={[formatRelative(new Date(j.created_at), now), runDuration(j, now)]}
+              href={jobHref(j.id)}
+            />
+          )}
+        />
       ) : null}
       {load.kind === "ok" && load.next !== null ? (
         <div className="flex items-center gap-3">

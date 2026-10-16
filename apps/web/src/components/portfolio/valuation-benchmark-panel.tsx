@@ -32,7 +32,7 @@ function Compare({ row, benchLabel }: { row: Row; benchLabel: string }) {
       <div className="text-[12px] text-text-muted">{row.label}</div>
       <div className="flex items-baseline justify-between gap-2">
         <span className="num font-heading text-[26px] leading-none font-semibold">{row.format(row.portfolio)}</span>
-        <span className="text-right text-[11px] text-text-faint">
+        <span className="text-right text-xs text-text-faint">
           {benchLabel} <span className="num text-text-muted">{row.format(row.benchmark)}</span>
           {gap !== null ? (
             <span className="num">
@@ -53,7 +53,7 @@ function Compare({ row, benchLabel }: { row: Row; benchLabel: string }) {
         formatValue={(v) => row.format(v)}
       />
       <div />
-      <div className="text-[11px] text-text-faint">covers {formatPct(row.coverage, 0)} of invested value</div>
+      <div className="text-xs text-text-faint">covers {formatPct(row.coverage, 0)} of invested value</div>
     </div>
   );
 }
@@ -74,7 +74,7 @@ export function ValuationBenchmarkPanel({ state }: { state: ResourceState<Portfo
         title={<span id="valuation-benchmark-heading">Valuation vs benchmark</span>}
         action={
           data?.benchmark ? (
-            <span className="text-[11px] text-text-faint">
+            <span className="text-xs text-text-faint">
               {data.benchmark.via}, {formatDate(data.benchmark.as_of)}
             </span>
           ) : null
@@ -129,7 +129,7 @@ function Body({ data }: { data: PortfolioValuation }) {
         <table className="w-full text-[12px]">
           <caption className="sr-only">Fund and index valuation figures</caption>
           <thead>
-            <tr className="text-left text-[10px] tracking-wide text-text-muted uppercase">
+            <tr className="text-left text-xs text-text-muted">
               <th className="py-1.5 font-medium">Compared with</th>
               <th className="py-1.5 text-right font-medium">P/E</th>
               <th className="py-1.5 text-right font-medium">P/B</th>
@@ -147,7 +147,7 @@ function Body({ data }: { data: PortfolioValuation }) {
               <tr key={`${c.fund_key}-${c.label}`} className="border-t border-border-soft">
                 <td className="py-1.5">
                   {c.label}
-                  <span className="block text-[11px] text-text-faint">
+                  <span className="block text-xs text-text-faint">
                     {c.via}
                     {c.stale ? " · stale" : ""}
                   </span>
@@ -168,7 +168,7 @@ function Body({ data }: { data: PortfolioValuation }) {
           <table className="w-full min-w-[26rem] text-[12px]">
             <caption className="sr-only">Each holding&rsquo;s contribution</caption>
             <thead>
-              <tr className="text-left text-[10px] tracking-wide uppercase">
+              <tr className="text-left text-xs">
                 <th className="py-1 font-medium">Holding</th>
                 <th className="py-1 text-right font-medium">Weight</th>
                 <th className="py-1 text-right font-medium">P/E used</th>

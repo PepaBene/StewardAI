@@ -1,7 +1,7 @@
 import { CONFIG_DOMAINS, DOMAIN_SLUGS, historyHref } from "@/lib/config/domains";
 import { humanizeMetric } from "@/lib/evidence/confidence";
 import { reviewQueueHref } from "@/lib/evidence/review";
-import { CLUSTERS, isClusterActive } from "@/lib/nav";
+import { type Destination, NAV_PAGES, resolveNav } from "@/lib/nav";
 import { kpiHref } from "@/lib/portfolio/kpi-anchor";
 
 /*
@@ -24,7 +24,7 @@ export type PaletteAction =
   | { kind: "ownership-13f" }
   | { kind: "research"; ticker: string };
 
-export type PaletteGroup = (typeof CLUSTERS)[number]["label"] | "Copilot" | "Holdings" | "Actions";
+export type PaletteGroup = Destination["label"] | "Go to" | "Copilot" | "Holdings" | "Actions";
 
 export type PaletteCommand = {
   id: string;
@@ -38,16 +38,14 @@ export type PaletteCommand = {
 };
 
 /**
- * Which of the five-cluster IA's groups a destination belongs to (Ledger_Design_System_
- * Redesign_Proposal.md section 3), so the palette's trailing label says "Oversight" or
- * "Research & Verification" instead of a blanket "Go to". Chat has no cluster: it is
- * ambient, so its entries are labelled "Copilot" directly by their own definition.
+ * Which destination a page belongs to (lib/nav.ts), so the palette's trailing label says
+ * "System" or "Research" instead of a blanket "Go to". Chat has no destination: it is
+ * ambient, so its entries are labelled "Copilot". Glossary and Methods are "Go to".
  */
 function clusterOf(href: string): PaletteGroup {
   const path = href.split(/[?#]/)[0];
   if (path === "/chat") return "Copilot";
-  const cluster = CLUSTERS.find((c) => isClusterActive(c, path));
-  return cluster?.label ?? "Config";
+  return resolveNav(path)?.destination.label ?? "Go to";
 }
 
 /** Primary destinations that aren't already a richly-keyworded entry below. */
@@ -148,7 +146,16 @@ export function jobCommands(query: string): PaletteCommand[] {
 }
 
 export function baseCommands(): PaletteCommand[] {
+  const listed = new Set<string>([...PRIMARY_PAGES, ...CONFIG_PAGES, ...OTHER_PAGES].map((p) => p.href));
   return [
+    // Every destination tab not already listed with richer keywords below.
+    ...NAV_PAGES.filter((p) => !listed.has(p.href)).map((p) => ({
+      id: `nav:${p.href}`,
+      label: p.label,
+      group: clusterOf(p.href),
+      keywords: p.destination.toLowerCase(),
+      href: p.href,
+    })),
     ...PRIMARY_PAGES.map((p) => ({
       id: `nav:${p.href}`,
       label: p.label,
@@ -158,7 +165,7 @@ export function baseCommands(): PaletteCommand[] {
     })),
     ...CONFIG_PAGES.map((p) => ({
       id: `nav:${p.href}`,
-      label: `Config: ${p.label}`,
+      label: `Settings: ${p.label}`,
       group: clusterOf(p.href),
       keywords: p.keywords,
       href: p.href,
@@ -201,7 +208,7 @@ export function holdingCommands(holdings: { ticker: string; name?: string | null
         label: name,
         group: "Holdings" as const,
         keywords: `${h.ticker} holding thesis`,
-        href: `/holdings/${encodeURIComponent(h.ticker)}`,
+        href: `/companies/${encodeURIComponent(h.ticker)}`,
       },
       {
         id: `review:${h.ticker}`,

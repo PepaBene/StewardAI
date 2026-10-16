@@ -48,7 +48,7 @@ function Table({ d }: { d: PortfolioConsensus }) {
                   <span className={cn("px-1.5 text-xs", TONE[h.coverage])} title={h.reason}>
                     {COVERAGE_LABEL[h.coverage]}
                   </span>
-                  {h.coverage !== "complete" ? <span className="block max-w-64 text-left text-[11px] text-text-muted sm:ml-auto">{h.reason}</span> : null}
+                  {h.coverage !== "complete" ? <span className="block max-w-64 text-left text-xs text-text-muted sm:ml-auto">{h.reason}</span> : null}
                 </td>
                 <td className="num px-2 py-1.5 text-right">{num(h.mean)?.toFixed(2) ?? "—"}</td>
                 <td className="num px-2 py-1.5 text-right">{num(h.upside) === null ? "—" : `${num(h.upside)! > 0 ? "+" : ""}${(num(h.upside)! * 100).toFixed(1)}%`}</td>

@@ -207,7 +207,6 @@ export function ThesisView() {
   return (
     <div className="flex flex-col gap-[22px]">
       <PageHeader
-        kicker="Research & Verification"
         title="Thesis workup"
         description="Ask for the thesis of a stock and the app does the rest: research, a stance (keep, add, trim or exit; buy or pass), the executive summary and the detailed memo. You can also ask the chat about any thesis."
         aside={
@@ -241,7 +240,7 @@ export function ThesisView() {
         ) : (
           <Blueprint className="divide-y divide-border-soft">
             {reviews.map((r) => (
-              <Link key={r.id} href={`/thesis/reviews/${r.id}`} className="block px-4 py-3 hover:bg-border-soft">
+              <Link key={r.id} href={`/thesis/reviews/${r.id}`} className="block px-4 py-3 hover:bg-surface-muted">
                 <span className="font-heading text-[17px] font-semibold">Review #{r.id}</span>
                 <span className="num ml-2 text-xs text-text-muted">
                   {r.status === "done" ? "done" : "researching"} · {formatDateTime(r.created_at)}
@@ -264,7 +263,7 @@ export function ThesisView() {
         ) : (
           <Blueprint className="divide-y divide-border-soft">
             {memos.map((m) => (
-              <Link key={m.id} href={`/thesis/memos/${m.id}`} className="block px-4 py-3 hover:bg-border-soft">
+              <Link key={m.id} href={`/thesis/memos/${m.id}`} className="block px-4 py-3 hover:bg-surface-muted">
                 <span className="font-mono text-sm">{m.ticker}</span>
                 <span className="ml-2 bg-border-soft px-2 py-px text-xs font-medium">{STANCE_TEXT[m.stance] ?? m.stance}</span>
                 <span className="num ml-2 text-xs text-text-muted">

@@ -1,47 +1,37 @@
 "use client";
 
 import { LoaderCircleIcon, RefreshCwIcon } from "lucide-react";
-import { useMemo, useState } from "react";
+import Link from "next/link";
+import { useState } from "react";
 
 import { AlertMessage } from "@/components/alert-message";
 import { EmptyState } from "@/components/empty-state";
-import { PageHeader } from "@/components/page-header";
-import type { AllocationItem } from "@/components/portfolio/allocation-bars";
+import { KpiStrip, type KpiTileProps } from "@/components/insight/kpi-tile";
 import { ScorecardPanel } from "@/components/insight/scorecard-panel";
+import { UpdatesFeedPanel } from "@/components/insight/updates-feed";
+import { PageHeader } from "@/components/page-header";
 import { AllocationPanel } from "@/components/portfolio/allocation-panel";
-import { CashFlowPanel } from "@/components/portfolio/cash-flow-panel";
-import { ConcentrationCompliance } from "@/components/portfolio/concentration-compliance";
+import type { AllocationItem } from "@/components/portfolio/allocation-bars";
 import { ContributionCard } from "@/components/portfolio/contribution-card";
-import { DriftPanel, DriftTable } from "@/components/portfolio/drift-panel";
-import { PortfolioDataContextSection } from "@/components/portfolio/data-context-section";
-import { KnockOnSection } from "@/components/portfolio/knock-on-section";
-import { ExposurePanel } from "@/components/portfolio/exposure-panel";
-import { useLookThrough } from "@/components/portfolio/look-through-exposure";
 import { FreshnessLabel } from "@/components/portfolio/freshness-label";
 import { OverviewHero, type HistoryLoad } from "@/components/portfolio/overview-hero";
-import { ReturnsHeatmap } from "@/components/portfolio/returns-heatmap";
-import { RiskPanel } from "@/components/portfolio/risk-panel";
-import { RiskStatTile } from "@/components/portfolio/risk-stat-tile";
-import { StatTile } from "@/components/portfolio/stat-tile";
-import { fetchValuation, ValuationBenchmarkPanel } from "@/components/portfolio/valuation-benchmark-panel";
+import { RiskGlance } from "@/components/portfolio/risk-glance";
 import { useSyncStatus } from "@/components/sync/sync-status-provider";
 import { Button } from "@/components/ui/button";
 import { getBrowserApiClient, type PortfolioHistory, type PortfolioOverview } from "@/lib/api/client";
-import { formatDate, formatMoney, formatPercent, gainLossTone } from "@/lib/format";
+import { formatDate, formatMoney, formatPercent } from "@/lib/format";
 import { useApiResource } from "@/lib/hooks/use-api-resource";
-import { VALUATION_SCALE, valuationAxis } from "@/lib/portfolio/valuation";
-import { herfindahlIndex } from "@/lib/portfolio/concentration";
-import { lookThroughRisk } from "@/lib/portfolio/look-through";
+import { money, pct } from "@/lib/insight/income";
+import { num } from "@/lib/insight/insight";
 import { formatCompactMoney, formatSignedPct } from "@/lib/portfolio/money";
-import { DEFAULT_HERO_RANGE, HISTORY_DAYS, rangeStart, sliceFrom, trailingRisk, type HeroRangeId } from "@/lib/portfolio/performance";
-import { foreignCurrencyShare, riskAxes } from "@/lib/portfolio/risk-profile";
-import { UpdatesFeedPanel } from "@/components/insight/updates-feed";
+import { DEFAULT_HERO_RANGE, HISTORY_DAYS, indexedRange, lastChange, periodReturn, rangeStart, type HeroRangeId } from "@/lib/portfolio/performance";
+import { shortTicker } from "@/lib/portfolio/ticker";
+import { benchmarkVerdict, incomeChangeVerdict, unrealisedVerdict } from "@/lib/verdicts/portfolio";
 import { cn } from "@/lib/utils";
 
 const fetchOverview = () => getBrowserApiClient().GET("/portfolio/overview");
 const fetchHistory = () => getBrowserApiClient().GET("/portfolio/history", { params: { query: { days: HISTORY_DAYS } } });
-
-const TONE_CLASS = { gain: "text-gain", loss: "text-loss", flat: "" };
+const fetchDividends = () => getBrowserApiClient().GET("/portfolio/dividends");
 
 export function OverviewView() {
   const { state, reload } = useApiResource(fetchOverview);
@@ -83,7 +73,7 @@ function Header({ data }: { data: PortfolioOverview }) {
     <PageHeader
       kicker="Portfolio"
       title="Overview"
-      description="Portfolio value, allocation and drift from target weights."
+      description="What your portfolio is worth, how it is doing and what changed."
       aside={
         data.freshness ? (
           <>
@@ -119,13 +109,9 @@ function historyLoad(state: ReturnType<typeof useApiResource<PortfolioHistory>>[
 function Overview({ data }: { data: PortfolioOverview }) {
   const { startSync, starting, view } = useSyncStatus();
   const history = historyLoad(useApiResource(fetchHistory).state);
+  const dividends = useApiResource(fetchDividends).state;
   const [range, setRange] = useState<HeroRangeId>(DEFAULT_HERO_RANGE);
   const h = history.kind === "ok" && !history.data.gap ? history.data : null;
-  const risk = useMemo(() => (h ? trailingRisk(h.points, h.benchmark) : null), [h]);
-  const lookThrough = useLookThrough().report;
-  const valuation = useApiResource(fetchValuation).state;
-  const valuationData = valuation.kind === "ok" ? valuation.data : valuation.kind === "error" ? valuation.previous : null;
-  const valuationRadar = valuationAxis(valuationData);
 
   if (!data.freshness || !data.account || !data.base) {
     return (
@@ -143,45 +129,73 @@ function Overview({ data }: { data: PortfolioOverview }) {
     );
   }
 
-  const { account, base, drift } = data;
+  const { account, base } = data;
   const baseCcy = base.base_currency;
-  const pplTone = gainLossTone(account.unrealized_ppl);
   const pplPct = account.invested_cost ? account.unrealized_ppl / account.invested_cost : null;
+
+  // Answer strip figures.
+  const asOf = h?.points.at(-1)?.date ?? null;
+  const change = h ? lastChange(h.points, h.values) : null;
+  const ytdStart = asOf ? rangeStart("ytd", asOf) : null;
+  const ytd = h && asOf ? periodReturn(h.points, ytdStart) : null;
+  const ytdBench = h && asOf && h.benchmark.length ? indexedRange(h.points, h.benchmark, ytdStart).benchmarkReturn : null;
+  const benchName = h?.benchmark_symbol ?? "the benchmark";
+  const returnVerdict = benchmarkVerdict(ytd, ytdBench, benchName);
+
+  const divData = dividends.kind === "ok" ? dividends.data : dividends.kind === "error" ? dividends.previous : null;
+  const income = divData && divData.summary.next_12m !== null ? divData.summary : null;
+  const incomeVerdict = incomeChangeVerdict(income ? num(income.change_vs_trailing) : null);
+  const plVerdict = unrealisedVerdict(pplPct);
+  const plSigned = account.unrealized_ppl >= 0 ? "gain" : "loss";
+
+  const tiles: KpiTileProps[] = [
+    {
+      label: "Portfolio value",
+      value: formatMoney(base.total, baseCcy, { decimals: 0 }),
+      hero: false,
+      change: change
+        ? {
+            text: `${change.amount !== null ? `${formatMoney(change.amount, baseCcy, { decimals: 0, signed: true })} ` : ""}(${formatSignedPct(change.pct, 2)})`,
+            direction: change.pct > 0 ? "up" : change.pct < 0 ? "down" : "flat",
+            period: `since ${formatDate(change.since)}`,
+          }
+        : undefined,
+      note: `${formatPercent(base.total ? base.invested / base.total : null, { decimals: 0 })} invested · ${formatCompactMoney(base.cash, baseCcy)} cash`,
+    },
+    {
+      label: asOf ? "Return this year" : "Return",
+      value: ytd === null ? "—" : formatSignedPct(ytd),
+      signed: ytd === null ? undefined : ytd >= 0 ? "gain" : "loss",
+      note: ytdBench !== null ? `${benchName} ${formatSignedPct(ytdBench)}` : undefined,
+      verdict: history.kind === "loading" ? undefined : { tone: returnVerdict.tone, text: returnVerdict.text },
+    },
+    {
+      label: `Unrealised P/L${account.account_currency !== baseCcy ? ` (${account.account_currency})` : ""}`,
+      value: formatCompactMoney(account.unrealized_ppl, account.account_currency, { signed: true }),
+      signed: plSigned,
+      note: pplPct === null ? undefined : `${formatSignedPct(pplPct)} on cost`,
+      verdict: { tone: plVerdict.tone, text: plVerdict.text },
+    },
+    {
+      label: "Income, next 12 months",
+      value: income ? money(income.next_12m, income.currency, 0) : "—",
+      note: income ? `${money(income.monthly_average, income.currency, 0)} a month · yield ${pct(income.yield_on_price, 1)}` : undefined,
+      verdict: income
+        ? { tone: incomeVerdict.tone, text: incomeVerdict.text }
+        : dividends.kind === "loading"
+          ? undefined
+          : { tone: "unknown", text: "No dividend forecast yet." },
+    },
+  ];
 
   const allocationItems: AllocationItem[] = data.allocation.map((slice) => ({
     key: slice.key,
-    label: slice.label,
-    sublabel: slice.key === "CASH" ? undefined : slice.key,
+    label: slice.label === slice.key ? shortTicker(slice.key) : slice.label,
+    sublabel: slice.key === "CASH" || slice.label === slice.key ? undefined : shortTicker(slice.key),
     value: slice.value_base,
     weight: slice.weight,
     muted: slice.key === "CASH",
   }));
-  const positionValues = allocationItems.filter((i) => !i.muted).map((i) => i.value);
-  const invested = positionValues.reduce((s, v) => s + v, 0);
-  const hhi = invested > 0 ? herfindahlIndex(positionValues.map((v) => v / invested)) : null;
-  const fxShare = foreignCurrencyShare(drift?.categories.find((c) => c.dimension === "currency")?.buckets, baseCcy, base.total);
-  const axes = riskAxes({
-    volatility: risk?.volatility ?? null,
-    beta: risk?.beta ?? null,
-    maxDrawdown: risk?.maxDrawdown ?? null,
-    hhi,
-    positions: positionValues.length,
-    fxShare,
-    benchmarkVolatility: risk?.benchmarkVolatility,
-    benchmarkMaxDrawdown: risk?.benchmarkMaxDrawdown,
-    lookThrough: lookThroughRisk(lookThrough),
-    valuation: { portfolio: valuationRadar.portfolio, benchmark: valuationRadar.benchmark, rim: `P/E ${VALUATION_SCALE.pe}` },
-  });
-
-  // Tile sparklines follow the hero's range (absolute values in the history's currency).
-  const asOf = h?.points.at(-1)?.date ?? null;
-  const start = asOf ? rangeStart(range, asOf) : null;
-  const sameCcy = h?.values_currency === baseCcy;
-  const values = h && sameCcy ? sliceFrom(h.values, start) : [];
-  const indexSpark = h ? sliceFrom(h.points, start).map((p) => p.close) : [];
-  const rangeLabel = range === "max" ? "all history" : range.toUpperCase();
-  const cash = drift?.cash;
-  const today = data.freshness.snapshot_date;
 
   return (
     <div className="space-y-5">
@@ -193,98 +207,26 @@ function Overview({ data }: { data: PortfolioOverview }) {
         </AlertMessage>
       ) : null}
 
-      <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
-        <OverviewHero
-          total={base.total}
-          currency={baseCcy}
-          subline={
-            account.account_currency !== baseCcy || Math.abs(account.total_value - base.total) > 0.5
-              ? <>Trading212 reports {formatMoney(account.total_value, account.account_currency)}</>
-              : <>Trading212 reports the same total in {account.account_currency}</>
-          }
-          history={history}
-          range={range}
-          onRange={setRange}
-        />
-        <section aria-label="Totals" className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-          <StatTile
-            label="Invested"
-            value={formatCompactMoney(base.invested, baseCcy)}
-            sub={<>{formatPercent(base.total ? base.invested / base.total : null)} of total</>}
-            spark={values.map((v) => v.invested)}
-            sparkNote={`Invested value, ${rangeLabel}`}
-          />
-          <StatTile
-            label="Cash"
-            value={formatCompactMoney(base.cash, baseCcy)}
-            sub={
-              <>
-                {formatPercent(base.total ? base.cash / base.total : null)}
-                {cash && cash.target_weight !== null ? <> · target {formatPercent(cash.target_weight)}</> : " of total"}
-              </>
-            }
-            spark={values.map((v) => v.cash)}
-            sparkNote={`Cash, ${rangeLabel}`}
-          />
-          <StatTile
-            label={`Unrealised P/L${account.account_currency !== baseCcy ? ` (${account.account_currency})` : ""}`}
-            value={<span className={TONE_CLASS[pplTone]}>{formatCompactMoney(account.unrealized_ppl, account.account_currency, { signed: true })}</span>}
-            sub={
-              <>
-                <span aria-hidden="true">{pplTone === "gain" ? "▲ " : pplTone === "loss" ? "▼ " : ""}</span>
-                {formatSignedPct(pplPct)} on cost · Trading212 figure
-              </>
-            }
-            subClassName={TONE_CLASS[pplTone]}
-            spark={values.map((v) => v.unrealised)}
-            sparkNote={`Unrealised P/L, ${rangeLabel}`}
-          />
-          <RiskStatTile
-            figures={risk}
-            historyLoading={history.kind === "loading"}
-            spark={indexSpark}
-            sparkNote={`Flow-adjusted performance index, ${rangeLabel}`}
-          />
-        </section>
-      </div>
+      <KpiStrip tiles={tiles} label="Portfolio at a glance" />
 
-      <ScorecardPanel />
+      <OverviewHero history={history} range={range} onRange={setRange} />
 
-      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2 xl:grid-cols-3">
-        <AllocationPanel items={allocationItems} currency={baseCcy} fxSource={base.fx_source} />
-        <DriftPanel data={data} />
-        <RiskPanel
-          figures={risk}
-          axes={axes}
-          fxShare={fxShare}
-          benchmarkSymbol={h?.benchmark_symbol ?? null}
-          loading={history.kind === "loading"}
-          lookThrough={lookThrough}
-        />
-      </div>
-
-      <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1.45fr)_minmax(0,1fr)]">
-        <ReturnsHeatmap points={h?.points ?? []} loading={history.kind === "loading"} />
-        <ConcentrationCompliance positions={positionValues} drift={drift} hasStrategy={data.strategy_config_version_id !== null} />
-      </div>
-
-      <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1.45fr)_minmax(0,1fr)]">
-        <CashFlowPanel year={Number(today.slice(0, 4))} today={today} />
-        {drift ? <ExposurePanel drift={drift} currency={baseCcy} lookThrough={lookThrough} /> : null}
+      <div className="grid grid-cols-1 items-start gap-5 xl:grid-cols-2">
+        <ScorecardPanel />
+        <RiskGlance />
       </div>
 
       <div className="grid grid-cols-1 items-start gap-5 xl:grid-cols-2">
         <ContributionCard />
-        <DriftTable data={data} />
+        <AllocationPanel items={allocationItems} currency={baseCcy} fxSource={base.fx_source} />
       </div>
 
-      <UpdatesFeedPanel title="What happened to your holdings" limit={12} />
-
-      <PortfolioDataContextSection />
-
-      <KnockOnSection />
-
-      <ValuationBenchmarkPanel state={valuation} />
+      <UpdatesFeedPanel title="What happened to your holdings" limit={8} />
+      <p className="-mt-3 text-sm">
+        <Link href="/news" className="font-medium text-accent-ink hover:underline">
+          See every update on Markets › News
+        </Link>
+      </p>
 
       <FxFootnote data={data} />
     </div>

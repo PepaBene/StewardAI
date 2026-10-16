@@ -46,7 +46,7 @@ export function CashFlowPanel({ year, today }: { year: number; today: string }) 
       ) : (
         <>
           <CashFlowSankey graph={graph} currency={currency} label={`Cash flow ${year} year to date, ${currency}`} />
-          <p className="text-[11px] leading-snug text-text-faint">
+          <p className="text-xs leading-snug text-text-faint">
             {formatCompactMoney(graph.inflow, currency)} in, {formatCompactMoney(graph.bought, currency)} bought, in {currency} as booked by
             Trading212.
             {graph.nodes.some((n) => n.id === "out:buy:stock" || n.id === "out:buy:etf")

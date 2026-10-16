@@ -23,7 +23,7 @@ import {
   type ProfileForm,
 } from "@/lib/config/profiles-form";
 import { configSaveQuery, useConfigEditor } from "@/lib/hooks/use-config-editor";
-import { BlueprintCorners } from "@/components/ui/blueprint";
+import { MoreSettings, ShareBar, SummaryPanel } from "@/components/config/summary";
 
 import { FundamentalsFields } from "./fundamentals-fields";
 
@@ -33,6 +33,8 @@ const MONTHS = [
   "January", "February", "March", "April", "May", "June",
   "July", "August", "September", "October", "November", "December",
 ].map((label, i) => ({ value: i + 1, label }));
+
+const hasResultsPage = (f: ProfileForm) => Boolean(f.ir_url.trim() || f.results_urls.trim());
 
 const EXPOSURE_LABELS: Record<string, string> = {
   revenue_currency: "Revenue currency",
@@ -78,6 +80,12 @@ export function ProfilesEditor() {
   const body = useMemo(() => profilesToBody(forms), [forms]);
   const dirty = JSON.stringify(body) !== baseline;
   const withoutProfile = holdings.filter((h) => !forms.some((f) => f.ticker === h.ticker));
+  const [selectedKey, setSelectedKey] = useState<string | null>(null);
+  const current = forms.find((f) => f.key === selectedKey) ?? forms[0];
+  const addProfile = (p: ProfileForm) => {
+    setForms((all) => [...all, p]);
+    setSelectedKey(p.key);
+  };
 
   async function save(note: string | null) {
     if (await editor.save(body, note)) setBaseline(JSON.stringify(body));
@@ -112,18 +120,56 @@ export function ProfilesEditor() {
               EDGAR only.
             </EmptyState>
           ) : null}
-          {forms.map((form, index) => (
-            <ProfileCard
-              key={form.key}
-              form={form}
-              index={index}
-              errors={editor.errors}
-              onChange={(change) => setForms((all) => all.map((f) => (f.key === form.key ? change(f) : f)))}
-              onRemove={() => setForms((all) => all.filter((f) => f.key !== form.key))}
-            />
-          ))}
+          {forms.length > 0 ? (
+            <SummaryPanel
+              title="Coverage"
+              reading={`${forms.length} profile${forms.length === 1 ? "" : "s"}; ${withoutProfile.length} holding${withoutProfile.length === 1 ? " has" : "s have"} none and use${withoutProfile.length === 1 ? "s" : ""} defaults.`}
+            >
+              <ShareBar
+                label="Profiles by where results are published"
+                segments={[
+                  { label: "Results page set", value: forms.filter((f) => hasResultsPage(f)).length, tone: "gain" },
+                  { label: "EDGAR only", value: forms.filter((f) => !hasResultsPage(f)).length, tone: "muted" },
+                ]}
+              />
+            </SummaryPanel>
+          ) : null}
+          {forms.length > 0 ? (
+            <div className="grid items-start gap-4 lg:grid-cols-[18rem_1fr]">
+              <ul aria-label="Profiles" className="space-y-1">
+                {forms.map((f) => (
+                  <li key={f.key}>
+                    <button
+                      type="button"
+                      aria-current={f.key === current?.key ? "true" : undefined}
+                      onClick={() => setSelectedKey(f.key)}
+                      className={`block w-full rounded-control px-3 py-2 text-left text-sm outline-none focus-visible:ring-2 focus-visible:ring-focus/30 ${
+                        f.key === current?.key ? "bg-surface-muted font-semibold" : "hover:bg-surface-muted"
+                      }`}
+                    >
+                      <span className="block truncate">{f.company_name || f.ticker || "New profile"}</span>
+                      <span className="block truncate text-xs font-normal text-text-muted">
+                        {f.ticker || "No ticker"}, fiscal year ends {MONTHS.find((m) => String(m.value) === String(f.fiscal_year_end_month))?.label ?? "in December"}
+                        {hasResultsPage(f) ? "" : ", EDGAR only"}
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+              {current ? (
+                <ProfileCard
+                  key={current.key}
+                  form={current}
+                  index={forms.findIndex((f) => f.key === current.key)}
+                  errors={editor.errors}
+                  onChange={(change) => setForms((all) => all.map((f) => (f.key === current.key ? change(f) : f)))}
+                  onRemove={() => setForms((all) => all.filter((f) => f.key !== current.key))}
+                />
+              ) : null}
+            </div>
+          ) : null}
           <div className="flex flex-wrap gap-2">
-            <Button variant="outline" onClick={() => setForms((all) => [...all, newProfile()])}>
+            <Button variant="outline" onClick={() => addProfile(newProfile())}>
               <PlusIcon aria-hidden="true" />
               Add profile
             </Button>
@@ -132,9 +178,7 @@ export function ProfilesEditor() {
                 key={h.ticker}
                 variant="ghost"
                 size="sm"
-                onClick={() =>
-                  setForms((all) => [...all, { ...newProfile(h.ticker), company_name: h.name ?? "" }])
-                }
+                onClick={() => addProfile({ ...newProfile(h.ticker), company_name: h.name ?? "" })}
               >
                 <PlusIcon aria-hidden="true" />
                 {h.name ?? h.ticker}
@@ -190,9 +234,8 @@ function ProfileCard({
     <section
       id={form.ticker || undefined}
       aria-label={`Profile ${form.ticker || index + 1}`}
-      className="scroll-mt-24 space-y-4 blueprint p-5"
+      className="scroll-mt-24 min-w-0 space-y-4 rounded-card bg-surface-muted p-5"
     >
-      <BlueprintCorners />
       <div className="flex flex-wrap items-start gap-3">
         <TextField className="w-56" label="Ticker" list="profile-tickers" {...text("ticker")} />
         <TextField className="min-w-56 flex-1" label="Company name" {...text("company_name")} />
@@ -215,6 +258,11 @@ function ProfileCard({
         />
         <TextField label="Reporting currency" placeholder="USD" maxLength={3} {...text("reporting_currency")} />
         <TextField label="SEC CIK" placeholder="looked up from the ticker" inputMode="numeric" {...text("sec_cik")} />
+      </fieldset>
+
+      <MoreSettings title="Data-source symbols" hint="Only when a derived symbol is wrong">
+      <fieldset className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <legend className="sr-only">Data-source symbols</legend>
         <TextField label="EDGAR / Finnhub symbol" placeholder="if not the ticker prefix" {...text("sec_ticker")} />
         <TextField
           label="Alpha Vantage symbol"
@@ -265,6 +313,7 @@ function ProfileCard({
           {...text("edinet_code")}
         />
       </fieldset>
+      </MoreSettings>
 
       <fieldset className="grid gap-3 lg:grid-cols-2">
         <legend className="mb-2 text-sm font-medium">Where results are published</legend>
@@ -283,7 +332,7 @@ function ProfileCard({
 
       <ValuationFields form={form} path={path} errors={errors} onChange={onChange} />
 
-      <details className="rounded-md border border-border p-3">
+      <details className="rounded-card bg-surface p-3">
         <summary className="cursor-pointer text-sm font-medium">News relevance and exposures</summary>
         <div className="mt-3 grid gap-3 lg:grid-cols-2">
           <TextAreaField label="Competitors" rows={2} {...text("competitors")} />
@@ -375,7 +424,7 @@ function ValuationFields({
   const open = hasManual || form.valuation_source !== "auto";
   const manualErrors = errorsAt(errors, manualPath);
   return (
-    <details className="rounded-md border border-border p-3" open={open || undefined}>
+    <details className="rounded-card bg-surface p-3" open={open || undefined}>
       <summary className="cursor-pointer text-sm font-medium">Valuation (P/E, P/B, dividend yield)</summary>
       <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <SelectField

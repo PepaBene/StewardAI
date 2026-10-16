@@ -7,6 +7,7 @@ import { WaterfallChart, type WaterfallStep } from "@/components/charts/waterfal
 import { ChartWithFooter } from "@/components/insight/chart-footer";
 import { formatCompact } from "@/lib/charts/format";
 import { Absent, ResourceGate } from "@/components/company/primitives";
+import { EntityName } from "@/components/entity-name";
 import { RangeButtons } from "@/components/portfolio/range-buttons";
 import { Blueprint, PanelHeading } from "@/components/ui/blueprint";
 import { CsvDownload } from "@/components/ui/csv-download";
@@ -45,7 +46,7 @@ function Bars({ rows, currency }: { rows: { label: string; value: number; note?:
           <li key={r.label} className="grid grid-cols-[minmax(9rem,14rem)_1fr_8rem] items-center gap-3 text-sm">
             <span>
               {r.label}
-              {r.note ? <span className="block text-[11px] text-text-muted">{r.note}</span> : null}
+              {r.note ? <span className="block text-xs text-text-muted">{r.note}</span> : null}
             </span>
             <span className="relative block h-3 bg-border-soft" aria-hidden="true">
               <span className="absolute inset-y-0 left-1/2 w-px bg-border" />
@@ -121,7 +122,17 @@ function Body({ data }: { data: AttributionData }) {
       </div>
       {b.unattributed_tickers.length > 0 ? (
         <AlertMessage title="Part of the portfolio could not be attributed">
-          The number of units changed without a stored fill for {b.unattributed_tickers.join(", ")} (a split, or a missing transaction). Their moves are left in “Not assigned”.
+          {b.unattributed_tickers.length} {b.unattributed_tickers.length === 1 ? "holding couldn’t" : "holdings couldn’t"} be attributed: the number of units changed without a stored fill (a split, or a missing transaction). Their moves are left in “Not assigned”.
+          <details className="mt-1">
+            <summary className="cursor-pointer text-accent-ink hover:underline">Which holdings</summary>
+            <ul className="mt-1 list-disc pl-5">
+              {b.unattributed_tickers.map((t) => (
+                <li key={t}>
+                  <EntityName id={t} />
+                </li>
+              ))}
+            </ul>
+          </details>
         </AlertMessage>
       ) : null}
       <Blueprint className="px-[22px] py-4">
@@ -192,7 +203,7 @@ function Body({ data }: { data: AttributionData }) {
                 <tr key={h.ticker} className="border-t border-border-soft">
                   <th scope="row" className="px-3 py-1.5 text-left font-normal">
                     {h.name ?? h.ticker}
-                    {h.name ? <span className="block text-[11px] text-text-muted">{h.ticker}</span> : null}
+                    {h.name ? <span className="block text-xs text-text-muted">{h.ticker}</span> : null}
                   </th>
                   {h.attributed ? (
                     <>

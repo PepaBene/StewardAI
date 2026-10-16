@@ -79,10 +79,12 @@ export function ChatPanel() {
 
   return (
     <>
-      <Button size="sm" onClick={() => open()} aria-haspopup="dialog" aria-keyshortcuts="Control+J Meta+J">
+      <Button size="sm" onClick={() => open()} aria-haspopup="dialog" aria-keyshortcuts="Control+J Meta+J" aria-label="Ask Steward">
         <SparklesIcon aria-hidden="true" />
-        <span className="hidden sm:inline">Ask Steward</span>
-        <span className="sr-only sm:hidden">Ask Steward</span>
+        {/* Icon only between lg and xl, where the full nav and the actions share one row. */}
+        <span aria-hidden="true" className="hidden sm:inline lg:hidden xl:inline">
+          Ask Steward
+        </span>
       </Button>
       <dialog
         ref={dialog}
@@ -101,7 +103,7 @@ export function ChatPanel() {
               </h2>
               <p className="text-xs text-text-muted">Answers with sources, or says it has none</p>
             </div>
-            <kbd className="hidden border border-border px-1.5 font-mono text-[11px] text-text-muted sm:inline" title="Opens this panel from any page">
+            <kbd className="hidden border border-border px-1.5 font-mono text-xs text-text-muted sm:inline" title="Opens this panel from any page">
               ⌘J
             </kbd>
             <Button variant="ghost" size="icon" className="text-text-muted" aria-label="Close the chat panel" onClick={() => dialog.current?.close()}>

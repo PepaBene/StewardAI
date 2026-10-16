@@ -27,7 +27,7 @@ export function TracePanel({ body }: { body: unknown }) {
           <table className="w-full min-w-[32rem] text-xs">
             <caption className="sr-only">Model calls: tokens, cost, time and outcome</caption>
             <thead>
-              <tr className="border-b border-border text-left text-[11px] tracking-wide text-text-muted uppercase">
+              <tr className="border-b border-border text-left text-xs text-text-muted">
                 <th scope="col" className="py-1 pr-2 font-medium">Step</th>
                 <th scope="col" className="py-1 pr-2 font-medium">Model</th>
                 <th scope="col" className="num py-1 pr-2 text-right font-medium">Tokens in / out</th>

@@ -106,7 +106,7 @@ function Body({ report, conclusion, onConclusion, readOnly }: { report: CompanyR
                     <span key={i} className={cn(s.check === "unsupported" && "text-loss")}>
                       {s.text}
                       {(s.source_ids ?? []).map((id) => (
-                        <sup key={id} className="ml-0.5 text-[10px] text-accent-ink">
+                        <sup key={id} className="ml-0.5 text-xs text-accent-ink">
                           [{id}]
                         </sup>
                       ))}{" "}

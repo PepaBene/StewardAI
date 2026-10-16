@@ -28,7 +28,7 @@ describe("autopilot helpers", () => {
 
   it("says who decided", () => {
     expect(deciderLabel("rule:listing-exact-match")).toBe(
-      "Rule listing-exact-match",
+      "Rule: Exact listing match",
     );
     expect(deciderLabel("model:gpt-6-luna")).toBe("gpt-6-luna");
     expect(deciderLabel("ttl")).toBe("Expired unanswered");

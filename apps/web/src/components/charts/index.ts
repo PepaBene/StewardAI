@@ -27,6 +27,8 @@ export {
 export { Treemap, type TreemapItem, type TreemapProps } from "./treemap";
 export { VintageFan, type VintageFanPoint, type VintageFanProps } from "./vintage-fan";
 export { WaterfallChart, type WaterfallChartProps, type WaterfallStep } from "./waterfall";
+export { LorenzChart, type LorenzChartProps } from "./lorenz";
+export { Dumbbell, type DumbbellProps, type DumbbellRow } from "./dumbbell";
 export { AuditTrail, type AuditTrailProps, type AuditTrailPoint } from "./audit-trail";
 export { RevisionLine, type RevisionLineProps, type RevisionLinePoint } from "./revision-line";
 export { Sankey,type SankeyProps, type SankeyLinkInput, type SankeyNodeInput } from "./sankey";
@@ -44,6 +46,7 @@ export {
 } from "./hbar";
 export {
   GridStatus,
+  StatusMatrix,
   GRID_STATUS_LEGEND,
   type GridCellStatus,
   type GridStatusProps,
@@ -63,3 +66,4 @@ export {
   type LegendEntry,
   type LegendSwatch,
 } from "./shared";
+export { ActivityCalendar, type ActivityCalendarProps } from "./activity-calendar";

@@ -9,3 +9,5 @@ export default function DiversificationPage() {
     </Suspense>
   );
 }
+
+export const metadata = { title: "Diversification · X-Ray" };

@@ -59,9 +59,9 @@ export function ReportTemplateCard({
     <section aria-labelledby={headingId} className="space-y-4 blueprint p-5">
       <BlueprintCorners />
       <div className="flex flex-wrap items-start justify-between gap-2">
-        <h3 id={headingId} className="flex flex-wrap items-center gap-2 text-[22px] leading-tight font-semibold">
+        <h3 id={headingId} className="panel-title flex flex-wrap items-center gap-2">
           <FileTextIcon aria-hidden="true" className="size-4 text-text-muted" />
-          {t.name || "(no name)"} <span className="font-mono text-sm font-normal text-text-muted">{t.id}</span>
+          {t.name || "(no name)"}
         </h3>
         <div className="flex flex-wrap gap-1">
           <Button variant="ghost" size="sm" onClick={onDuplicate} aria-label={`Duplicate template ${label}`}>
@@ -154,7 +154,7 @@ function TemplateSections({
           const name = custom ? custom.title.trim() || "Your section" : sectionLabel(s.id);
           const info = RESEARCH_SECTIONS.find((r) => r.id === s.id);
           return (
-            <li key={s.key} className="space-y-2 rounded-md border border-border px-2 py-2 text-sm">
+            <li key={s.key} className="space-y-2 rounded-control bg-surface px-2 py-2 text-sm">
               <div className="flex flex-wrap items-center gap-2">
                 <label className="inline-flex flex-1 items-center gap-2">
                   <input

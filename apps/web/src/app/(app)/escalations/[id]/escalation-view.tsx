@@ -87,7 +87,7 @@ function Escalation({ initial }: { initial: EscalationOut }) {
         description={
           <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
             {e.ticker ? (
-              <Link href={`/holdings/${encodeURIComponent(e.ticker)}`} className="font-mono text-xs text-accent-ink hover:underline">
+              <Link href={`/companies/${encodeURIComponent(e.ticker)}`} className="font-mono text-xs text-accent-ink hover:underline">
                 {e.ticker}
               </Link>
             ) : null}
@@ -211,7 +211,7 @@ function Escalation({ initial }: { initial: EscalationOut }) {
             {body.rationale && status.kind === "assessed" ? <p className="text-text-muted">{body.rationale}</p> : null}
             {e.ticker ? (
               <p>
-                <Link href={`/holdings/${encodeURIComponent(e.ticker)}#thesis-heading`} className={LINK}>
+                <Link href={`/companies/${encodeURIComponent(e.ticker)}/case#thesis-heading`} className={LINK}>
                   Open the thesis of {e.ticker}
                 </Link>
               </p>

@@ -167,7 +167,7 @@ export function ReportSearch({ state }: { state: SearchState }) {
                 <ol className="divide-y divide-border-soft border border-border">
                   {load.hits.map((h) => (
                     <li key={`${h.type}:${h.id}`}>
-                      <Link href={reportHitHref(h)} className="block space-y-1 p-3 hover:bg-border-soft">
+                      <Link href={reportHitHref(h)} className="block space-y-1 p-3 hover:bg-surface-muted">
                         <span className="flex flex-wrap items-center justify-between gap-2">
                           <span className="font-medium">{h.title}</span>
                           <time dateTime={h.created_at} className="num text-xs text-text-muted">

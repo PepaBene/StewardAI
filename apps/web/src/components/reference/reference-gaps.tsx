@@ -71,7 +71,7 @@ export function ReferenceGapsPanel() {
               {data.identity.map((g) => (
                 <tr key={g.ticker} className="border-b border-border align-top last:border-0">
                   <th scope="row" className="px-3 py-1.5 text-left font-normal">
-                    <Link href={`/holdings/${encodeURIComponent(g.ticker)}#identity-heading`} className={LINK}>
+                    <Link href={`/companies/${encodeURIComponent(g.ticker)}/network#identity-heading`} className={LINK}>
                       {g.name ?? g.ticker}
                     </Link>
                     {g.name ? <span className="ml-1 font-mono text-xs text-text-muted">{g.ticker}</span> : null}
@@ -104,7 +104,7 @@ export function ReferenceGapsPanel() {
                     {g.kind === "benchmark" ? (
                       g.key
                     ) : (
-                      <Link href={`/holdings/${encodeURIComponent(g.key)}#prices-heading`} className={LINK}>
+                      <Link href={`/companies/${encodeURIComponent(g.key)}/network#prices-heading`} className={LINK}>
                         {g.key}
                       </Link>
                     )}

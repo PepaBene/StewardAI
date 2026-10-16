@@ -167,7 +167,7 @@ export function HoldingHeader({
           </div>
           <div className="min-w-0">
             <h1 className="page-title mb-2">{name}</h1>
-            <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
+            <div className="flex flex-wrap items-center gap-1.5 text-xs">
               <span className="mr-1.5 font-mono text-xs text-text-muted" title={detail.ticker}>
                 {[short, exchange, currency].filter(Boolean).join(" · ")}
               </span>
@@ -238,7 +238,7 @@ function CandleRangeSwitch({ value, onChange }: { value: ChartRangeId; onChange:
           className={cn(
             "px-2.5 py-1.5",
             i > 0 && "border-l border-border",
-            value === r.id ? "bg-accent text-accent-foreground" : "text-text hover:bg-border-soft",
+            value === r.id ? "bg-accent text-accent-foreground" : "text-text hover:bg-surface-muted",
           )}
         >
           {r.label}
@@ -418,7 +418,7 @@ export function PositionPanel({
           label="Weight against target"
           className="h-2.5"
         />
-        <div className="num flex justify-between text-[10px] text-text-faint">
+        <div className="num flex justify-between text-xs text-text-faint">
           <span>0%</span>
           <span>{formatPercent(scale, { decimals: 0 })}</span>
         </div>
@@ -534,8 +534,8 @@ export function KpiBarsPanel({ ticker, kpis, hasThesis }: { ticker: string; kpis
                   <a href={`#${kpiAnchorId(kpi.id)}`} className="font-medium hover:text-accent-ink hover:underline">
                     {label} <span className="num font-normal text-text-muted">{formatTarget(kpi.operator, kpi.threshold, kpi.unit)}</span>
                   </a>
-                  <span className={cn("shrink-0 px-1.5 py-0.5 text-[10px] font-semibold tracking-[0.05em] uppercase", STATUS_TAG[status])}>
-                    {status}
+                  <span className={cn("shrink-0 px-1.5 py-0.5 text-xs font-semibold", STATUS_TAG[status])}>
+                    {status.charAt(0).toUpperCase() + status.slice(1)}
                     {v?.stale ? " · old config" : ""}
                   </span>
                 </div>
@@ -548,7 +548,7 @@ export function KpiBarsPanel({ ticker, kpis, hasThesis }: { ticker: string; kpis
                   label={`${label} against its threshold`}
                   formatValue={(x) => formatObserved(x, kpi.unit)}
                 />
-                <div className="num flex justify-between gap-2 text-[11px] text-text-muted">
+                <div className="num flex justify-between gap-2 text-xs text-text-muted">
                   <span>
                     {v ? `Latest ${formatObserved(v.observed_value, kpi.unit)}` : "Never judged"}
                     {v?.period ? ` · ${v.period}` : ""}
@@ -569,9 +569,9 @@ export function KpiBarsPanel({ ticker, kpis, hasThesis }: { ticker: string; kpis
 function Stat({ label, value, sub }: { label: string; value: string; sub: ReactNode }) {
   return (
     <div className="min-w-0">
-      <div className="text-[11px] text-text-muted">{label}</div>
+      <div className="text-xs text-text-muted">{label}</div>
       <div className="num font-heading text-xl font-semibold">{value}</div>
-      <div className="text-[10px] text-text-faint">{sub}</div>
+      <div className="text-xs text-text-faint">{sub}</div>
     </div>
   );
 }
@@ -648,7 +648,7 @@ export function DrawdownPanel({
         <Stat label="VaR 95%" value={varDay !== null ? formatPct(varDay, 1) : "—"} sub="1-day, historical" />
         {ticker ? <RiskShareStat ticker={ticker} /> : null}
       </div>
-      <p className="text-[11px] text-text-muted">
+      <p className="text-xs text-text-muted">
         Drawdown and max DD from the last year of daily closes. Volatility and beta are the backend&rsquo;s (252 days,
         log returns annualised); the portfolio figure uses the same method on the flow-adjusted portfolio index. VaR is
         the 5th-percentile daily return of the last year.
@@ -705,7 +705,7 @@ export function NextReportPanel({ detail, today }: { detail: HoldingDetail; toda
       {chosen ? (
         <>
           <div className="mt-1 flex flex-wrap items-center justify-between gap-2">
-            <span className="text-[11px] tracking-[0.1em] text-text-muted uppercase">
+            <span className="text-xs text-text-muted">
               {humanizeMetric(chosen.kpi.metric)}, {chosen.kpi.unit}
             </span>
             {charted.length > 1 ? (
@@ -717,7 +717,7 @@ export function NextReportPanel({ detail, today }: { detail: HoldingDetail; toda
                     aria-pressed={k === chosen}
                     onClick={() => setKpiId(k.kpi.id)}
                     className={cn(
-                      "border px-1.5 py-0.5 text-[10px]",
+                      "border px-1.5 py-0.5 text-xs",
                       k === chosen ? "border-accent bg-accent text-accent-foreground" : "border-border text-text-muted hover:text-text",
                     )}
                   >
@@ -804,7 +804,7 @@ export function TimelinePanel({ ticker, entries, loaded }: { ticker: string; ent
                   e.text
                 )}
               </span>
-              <span className="col-start-3 text-[11px] text-text-muted sm:col-start-auto sm:text-right">{e.source}</span>
+              <span className="col-start-3 text-xs text-text-muted sm:col-start-auto sm:text-right">{e.source}</span>
             </li>
           ))}
         </ol>
@@ -857,7 +857,7 @@ export function HoldersPanel({ data, loaded }: { data: HoldingOwnership | null; 
         </ul>
       )}
       {data && rows.length > 0 ? (
-        <p className="text-[11px] text-text-muted">
+        <p className="text-xs text-text-muted">
           {data.source}
           {period ? `, quarter ended ${formatDate(period)}` : ""}. Shares held; bars relative to the largest holder.
           {data.top_holders_previous_period

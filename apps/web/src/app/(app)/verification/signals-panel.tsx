@@ -7,13 +7,13 @@ import { EmptyState } from "@/components/empty-state";
 import { dataOf, Panel, ResourceNotice } from "@/components/oversight/panel";
 import { getBrowserApiClient } from "@/lib/api/client";
 import { formatPct } from "@/lib/charts/format";
-import { useApiResource } from "@/lib/hooks/use-api-resource";
+import { useApiResource, type ResourceState } from "@/lib/hooks/use-api-resource";
 import { parseHistory, TREND_TEXT } from "@/lib/verification/history";
-import { parseSignals, signalLabel } from "@/lib/verification/verification";
+import { signalLabel, type SignalGate } from "@/lib/verification/verification";
 
 import { Verdict } from "./gates-panel";
 
-const fetchSignals = () => getBrowserApiClient().GET("/verification/signals");
+export const fetchSignals = () => getBrowserApiClient().GET("/verification/signals");
 
 /**
  * One card per signal: may it be published? The meter shows the latest audit; opening "Audit
@@ -77,14 +77,13 @@ function HistoryBody({ name }: { name: string }) {
   );
 }
 
-export function SignalsPanel() {
-  const { state } = useApiResource(fetchSignals);
+export function SignalsPanel({ state, signals }: { state: ResourceState<unknown>; signals: SignalGate[] }) {
   const data = dataOf(state);
-  const signals = useMemo(() => (data ? parseSignals(data) : []), [data]);
 
   return (
     <Panel
       id="signals"
+      rounded
       title="Signal publish checks"
       description="A signal may be published only after a reviewed audit shows its evidence is accurate and that no value leaked in from after the date it describes. Precision is the share of audited evidence rows that were correct."
     >
@@ -93,7 +92,7 @@ export function SignalsPanel() {
       {signals.length > 0 ? (
         <ul className="grid grid-cols-1 gap-3 md:grid-cols-2">
           {signals.map((s) => (
-            <li key={s.name} className="space-y-2 border border-border-soft px-4 py-3">
+            <li key={s.name} className="space-y-2 rounded-card bg-surface-muted px-4 py-3">
               <div className="flex items-center justify-between gap-3">
                 <h3 className="text-sm font-semibold">{signalLabel(s.name)}</h3>
                 <Verdict ok={s.publishable} yes="Publishable" no="Not publishable" />

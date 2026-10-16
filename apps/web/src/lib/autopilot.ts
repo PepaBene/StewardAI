@@ -1,4 +1,5 @@
 import type { components } from "@/lib/api/schema";
+import { label } from "@/lib/labels";
 
 export type AutoDecision = components["schemas"]["AutoDecision"];
 export type NeedsYouItem = components["schemas"]["NeedsYouItem"];
@@ -62,7 +63,7 @@ export function statusLabel(status: AutoDecision["status"]): string {
 
 /** "rule:listing-exact-match" -> "Rule listing-exact-match"; "model:gpt-6-luna" -> "gpt-6-luna". */
 export function deciderLabel(decidedBy: string): string {
-  if (decidedBy.startsWith("rule:")) return `Rule ${decidedBy.slice(5)}`;
+  if (decidedBy.startsWith("rule:")) return `Rule: ${label("rule", decidedBy)}`;
   if (decidedBy.startsWith("model:")) return decidedBy.slice(6);
   if (decidedBy === "ttl") return "Expired unanswered";
   if (decidedBy === "owner-accepted") return "You accepted";

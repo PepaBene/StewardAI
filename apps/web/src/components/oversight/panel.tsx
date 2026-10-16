@@ -32,10 +32,27 @@ export function ResourceNotice<T>({ state, what }: { state: ResourceState<T>; wh
 }
 
 /** A blueprint-framed page section with a heading and a one-paragraph explanation. */
-export function Panel({ id, title, description, children }: { id: string; title: string; description?: ReactNode; children: ReactNode }) {
+export function Panel({
+  id,
+  title,
+  description,
+  children,
+  rounded = false,
+}: {
+  id: string;
+  title: string;
+  description?: ReactNode;
+  children: ReactNode;
+  /** A rounded surface card instead of the blueprint frame. */
+  rounded?: boolean;
+}) {
   return (
-    <section id={id} aria-labelledby={`${id}-heading`} className="blueprint scroll-mt-24 space-y-3 px-5 py-5">
-      <BlueprintCorners />
+    <section
+      id={id}
+      aria-labelledby={`${id}-heading`}
+      className={rounded ? "scroll-mt-24 space-y-3 rounded-card bg-surface-muted px-5 py-5" : "blueprint scroll-mt-24 space-y-3 px-5 py-5"}
+    >
+      {rounded ? null : <BlueprintCorners />}
       <div>
         <h2 id={`${id}-heading`} className="text-[22px] leading-tight font-semibold">
           {title}

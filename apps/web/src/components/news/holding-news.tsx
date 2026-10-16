@@ -18,6 +18,7 @@ import { formatDate } from "@/lib/format";
 import { ingestFreshness, ingestPrefix } from "@/lib/freshness";
 import { useNow } from "@/lib/hooks/use-now";
 import { isExternalUrl } from "@/lib/sources/sources";
+import { decodeEntities } from "@/lib/news/entities";
 
 export type HoldingNewsData = {
   items: NewsItemOut[] | null;
@@ -94,11 +95,11 @@ export function HoldingNews({ ticker, news }: { ticker: string; news: HoldingNew
                     <SeverityDot severity={lead.story.severity} className="mt-1" />
                     {isExternalUrl(lead.url) ? (
                       <a href={lead.url} target="_blank" rel="noreferrer" className="inline-flex items-start gap-1 font-medium hover:text-accent-ink hover:underline">
-                        {lead.headline}
+                        {decodeEntities(lead.headline)}
                         <ExternalLinkIcon aria-hidden="true" className="mt-0.5 size-3 shrink-0 text-text-muted" />
                       </a>
                     ) : (
-                      <span className="font-medium">{lead.headline}</span>
+                      <span className="font-medium">{decodeEntities(lead.headline)}</span>
                     )}
                   </span>
                   <p className="flex flex-wrap items-center gap-x-2 text-text-muted">
@@ -111,7 +112,7 @@ export function HoldingNews({ ticker, news }: { ticker: string; news: HoldingNew
                 <div className="flex flex-wrap items-center justify-end gap-1.5">
                   <SeverityBadge severity={lead.story.severity} />
                   <ConfidenceBadge confidence={lead.story.confidence} />
-                  <FeedbackControl target={{ kind: "story", id: lead.story.id }} label={`story “${lead.headline}”`} />
+                  <FeedbackControl target={{ kind: "story", id: lead.story.id }} label={`story “${decodeEntities(lead.headline)}”`} />
                 </div>
               </li>
             );

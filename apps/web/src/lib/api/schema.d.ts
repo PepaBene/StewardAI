@@ -5840,6 +5840,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/checks/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Preview Checks
+         * @description Per holding, the current and would-be check states under the draft config, and how many
+         *     holdings change. Evaluates the real checks engine with the draft limits against today's stored
+         *     inputs; saves and caches nothing. Up to 60 holdings, largest first.
+         */
+        post: operations["preview_checks"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/portfolio/dividends": {
         parameters: {
             query?: never;
@@ -6900,6 +6922,72 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/companies/{ticker}/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Company Summary
+         * @description Name, symbol, exchange, last price and day change, the default fair value, your position
+         *     when held and the check axes: what the page header and sidebar need in one request.
+         */
+        get: operations["get_company_summary"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/companies/{ticker}/market-context": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Company Market Context
+         * @description 7-day and 1-year shareholder returns against the industry and the market (the first
+         *     Prices benchmark) with a pass sentence, the spread of weekly price moves, and up to four
+         *     competitors with their check scores. Every figure is null when its history is missing, and
+         *     `reasons` says which.
+         */
+        get: operations["get_company_market_context"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/companies/{ticker}/fair-values": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Company Fair Values
+         * @description Every fair value on file in the listing's currency beside the last price: your DCF and
+         *     multiple-path scenarios, the default DCF, the thesis target, the peer-multiple value and the
+         *     analyst mean, low and high, each with its date and a note on where it came from.
+         */
+        get: operations["get_company_fair_values"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/funds/catalog": {
         parameters: {
             query?: never;
@@ -7625,6 +7713,49 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/portfolio/performance/drawdown": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Drawdown
+         * @description The underwater curve of the flow-adjusted portfolio index over `days` (deposits and
+         *     withdrawals excluded), with the maximum drawdown and its peak, trough and recovery dates.
+         *     Empty with a reason before two snapshots exist.
+         */
+        get: operations["get_drawdown"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portfolio/performance/waterfall": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Waterfall
+         * @description Start value to end value over `days`: net deposits, price return, FX effect, income, costs
+         *     and what the attribution could not place. A step it cannot compute is null with a reason.
+         */
+        get: operations["get_waterfall"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/portfolio/performance/sleeves": {
         parameters: {
             query?: never;
@@ -7833,6 +7964,28 @@ export interface paths {
          *     with benchmark-relative over- and underweights where the classification is like-for-like.
          */
         get: operations["get_concentration"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portfolio/xray/allocation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Allocation
+         * @description Lorenz curve of the equity holdings with HHI, effective number of holdings and Gini, and
+         *     the full sector to industry to holding tree with weights (every holding, unlike the capped
+         *     flow in /diversification). Issuers looked through funds; unclassified ones are marked.
+         */
+        get: operations["get_allocation"];
         put?: never;
         post?: never;
         delete?: never;
@@ -11337,6 +11490,26 @@ export interface components {
             /** Note */
             note: string;
         };
+        /** Allocation */
+        Allocation: {
+            /** As Of */
+            as_of: string;
+            /**
+             * Equity Weight
+             * @description Share of the portfolio that is equity.
+             */
+            equity_weight: number;
+            lorenz: components["schemas"]["LorenzCurve"];
+            /**
+             * Tree
+             * @description Sectors, largest first.
+             */
+            tree: components["schemas"]["AllocationNode"][];
+            /** Notes */
+            notes: string[];
+            /** Reasons */
+            reasons?: string[];
+        };
         /** AllocationLine */
         AllocationLine: {
             /** Ticker */
@@ -11373,6 +11546,32 @@ export interface components {
              * @description Change in ex-ante portfolio volatility from this line (percentage points of annual volatility, as a fraction).
              */
             volatility_change: number | null;
+        };
+        /** AllocationNode */
+        AllocationNode: {
+            /** Id */
+            id: string;
+            /** Label */
+            label: string;
+            /**
+             * Level
+             * @description sector, industry or holding.
+             */
+            level: string;
+            /**
+             * Weight
+             * @description Share of the whole portfolio.
+             */
+            weight: number;
+            /** Share Of Equity */
+            share_of_equity: number | null;
+            /**
+             * Unclassified
+             * @default false
+             */
+            unclassified: boolean;
+            /** Children */
+            children?: components["schemas"]["AllocationNode"][];
         };
         /** AllocationPlan */
         AllocationPlan: {
@@ -14482,6 +14681,17 @@ export interface components {
                 [key: string]: number;
             };
         };
+        /** CheckChange */
+        CheckChange: {
+            /** Id */
+            id: string;
+            /** Label */
+            label: string;
+            /** Was */
+            was: string;
+            /** Now */
+            now: string;
+        };
         /**
          * CheckLimits
          * @description Numeric limits of the five-axis checks and the risk checks (defaults from plan §9).
@@ -14752,6 +14962,28 @@ export interface components {
             /** Note */
             note: string | null;
             body: components["schemas"]["ChecksConfig"];
+        };
+        /** ChecksPreview */
+        ChecksPreview: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "complete" | "partial" | "unavailable";
+            /** Holdings */
+            holdings: components["schemas"]["HoldingPreview"][];
+            /**
+             * Changed Count
+             * @description Holdings with at least one check that would flip.
+             */
+            changed_count: number;
+            /** Holdings Total */
+            holdings_total: number;
+            /**
+             * Skipped
+             * @description Holdings whose inputs could not be loaded.
+             */
+            skipped: string[];
         };
         /** Citation */
         Citation: {
@@ -15372,6 +15604,49 @@ export interface components {
                 [key: string]: unknown;
             };
         };
+        /** CompanyFairValues */
+        CompanyFairValues: {
+            /** Ticker */
+            ticker: string;
+            /** Price */
+            price: number | string | null;
+            /** Price Currency */
+            price_currency: string | null;
+            /** Price Date */
+            price_date: string | null;
+            /** Default Source */
+            default_source: string | null;
+            /** Values */
+            values: components["schemas"]["FairValueItem"][];
+            /** Reasons */
+            reasons: string[];
+        };
+        /** CompanyMarketContext */
+        CompanyMarketContext: {
+            /** Ticker */
+            ticker: string;
+            /** As Of */
+            as_of: string | null;
+            /** Industry Label */
+            industry_label: string | null;
+            /** Industry Basis */
+            industry_basis: string | null;
+            /** Industry Members */
+            industry_members: number;
+            /** Market Label */
+            market_label: string | null;
+            /** Returns */
+            returns: components["schemas"]["ReturnRow"][];
+            /** Return Sentence */
+            return_sentence: string | null;
+            /** Industry Sentence */
+            industry_sentence: string | null;
+            volatility: components["schemas"]["Volatility"];
+            /** Competitors */
+            competitors: components["schemas"]["Competitor"][];
+            /** Reasons */
+            reasons: string[];
+        };
         /** CompanyReport */
         CompanyReport: {
             /** Ticker */
@@ -15459,6 +15734,34 @@ export interface components {
             observations: components["schemas"]["CompanyResearchObservation"][];
         } & {
             [key: string]: unknown;
+        };
+        /** CompanySummary */
+        CompanySummary: {
+            /** Ticker */
+            ticker: string;
+            /** Symbol */
+            symbol: string;
+            /** Name */
+            name: string | null;
+            /** Exchange */
+            exchange: string | null;
+            /** Mic */
+            mic: string | null;
+            /** Currency */
+            currency: string | null;
+            /** Country */
+            country: string | null;
+            /** Held */
+            held: boolean;
+            price: components["schemas"]["Quote"];
+            fair_value: components["schemas"]["SummaryFairValue"] | null;
+            position: components["schemas"]["SummaryPosition"] | null;
+            /** Axes */
+            axes: components["schemas"]["SummaryAxis"][];
+            /** Checks Status */
+            checks_status: string | null;
+            /** Reasons */
+            reasons: string[];
         };
         /** CompanyValuation */
         CompanyValuation: {
@@ -15640,6 +15943,29 @@ export interface components {
             source_url: string;
             /** Provider */
             provider: string;
+        };
+        /** Competitor */
+        Competitor: {
+            /** Ticker */
+            ticker: string;
+            /** Name */
+            name: string | null;
+            /** Last Price */
+            last_price: number | null;
+            /** Currency */
+            currency: string | null;
+            /**
+             * Basis
+             * @description confirmed_peer or same_industry.
+             */
+            basis: string;
+            /**
+             * Scores
+             * @description Latest cached check-axis scores (0-6); null when the company has none.
+             */
+            scores: {
+                [key: string]: number | string | null;
+            } | null;
         };
         /** ComplianceRow */
         ComplianceRow: {
@@ -18671,6 +18997,51 @@ export interface components {
              */
             fan_step_weeks: number;
         };
+        /** DrawdownPoint */
+        DrawdownPoint: {
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            /**
+             * Drawdown
+             * @description Index / running peak - 1; 0 at a new high, else negative.
+             */
+            drawdown: number;
+        };
+        /** DrawdownResponse */
+        DrawdownResponse: {
+            /** As Of */
+            as_of: string | null;
+            /** Base Currency */
+            base_currency: string | null;
+            /** Days */
+            days: number;
+            /** Points */
+            points: components["schemas"]["DrawdownPoint"][];
+            /**
+             * Max Drawdown
+             * @description The deepest drawdown as a negative fraction.
+             */
+            max_drawdown: number | null;
+            /**
+             * Peak Date
+             * @description High that preceded the deepest drawdown.
+             */
+            peak_date: string | null;
+            /** Trough Date */
+            trough_date: string | null;
+            /**
+             * Recovery Date
+             * @description First day the index regained the peak; null while still under water.
+             */
+            recovery_date: string | null;
+            /** Current Drawdown */
+            current_drawdown: number | null;
+            /** Reasons */
+            reasons?: string[];
+        };
         /** Drift */
         Drift: {
             /** Stale */
@@ -21031,6 +21402,39 @@ export interface components {
             /** Method Version */
             method_version?: string;
             footer: components["schemas"]["PictureFooter"];
+        };
+        /** FairValueItem */
+        FairValueItem: {
+            /**
+             * Source
+             * @description dcf, dcf_default, dcf_bear, dcf_bull, multiple_path, multiple_path_bear, multiple_path_bull, thesis_target, peer_multiple, analyst_mean, analyst_low or analyst_high.
+             */
+            source: string;
+            /**
+             * Basis
+             * @description The stored basis, where one exists.
+             */
+            basis: string | null;
+            /** Label */
+            label: string;
+            /** Value */
+            value: number | string | null;
+            /** Currency */
+            currency: string | null;
+            /**
+             * Upside
+             * @description Value / last price - 1.
+             */
+            upside: number | string | null;
+            /** As Of */
+            as_of: string | null;
+            /** Basis Note */
+            basis_note: string;
+            /**
+             * Is Default
+             * @default false
+             */
+            is_default: boolean;
         };
         /** FairValueRules */
         FairValueRules: {
@@ -23960,6 +24364,19 @@ export interface components {
             quantity: number;
             /** Forfeits Exemption Warning */
             forfeits_exemption_warning: boolean;
+        };
+        /** HoldingPreview */
+        HoldingPreview: {
+            /** Ticker */
+            ticker: string;
+            /** Name */
+            name: string | null;
+            current: components["schemas"]["StateTally"];
+            would_be: components["schemas"]["StateTally"];
+            /** Changes */
+            changes: components["schemas"]["CheckChange"][];
+            /** Changed */
+            changed: boolean;
         };
         /** HoldingPrices */
         HoldingPrices: {
@@ -27562,6 +27979,51 @@ export interface components {
              */
             keep_snapshots: number;
         };
+        /** LorenzCurve */
+        LorenzCurve: {
+            /**
+             * Points
+             * @description Starts at (0, 0), ends at (1, 1).
+             */
+            points: components["schemas"]["LorenzPoint"][];
+            /** Holdings */
+            holdings: number;
+            /**
+             * Hhi
+             * @description Sum of squared shares of the equity, 0 to 1.
+             */
+            hhi: number | null;
+            /**
+             * Effective N
+             * @description 1 / HHI: equally sized holdings that match it.
+             */
+            effective_n: number | null;
+            /**
+             * Gini
+             * @description 0 equal weights, towards 1 one holding dominates.
+             */
+            gini: number | null;
+            /**
+             * Top Weight Share
+             * @description Share of equity in the largest holding.
+             */
+            top_weight_share: number | null;
+            /** Reason */
+            reason?: string | null;
+        };
+        /** LorenzPoint */
+        LorenzPoint: {
+            /**
+             * Holdings Share
+             * @description Cumulative share of holdings, smallest first.
+             */
+            holdings_share: number;
+            /**
+             * Weight Share
+             * @description Cumulative share of equity value they make up.
+             */
+            weight_share: number;
+        };
         /** LotOut */
         LotOut: {
             /** Lot Id */
@@ -27919,6 +28381,11 @@ export interface components {
             /** Positions Detail */
             positions_detail: components["schemas"]["ManagerPosition"][];
             /**
+             * Sold Out
+             * @description Largest positions held at the earlier quarter end and gone at the latest.
+             */
+            sold_out?: components["schemas"]["ManagerPosition"][];
+            /**
              * Performance Available
              * @default false
              */
@@ -27943,6 +28410,24 @@ export interface components {
             shares: number | string | null;
             /** Shares Type */
             shares_type: string;
+            /**
+             * Previous Shares
+             * @description Shares at the earlier quarter end; null when not held then.
+             */
+            previous_shares?: number | string | null;
+            /** Previous Value Usd */
+            previous_value_usd?: number | string | null;
+            /**
+             * Change
+             * @default unknown
+             * @enum {string}
+             */
+            change: "new" | "added" | "trimmed" | "unchanged" | "sold" | "unknown";
+            /**
+             * Share Change Pct
+             * @description Shares now / shares then - 1; null for new or sold positions.
+             */
+            share_change_pct?: number | null;
         };
         /** ManagerRename */
         ManagerRename: {
@@ -34188,6 +34673,32 @@ export interface components {
              */
             timezone: string;
         };
+        /** Quote */
+        Quote: {
+            /** Last */
+            last: number | string | null;
+            /**
+             * Currency
+             * @description Major unit, e.g. GBP for a pence-quoted listing.
+             */
+            currency: string | null;
+            /** As Of */
+            as_of: string | null;
+            /** Previous */
+            previous: number | string | null;
+            /**
+             * Day Change
+             * @description Last minus previous close.
+             */
+            day_change: number | string | null;
+            /**
+             * Day Change Pct
+             * @description Last / previous close - 1, a fraction.
+             */
+            day_change_pct: number | string | null;
+            /** Reason */
+            reason?: string | null;
+        };
         /** RankingResponse */
         RankingResponse: {
             /** Method Version */
@@ -36198,6 +36709,27 @@ export interface components {
             meets_hurdle: boolean | null;
             /** Meets Asymmetry */
             meets_asymmetry: boolean | null;
+        };
+        /** ReturnRow */
+        ReturnRow: {
+            /**
+             * Window
+             * @description 7d or 1y.
+             */
+            window: string;
+            /** Company */
+            company: number | null;
+            /** Industry */
+            industry: number | null;
+            /** Market */
+            market: number | null;
+            /**
+             * Vs Market
+             * @description Company minus market, as a fraction.
+             */
+            vs_market: number | null;
+            /** Vs Industry */
+            vs_industry: number | null;
         };
         /** ReverseSolve */
         ReverseSolve: {
@@ -39899,6 +40431,17 @@ export interface components {
             /** Warnings */
             warnings?: string[];
         };
+        /** StateTally */
+        StateTally: {
+            /** Passes */
+            passes: number;
+            /** Fails */
+            fails: number;
+            /** Unknown */
+            unknown: number;
+            /** Risk Flags */
+            risk_flags: number;
+        };
         /** StatedAction */
         StatedAction: {
             /** Kind */
@@ -40757,6 +41300,63 @@ export interface components {
             kinds: components["schemas"]["KindSummary"][];
             /** Waiting */
             waiting: number;
+        };
+        /** SummaryAxis */
+        SummaryAxis: {
+            /** Axis */
+            axis: string;
+            /** Label */
+            label: string;
+            /** Score */
+            score: number | string | null;
+            /** Max */
+            max: number;
+            /**
+             * Text
+             * @description '4 of 5 applicable', or why there is no score.
+             */
+            text: string;
+        };
+        /** SummaryFairValue */
+        SummaryFairValue: {
+            /** Value */
+            value: number | string;
+            /** Currency */
+            currency: string | null;
+            /** Source */
+            source: string;
+            /** Basis Label */
+            basis_label: string;
+            /** As Of */
+            as_of: string | null;
+            /** Upside */
+            upside: number | string | null;
+        };
+        /** SummaryPosition */
+        SummaryPosition: {
+            /** Quantity */
+            quantity: number;
+            /** Value Account */
+            value_account: number;
+            /** Account Currency */
+            account_currency: string;
+            /** Value Base */
+            value_base: number;
+            /**
+             * Ppl
+             * @description Unrealised P/L in the account currency.
+             */
+            ppl: number;
+            /**
+             * Ppl Pct
+             * @description Unrealised P/L over cost, a fraction.
+             */
+            ppl_pct: number | null;
+            /**
+             * Weight
+             * @description Share of the portfolio, a fraction.
+             */
+            weight: number | null;
         };
         /** SupplyChain */
         SupplyChain: {
@@ -43514,6 +44114,29 @@ export interface components {
             /** Value Base */
             value_base: number;
         };
+        /** Volatility */
+        Volatility: {
+            /**
+             * Company
+             * @description Sample std of weekly returns, over 52 weeks.
+             */
+            company: number | null;
+            /** Industry */
+            industry: number | null;
+            /** Market */
+            market: number | null;
+            /**
+             * Company Annualised
+             * @description Weekly std x sqrt(52).
+             */
+            company_annualised: number | null;
+            /** Industry Annualised */
+            industry_annualised: number | null;
+            /** Market Annualised */
+            market_annualised: number | null;
+            /** Sentence */
+            sentence: string | null;
+        };
         /** WatchFairValue */
         WatchFairValue: {
             /** Ticker */
@@ -43622,6 +44245,51 @@ export interface components {
             reason?: string | null;
             /** Note */
             note?: string | null;
+        };
+        /** WaterfallResponse */
+        WaterfallResponse: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "complete" | "partial" | "unavailable";
+            /** Start */
+            start: string | null;
+            /** End */
+            end: string | null;
+            /** Days */
+            days: number;
+            /** Base Currency */
+            base_currency: string | null;
+            /** Steps */
+            steps: components["schemas"]["WaterfallStep"][];
+            /** Reasons */
+            reasons?: string[];
+        };
+        /** WaterfallStep */
+        WaterfallStep: {
+            /**
+             * Key
+             * @enum {string}
+             */
+            key: "start" | "net_deposits" | "price" | "fx" | "income" | "costs" | "unattributed" | "end";
+            /** Label */
+            label: string;
+            /**
+             * Value
+             * @description Signed amount in the base currency; null if unknown.
+             */
+            value: number | null;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "total" | "delta";
+            /**
+             * Reason
+             * @description Why the value is null.
+             */
+            reason?: string | null;
         };
         /** WebFactDecision */
         WebFactDecision: {
@@ -54918,6 +55586,39 @@ export interface operations {
             };
         };
     };
+    preview_checks: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChecksConfig"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChecksPreview"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     portfolio_dividends: {
         parameters: {
             query?: never;
@@ -56853,6 +57554,99 @@ export interface operations {
             };
         };
     };
+    get_company_summary: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CompanySummary"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_company_market_context: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CompanyMarketContext"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_company_fair_values: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CompanyFairValues"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     fund_catalog: {
         parameters: {
             query?: never;
@@ -58043,6 +58837,68 @@ export interface operations {
             };
         };
     };
+    get_drawdown: {
+        parameters: {
+            query?: {
+                days?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DrawdownResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_waterfall: {
+        parameters: {
+            query?: {
+                days?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WaterfallResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_sleeves: {
         parameters: {
             query?: {
@@ -58420,6 +59276,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["XrayConcentrationResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_allocation: {
+        parameters: {
+            query?: {
+                /** @description Show the holdings as they were on this date (the latest snapshot before). */
+                as_of?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Allocation"];
                 };
             };
             /** @description Validation Error */

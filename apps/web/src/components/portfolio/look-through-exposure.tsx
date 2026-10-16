@@ -70,19 +70,19 @@ export function TopUnderlyingHoldings({
               <div className="flex items-baseline justify-between gap-2">
                 <span className="truncate font-medium text-text" title={h.isins.join(", ")}>
                   {h.name}
-                  {h.ticker ? <span className="ml-1.5 font-mono text-[10px] text-text-muted">{displayTicker(h.ticker)}</span> : null}
+                  {h.ticker ? <span className="ml-1.5 font-mono text-xs text-text-muted">{displayTicker(h.ticker)}</span> : null}
                 </span>
               </div>
               <HBar value={h.weight} max={scale} size="sm" label={`${h.name} look-through weight`} className="my-1" />
-              <div className="truncate text-[11px] text-text-muted" title={viaText(h)}>
+              <div className="truncate text-xs text-text-muted" title={viaText(h)}>
                 {viaText(h)}
               </div>
             </div>
             <div className="text-right">
               <div className="num font-semibold">{formatPct(h.weight, 1)}</div>
-              <div className="num text-[11px] text-text-muted">{formatMoney(h.value_base, currency, { decimals: 0 })}</div>
+              <div className="num text-xs text-text-muted">{formatMoney(h.value_base, currency, { decimals: 0 })}</div>
               {benchmarkLabel && h.benchmark_weight != null ? (
-                <div className="num text-[11px] text-text-faint" title={`${benchmarkLabel} weight`}>
+                <div className="num text-xs text-text-faint" title={`${benchmarkLabel} weight`}>
                   {benchmarkLabel} {formatPct(h.benchmark_weight, 1)}
                 </div>
               ) : null}
@@ -99,7 +99,7 @@ export function LookThroughProvenance({ report }: { report: LookThroughReport })
   const funds = heldFunds(report);
   const cov = report.coverage;
   return (
-    <div className="space-y-1 text-[11px] text-text-muted">
+    <div className="space-y-1 text-xs text-text-muted">
       <ul className="m-0 list-none space-y-0.5 p-0">
         {funds.map((f) => (
           <li key={f.isin}>
@@ -133,7 +133,7 @@ function FxTable({ report }: { report: LookThroughReport }) {
       <table className="w-full min-w-[20rem] text-xs">
         <caption className="sr-only">Currency exposure against the benchmarks</caption>
         <thead>
-          <tr className="border-b border-border text-[10px] tracking-[0.08em] text-text-muted uppercase">
+          <tr className="border-b border-border text-xs text-text-muted">
             <th scope="col" className="py-1.5 text-left font-medium">Currency</th>
             <th scope="col" className="py-1.5 text-right font-medium">Portfolio</th>
             {fx.benchmark_label ? <th scope="col" className="py-1.5 text-right font-medium">{fx.benchmark_label}</th> : null}
@@ -163,7 +163,7 @@ function FxTable({ report }: { report: LookThroughReport }) {
           ))}
         </tbody>
       </table>
-      <p className="mt-1 text-[11px] text-text-faint">
+      <p className="mt-1 text-xs text-text-faint">
         Share of value whose currency is known ({formatPct(fx.known_share, 0)} of the total), cash in its own currency.
         {others.some((b) => b.currency_derived) ? " * Derived from the benchmark's country weights." : ""}
       </p>
@@ -207,7 +207,7 @@ export function LookThroughExposure({ report, currency }: { report: LookThroughR
       </details>
       <details className="text-sm">
         <summary className="cursor-pointer text-xs font-medium text-accent-ink hover:underline">How look-through is computed</summary>
-        <div className="mt-2 space-y-1.5 text-[11px] leading-snug text-text-muted">
+        <div className="mt-2 space-y-1.5 text-xs leading-snug text-text-muted">
           <p>{report.method}</p>
           {report.exposures.map((d) => (
             <p key={d.dimension}>

@@ -9,3 +9,5 @@ export default function FundamentalsPage() {
     </Suspense>
   );
 }
+
+export const metadata = { title: "Fundamentals · X-Ray" };

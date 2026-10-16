@@ -40,7 +40,7 @@ export function CoverageSummaryPanel() {
       <BlueprintCorners />
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h2 id="coverage-summary-heading" className="text-[22px] leading-tight font-semibold">
+          <h2 id="coverage-summary-heading" className="panel-title">
             Coverage in numbers
           </h2>
           <p className="max-w-[68ch] text-sm text-text-muted">Entries in the coverage ledger, grouped, with the share of expected periods that have data.</p>
@@ -68,7 +68,7 @@ export function CoverageSummaryPanel() {
       {data && groups.length === 0 ? <EmptyState title="Nothing recorded">No coverage entries exist yet.</EmptyState> : null}
 
       {groups.length > 0 ? (
-        <div className="relative overflow-x-auto border border-border">
+        <div className="relative overflow-x-auto rounded-card bg-surface-muted">
           <table className="w-full min-w-[40rem] text-sm">
             <caption className="sr-only">Coverage entries per {groupBy}</caption>
             <thead className="bg-surface-muted">

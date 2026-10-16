@@ -22,19 +22,22 @@ export function AnswerStrip({
   className?: string;
 }) {
   return (
-    <section aria-label={lead.label} className={cn("grid gap-x-8 gap-y-4 border-y border-border py-5 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,2fr)]", className)}>
+    <section
+      aria-label={lead.label}
+      className={cn("blueprint grid gap-x-8 gap-y-5 px-5 py-5 md:px-6 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,2fr)]", className)}
+    >
       <div className="min-w-0">
-        <p className="text-sm text-text-muted">{lead.label}</p>
-        <p className="num mt-1 font-heading text-[40px] leading-none font-semibold tracking-tight sm:text-[52px]">{lead.value}</p>
+        <p className="text-xs text-text-muted">{lead.label}</p>
+        <p className="num mt-1.5 font-heading text-[34px] leading-[38px] font-semibold md:text-[44px] md:leading-[48px]">{lead.value}</p>
         {lead.sentence ? <p className="mt-2 max-w-prose text-sm text-text-muted">{lead.sentence}</p> : null}
-        {chip ? <div className="mt-2">{chip}</div> : null}
+        {chip ? <div className="mt-2.5">{chip}</div> : null}
       </div>
       <dl className="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-4 lg:self-end">
         {figures.map((f) => (
-          <div key={f.label} className="min-w-0 border-l border-border-soft pl-3">
+          <div key={f.label} className="min-w-0 border-l border-border-soft pl-4">
             <dt className="text-xs text-text-muted">{f.label}</dt>
-            <dd className="num mt-0.5 text-lg font-semibold">{f.value}</dd>
-            {f.note ? <dd className="text-[11px] text-text-faint">{f.note}</dd> : null}
+            <dd className="num mt-1 font-heading text-[22px] leading-7 font-semibold">{f.value}</dd>
+            {f.note ? <dd className="text-xs text-text-faint">{f.note}</dd> : null}
           </div>
         ))}
       </dl>
@@ -47,7 +50,7 @@ export function CoverageChip({ children, tone = "neutral" }: { children: ReactNo
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1.5 border px-2 py-0.5 text-xs",
+        "inline-flex h-[22px] items-center gap-1.5 rounded-full border px-2 text-xs",
         tone === "neutral" && "border-border text-text-muted",
         tone === "partial" && "border-warning-signal text-text",
         tone === "unavailable" && "border-loss text-text",

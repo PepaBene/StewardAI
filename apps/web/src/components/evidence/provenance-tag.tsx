@@ -14,7 +14,7 @@ export function ProvenanceTag({ provenance, className }: { provenance: Provenanc
       title={description}
       data-provenance={provenance}
       className={cn(
-        "inline-flex items-center border border-border px-1 font-mono text-[10px] tracking-wide text-text-muted uppercase",
+        "inline-flex items-center border border-border px-1 text-xs text-text-muted",
         className,
       )}
     >

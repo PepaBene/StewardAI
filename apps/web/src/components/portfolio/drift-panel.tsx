@@ -54,7 +54,7 @@ export function DriftPanel({ data }: { data: PortfolioOverview }) {
         title="Against target bands"
         action={
           drift && rows.length ? (
-            <span className={cn("px-2 py-0.5 text-[11px] font-semibold", out > 0 ? "bg-accent text-accent-foreground" : "border border-border text-text-muted")}>
+            <span className={cn("px-2 py-0.5 text-xs font-semibold", out > 0 ? "bg-accent text-accent-foreground" : "border border-border text-text-muted")}>
               {out > 0 ? `${out} outside band` : "All inside band"}
             </span>
           ) : null
@@ -98,7 +98,7 @@ export function DriftTable({ data }: { data: PortfolioOverview }) {
           <table className="w-full min-w-[30rem] text-sm">
             <caption className="sr-only">Drift from target weights</caption>
             <thead>
-              <tr className="border-b border-border bg-surface-muted text-left text-[11px] tracking-[0.08em] text-text-muted uppercase">
+              <tr className="border-b border-border bg-surface-muted text-left text-xs text-text-muted">
                 <th scope="col" className="px-2 py-2 font-medium">Holding</th>
                 <th scope="col" className="px-2 py-2 text-right font-medium">Weight</th>
                 <th scope="col" className="px-2 py-2 text-right font-medium">Target</th>
@@ -110,7 +110,7 @@ export function DriftTable({ data }: { data: PortfolioOverview }) {
               {targeted.map((p) => (
                 <tr key={p.ticker} className="border-b border-border-soft last:border-0">
                   <th scope="row" className="px-2 py-2 text-left font-mono text-xs font-normal">
-                    <Link href={`/holdings/${encodeURIComponent(p.ticker)}`} className="hover:text-accent-ink hover:underline">
+                    <Link href={`/companies/${encodeURIComponent(p.ticker)}`} className="hover:text-accent-ink hover:underline">
                       {p.ticker}
                     </Link>
                     {p.held ? null : <span className="ml-1 font-sans text-text-muted">(not held)</span>}
@@ -160,7 +160,9 @@ export function DriftTable({ data }: { data: PortfolioOverview }) {
       )}
       {untargeted.length > 0 && data.strategy_config_version_id !== null ? (
         <p className="text-xs text-text-muted">
-          No target set for {untargeted.map((p) => p.ticker).join(", ")}.{" "}
+          {untargeted.length === drift?.positions.length
+            ? `None of the ${untargeted.length} positions has a target weight yet.`
+            : `No target set for ${untargeted.length} ${untargeted.length === 1 ? "position" : "positions"}: ${untargeted.map((p) => shortTicker(p.ticker)).join(", ")}.`}{" "}
           <Link href="/holdings" className="text-accent-ink underline-offset-4 hover:underline">
             See all holdings
           </Link>

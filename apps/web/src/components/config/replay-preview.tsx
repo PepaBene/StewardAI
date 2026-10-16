@@ -117,7 +117,7 @@ export function ReplayPreviewDialog<B>({
       {open ? (
         <div className="space-y-4 p-5">
           <div>
-            <h2 id="replay-title" className="text-[22px] leading-tight font-semibold">
+            <h2 id="replay-title" className="panel-title">
               Before you save: what this change would have done
             </h2>
             <p className="text-sm text-text-muted">
@@ -181,7 +181,7 @@ function PreviewDiff({ preview }: { preview: ReplayPreview }) {
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-md border border-border p-2">
+    <div className="rounded-card bg-surface-muted p-2">
       <dt className="text-xs text-text-muted">{label}</dt>
       <dd className="num text-lg font-semibold">{value}</dd>
     </div>
@@ -191,7 +191,7 @@ function Stat({ label, value }: { label: string; value: string }) {
 function ChangeItem({ row }: { row: ChangeRow }) {
   const Icon = EFFECT_ICONS[row.effect.kind];
   return (
-    <li className="space-y-2 rounded-md border border-border p-3 text-sm">
+    <li className="space-y-2 rounded-card bg-surface p-3 text-sm">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
           <p className="font-medium break-words">{row.headline}</p>

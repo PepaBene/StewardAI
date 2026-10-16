@@ -389,7 +389,7 @@ function Composer({
         <p id={`${id}-err`} className="text-xs text-text">
           {error}
         </p>
-        <p id={`${id}-hint`} className="text-[11px] text-text-faint">
+        <p id={`${id}-hint`} className="text-xs text-text-faint">
           Enter to send · Shift+Enter for a new line{disabled ? " · waiting for the answer" : ""}
         </p>
       </div>
@@ -411,7 +411,7 @@ function Message({
     return (
       <article aria-label="Your message" className="flex flex-col items-end gap-1">
         <p className="max-w-[78%] bg-accent px-3.5 py-2.5 text-[15px] whitespace-pre-line text-accent-foreground">{m.content}</p>
-        <time dateTime={m.created_at} className="num text-[11px] text-text-faint">
+        <time dateTime={m.created_at} className="num text-xs text-text-faint">
           {formatDateTime(m.created_at)}
         </time>
       </article>
@@ -449,7 +449,7 @@ function Message({
         <ChatVisual key={i} block={v} />
       ))}
       {m.answer && m.answer.shape !== "low_evidence" && m.answer.sources.length > 0 ? <SourceChips sources={m.answer.sources} /> : null}
-      <p className="flex flex-wrap gap-x-2 text-[11px] text-text-faint">
+      <p className="flex flex-wrap gap-x-2 text-xs text-text-faint">
         <time dateTime={m.created_at} className="num">
           {formatDateTime(m.created_at)}
         </time>
@@ -466,7 +466,7 @@ function Message({
 }
 
 /** Superscript "[1]" citation, in accent ink. */
-const SUP = "ml-0.5 border-0 px-0 align-super text-[10px] leading-none font-semibold text-accent-ink hover:underline";
+const SUP = "ml-0.5 border-0 px-0 align-super text-xs leading-none font-semibold text-accent-ink hover:underline";
 
 function AnswerSentence({ sentence, numbering }: { sentence: ChatSentence; numbering: Map<string, { number: number; source: Source }> }) {
   const view = sentenceView(sentence, numbering);
@@ -488,7 +488,7 @@ function AnswerSentence({ sentence, numbering }: { sentence: ChatSentence; numbe
               className={SUP}
             />
           ) : (
-            <sup key={c.id} className="ml-0.5 text-[10px] font-semibold text-text-muted" title="No link stored for this source">
+            <sup key={c.id} className="ml-0.5 text-xs font-semibold text-text-muted" title="No link stored for this source">
               [{c.number ?? c.id}]
             </sup>
           ),

@@ -6,6 +6,7 @@ import { useCallback, useMemo, useState } from "react";
 
 import { AlertMessage } from "@/components/alert-message";
 import { ConfigHeader } from "@/components/config/config-header";
+import { MoreSettings, SummaryPanel } from "@/components/config/summary";
 import { EmptyState } from "@/components/empty-state";
 import { Button } from "@/components/ui/button";
 import { getBrowserApiClient, type ExchangeCalendar } from "@/lib/api/client";
@@ -87,7 +88,7 @@ function HolidayRefresh({ onDone }: { onDone: () => void }) {
     }
   }
   return (
-    <div className="flex flex-wrap items-center gap-3 rounded-lg border border-border bg-surface-muted p-3">
+    <div className="flex flex-wrap items-center gap-3 rounded-card bg-surface-muted p-3">
       <Button size="sm" variant="outline" onClick={() => void run()} disabled={status?.busy}>
         {status?.busy ? <LoaderCircleIcon aria-hidden="true" className="animate-spin" /> : <CalendarDaysIcon aria-hidden="true" />}
         Refresh holidays
@@ -105,25 +106,50 @@ function HolidayRefresh({ onDone }: { onDone: () => void }) {
 
 function CalendarContent({ data, reload }: { data: ExchangeCalendar; reload: () => void }) {
   const exchanges = Object.entries(data.exchanges).sort(([a], [b]) => a.localeCompare(b));
+  const upcoming = sortClosures(data.closures).filter((r) => !isPast(r.date, isoToday()));
   return (
     <>
-      <section aria-labelledby="exchanges-heading" className="space-y-2">
-        <h2 id="exchanges-heading" className="text-[22px] leading-tight font-semibold">
-          Holding exchanges
-        </h2>
-        {exchanges.length === 0 ? (
-          <p className="text-sm text-text-muted">No holding has a resolved home market yet.</p>
-        ) : (
-          <ul className="flex flex-wrap gap-2 text-sm">
-            {exchanges.map(([mic, country]) => (
-              <li key={mic} className="border border-border px-2 py-1">
-                <span className="font-mono">{mic}</span> <span className="text-text-muted">· {country}</span>
-              </li>
-            ))}
+      <SummaryPanel
+        title="Next closures by exchange"
+        reading={
+          exchanges.length === 0
+            ? "No holding has a resolved home market yet."
+            : `${exchanges.length} exchange${exchanges.length === 1 ? "" : "s"}; ${upcoming.length} confirmed closure${upcoming.length === 1 ? "" : "s"} ahead, ${data.suggestions.length} suggested day${data.suggestions.length === 1 ? "" : "s"} waiting.`
+        }
+      >
+        {exchanges.length > 0 ? (
+          <ul aria-label="Next closures by exchange" className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            {exchanges.map(([mic, country]) => {
+              const next = upcoming.filter((r) => r.mic === mic).slice(0, 3);
+              return (
+                <li key={mic} className="rounded-control bg-surface px-3 py-2 text-sm">
+                  <p className="font-medium">
+                    {mic} <span className="font-normal text-text-muted">{country}</span>
+                  </p>
+                  {next.length === 0 ? (
+                    <p className="text-text-muted">No closures confirmed ahead.</p>
+                  ) : (
+                    <ul className="mt-1 space-y-0.5">
+                      {next.map((r) => (
+                        <li key={closureKey(r)} className="flex justify-between gap-2">
+                          <span className="truncate">{r.name}</span>
+                          <span className="num shrink-0 text-text-muted">{formatDate(r.date)}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </li>
+              );
+            })}
           </ul>
-        )}
-      </section>
-      <Suggestions data={data} reload={reload} />
+        ) : null}
+      </SummaryPanel>
+      <MoreSettings
+        title="Confirm suggested closures"
+        hint={`${data.suggestions.length} public holiday${data.suggestions.length === 1 ? "" : "s"} waiting`}
+      >
+        <Suggestions data={data} reload={reload} />
+      </MoreSettings>
       <Confirmed data={data} />
       <SessionsSection mics={exchanges.map(([mic]) => mic)} />
     </>
@@ -177,7 +203,7 @@ function Suggestions({ data, reload }: { data: ExchangeCalendar; reload: () => v
     <section aria-labelledby="suggested-heading" className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h2 id="suggested-heading" className="text-[22px] leading-tight font-semibold">
+          <h2 id="suggested-heading" className="panel-title">
             Suggested closures
           </h2>
           <p className="text-sm text-text-muted">
@@ -193,7 +219,7 @@ function Suggestions({ data, reload }: { data: ExchangeCalendar; reload: () => v
       <div role="status" aria-live="polite">
         {result ? (
           result.ok ? (
-            <p className="rounded-md border border-border bg-surface-muted p-2 text-sm">
+            <p className="rounded-card bg-surface p-3 text-sm">
               {result.text}{" "}
               <Link href={historyHref("jobs")} className={LINK}>
                 Jobs history
@@ -210,7 +236,7 @@ function Suggestions({ data, reload }: { data: ExchangeCalendar; reload: () => v
           loaded yet: use <strong>Refresh holidays</strong>.
         </EmptyState>
       ) : (
-        <div className="overflow-x-auto border border-border">
+        <div className="overflow-x-auto rounded-card bg-surface">
           <table className="w-full min-w-[32rem] text-sm">
             <caption className="sr-only">Suggested exchange closures; select the days the exchange is closed</caption>
             <thead className="bg-surface-muted">
@@ -249,7 +275,7 @@ function Suggestions({ data, reload }: { data: ExchangeCalendar; reload: () => v
                       {past ? <span className="ml-1 text-xs text-text-muted">(past)</span> : null}
                     </td>
                     <td className="px-3 py-1.5">
-                      <span className="font-mono">{r.mic}</span>
+                      <span>{r.mic}</span>
                       {data.exchanges[r.mic] ? <span className="text-text-muted"> · {data.exchanges[r.mic]}</span> : null}
                     </td>
                     <td className="px-3 py-1.5">{r.name}</td>
@@ -270,7 +296,7 @@ function Confirmed({ data }: { data: ExchangeCalendar }) {
     <section aria-labelledby="confirmed-heading" className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h2 id="confirmed-heading" className="text-[22px] leading-tight font-semibold">
+          <h2 id="confirmed-heading" className="panel-title">
             Confirmed closures
           </h2>
           <p className="text-sm text-text-muted">In the Jobs config (Holiday calendar); edit or remove them there.</p>
@@ -285,7 +311,7 @@ function Confirmed({ data }: { data: ExchangeCalendar }) {
       {rows.length === 0 ? (
         <EmptyState title="No closures confirmed">Confirm suggested days above, or add them in Config: Jobs.</EmptyState>
       ) : (
-        <div className="overflow-x-auto border border-border">
+        <div className="overflow-x-auto rounded-card bg-surface-muted">
           <table className="w-full min-w-[28rem] text-sm">
             <thead className="bg-surface-muted">
               <tr className="border-b border-border text-text-muted">
@@ -298,7 +324,7 @@ function Confirmed({ data }: { data: ExchangeCalendar }) {
               {rows.map((r) => (
                 <tr key={closureKey(r)} className="border-b border-border last:border-0">
                   <td className="num px-3 py-1.5 text-right whitespace-nowrap">{formatDate(r.date)}</td>
-                  <td className="px-3 py-1.5 font-mono">{r.mic}</td>
+                  <td className="px-3 py-1.5">{r.mic}</td>
                   <td className="px-3 py-1.5">{r.name}</td>
                 </tr>
               ))}

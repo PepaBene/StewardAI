@@ -61,7 +61,7 @@ export function PatentsPanel({ ticker }: { ticker: string }) {
             >
               <span />
               {m.years.map((y) => (
-                <span key={y} className="num text-center text-[11px] text-text-faint">
+                <span key={y} className="num text-center text-xs text-text-faint">
                   {String(y).slice(2)}
                 </span>
               ))}
