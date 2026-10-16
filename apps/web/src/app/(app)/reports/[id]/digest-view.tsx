@@ -238,8 +238,10 @@ function Digest({ report }: { report: ReportOut }) {
   const happened = useMemo(() => whatHappened(body), [body]);
   const checks = digestChecks(body, holdings ? holdings.holdings.map((h) => h.ticker) : null);
 
+  // Laid out by its own width (container queries), not the viewport's: the digest also sits in
+  // the reports page's right-hand pane, where viewport breakpoints squeezed it into slivers.
   return (
-    <div className="flex flex-col gap-5">
+    <div className="@container flex flex-col gap-5">
       <Hero report={report} alerts={alerts ?? null} />
 
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-text-muted">
@@ -253,7 +255,7 @@ function Digest({ report }: { report: ReportOut }) {
       </div>
 
       <AskAboutSelection>
-        <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
+        <div className="grid grid-cols-1 gap-5 @4xl:grid-cols-2">
           <Movers movers={movers} />
           <Blueprint aria-labelledby="happened-heading" className="flex flex-col gap-3 px-6 py-5">
             <PanelHeading
@@ -312,7 +314,7 @@ function Digest({ report }: { report: ReportOut }) {
         </div>
       </AskAboutSelection>
 
-      <Blueprint aria-label="Checks" className="grid grid-cols-1 gap-5 px-6 py-5 sm:grid-cols-3">
+      <Blueprint aria-label="Checks" className="grid grid-cols-1 gap-5 px-6 py-5 @xl:grid-cols-3">
         <CheckRing
           label="Claims supported"
           ratio={checks.claims}
@@ -328,8 +330,8 @@ function Digest({ report }: { report: ReportOut }) {
         />
       </Blueprint>
 
-      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[9rem_minmax(0,1fr)_18rem]">
-        <TocRail items={tocItems(body)} />
+      <div className="grid grid-cols-1 gap-5 @4xl:grid-cols-[minmax(0,1fr)_18rem] @6xl:grid-cols-[9rem_minmax(0,1fr)_18rem]">
+        <TocRail items={tocItems(body)} className="lg:hidden @6xl:block" />
         <AskAboutSelection>
           <article className="flex flex-col gap-5" aria-label="Stories and status">
             {(body.sections ?? []).some((s) => (s.stories ?? []).length > 0 || (s.verdicts ?? []).length > 0) ? (
@@ -353,26 +355,24 @@ function Digest({ report }: { report: ReportOut }) {
                             const lead = byId.get(story.news_item_ids[0]);
                             const extra = story.news_item_ids.length - 1;
                             return (
-                              <li key={story.cluster_id} className="flex flex-wrap items-start justify-between gap-2 border border-border-soft p-3 text-sm">
-                                <div className="min-w-0 flex-1">
-                                  {lead && isExternalUrl(lead.url) ? (
-                                    <a href={lead.url} target="_blank" rel="noreferrer" className="font-medium hover:text-accent-ink hover:underline">
-                                      {decodeEntities(story.headline)}
-                                    </a>
-                                  ) : (
-                                    <span className="font-medium">{decodeEntities(story.headline)}</span>
-                                  )}
-                                  <p className="text-xs text-text-muted">
+                              <li key={story.cluster_id} className="space-y-1.5 border border-border-soft p-3 text-sm">
+                                {lead && isExternalUrl(lead.url) ? (
+                                  <a href={lead.url} target="_blank" rel="noreferrer" className="block font-medium hover:text-accent-ink hover:underline">
+                                    {decodeEntities(story.headline)}
+                                  </a>
+                                ) : (
+                                  <span className="block font-medium">{decodeEntities(story.headline)}</span>
+                                )}
+                                <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 text-xs text-text-muted">
+                                  <SeverityBadge severity={story.severity} />
+                                  <ConfidenceBadge confidence={story.confidence} />
+                                  <span>
                                     {eventLabel(story.event_type)} · {lead?.outlet ?? "source"}
                                     {extra > 0 ? ` +${extra} more` : ""} ·{" "}
                                     <Link href={`/news?story=${story.cluster_id}`} className="text-accent-ink hover:underline">
                                       all sources
                                     </Link>
-                                  </p>
-                                </div>
-                                <div className="flex flex-wrap items-center justify-end gap-1.5">
-                                  <SeverityBadge severity={story.severity} />
-                                  <ConfidenceBadge confidence={story.confidence} />
+                                  </span>
                                   <FeedbackControl target={{ kind: "story", id: story.cluster_id }} label={`story “${decodeEntities(story.headline)}”`} />
                                 </div>
                               </li>
@@ -469,8 +469,8 @@ function Hero({ report, alerts }: { report: ReportOut; alerts: AlertOut[] | null
   return (
     <section aria-labelledby="digest-headline" className="blueprint border-accent bg-accent px-6 py-6 text-accent-foreground">
       <BlueprintCorners />
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1.5fr)_repeat(3,minmax(0,1fr))] lg:items-end">
-        <div className="min-w-0">
+      <div className="grid grid-cols-1 gap-6 @xl:grid-cols-3 @xl:items-end @5xl:grid-cols-[minmax(0,1.5fr)_repeat(3,minmax(0,1fr))]">
+        <div className="min-w-0 @xl:col-span-3 @5xl:col-span-1">
           <p className="text-xs font-semibold opacity-85">
             {label} · <span className="num">{shortDay(new Date(report.created_at))} {new Date(report.created_at).getFullYear()}</span>
           </p>
