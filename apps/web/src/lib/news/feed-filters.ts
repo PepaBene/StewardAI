@@ -11,6 +11,10 @@ export type FeedFilters = {
   confidences: Confidence[];
   tiers: number[];
   story: number | null;
+  /** Also stories reached only through a rival, supplier, customer or watch topic. */
+  related?: boolean;
+  /** Also stories the classifier judged not worth a digest line (severity 0). */
+  ignored?: boolean;
 };
 
 export const EMPTY_FILTERS: FeedFilters = {
@@ -19,7 +23,21 @@ export const EMPTY_FILTERS: FeedFilters = {
   confidences: [],
   tiers: [],
   story: null,
+  related: false,
+  ignored: false,
 };
+
+/**
+ * The GET /news scope: by default only stories about a holding itself and worth at least a
+ * digest line; a single story is always shown whole.
+ */
+export function feedScope(filters: FeedFilters): { direct: boolean; severity: number[] | undefined } {
+  if (filters.story) return { direct: false, severity: filters.severities.length ? filters.severities : undefined };
+  return {
+    direct: !filters.related,
+    severity: filters.severities.length ? filters.severities : filters.ignored ? undefined : [1, 2, 3],
+  };
+}
 
 function ints(values: string[], min: number, max: number): number[] {
   const parsed = values.map(Number).filter((n) => Number.isInteger(n) && n >= min && n <= max);
@@ -37,6 +55,8 @@ export function parseFilters(params: URLSearchParams): FeedFilters {
     ),
     tiers: ints(params.getAll("tier"), 1, 3),
     story: Number.isInteger(story) && story > 0 ? story : null,
+    related: params.get("related") === "1",
+    ignored: params.get("ignored") === "1",
   };
 }
 
@@ -47,6 +67,8 @@ export function filtersToSearch(filters: FeedFilters): string {
   filters.confidences.forEach((c) => params.append("confidence", c));
   filters.tiers.forEach((t) => params.append("tier", String(t)));
   if (filters.story) params.set("story", String(filters.story));
+  if (filters.related) params.set("related", "1");
+  if (filters.ignored) params.set("ignored", "1");
   const text = params.toString();
   return text ? `?${text}` : "";
 }
@@ -63,6 +85,27 @@ export function isFiltered(filters: FeedFilters): boolean {
     filters.confidences.length > 0 ||
     filters.tiers.length > 0
   );
+}
+
+type LinkLike = { ticker: string; via: string };
+
+const INDIRECT = new Set(["competitor", "supplier", "customer", "constituent", "topic"]);
+
+/**
+ * A story's holdings: those it is about (named, or the source is theirs) and those it only
+ * reaches through a rival, supplier, customer or topic, each ticker once, the story's own first.
+ */
+export function splitLinks<T extends LinkLike>(links: readonly T[], storyTicker: string | null | undefined): { about: T[]; related: T[] } {
+  const about = new Map<string, T>();
+  const related = new Map<string, T>();
+  for (const link of links) {
+    if (!INDIRECT.has(link.via)) about.set(link.ticker, link);
+  }
+  for (const link of links) {
+    if (INDIRECT.has(link.via) && !about.has(link.ticker) && !related.has(link.ticker)) related.set(link.ticker, link);
+  }
+  const first = (a: T, b: T) => Number(b.ticker === storyTicker) - Number(a.ticker === storyTicker);
+  return { about: [...about.values()].sort(first), related: [...related.values()].sort(first) };
 }
 
 /** Consecutive items of one story, shown as one row with its copies. */

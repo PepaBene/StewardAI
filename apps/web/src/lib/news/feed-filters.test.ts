@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { byLead, EMPTY_FILTERS, filtersToSearch, groupByStory, isFiltered, parseFilters, toggle } from "./feed-filters";
+import { byLead, EMPTY_FILTERS, feedScope, filtersToSearch, groupByStory, isFiltered, parseFilters, splitLinks, toggle } from "./feed-filters";
 
 describe("feed filters", () => {
   it("round-trips through the URL", () => {
@@ -10,6 +10,8 @@ describe("feed filters", () => {
       confidences: ["verified" as const, "disputed" as const],
       tiers: [1],
       story: null,
+      related: false,
+      ignored: false,
     };
     const search = filtersToSearch(filters);
     expect(search).toBe("?ticker=AAPL_US_EQ&severity=2&severity=3&confidence=verified&confidence=disputed&tier=1");
@@ -24,6 +26,32 @@ describe("feed filters", () => {
     expect(filtersToSearch(EMPTY_FILTERS)).toBe("");
     expect(isFiltered(EMPTY_FILTERS)).toBe(false);
     expect(isFiltered(parsed)).toBe(true);
+  });
+
+  it("scopes the feed to stories about holdings by default", () => {
+    expect(feedScope(EMPTY_FILTERS)).toEqual({ direct: true, severity: [1, 2, 3] });
+    expect(feedScope({ ...EMPTY_FILTERS, related: true, ignored: true })).toEqual({ direct: false, severity: undefined });
+    expect(feedScope({ ...EMPTY_FILTERS, severities: [3] })).toEqual({ direct: true, severity: [3] });
+    expect(feedScope({ ...EMPTY_FILTERS, story: 7 })).toEqual({ direct: false, severity: undefined });
+    const search = filtersToSearch({ ...EMPTY_FILTERS, related: true });
+    expect(search).toBe("?related=1");
+    expect(parseFilters(new URLSearchParams(search.slice(1))).related).toBe(true);
+  });
+
+  it("splits a story's holdings into those it is about and those it reaches", () => {
+    const { about, related } = splitLinks(
+      [
+        { ticker: "B", via: "customer" },
+        { ticker: "A", via: "name" },
+        { ticker: "C", via: "competitor" },
+        { ticker: "A", via: "source" },
+        { ticker: "C", via: "topic" },
+        { ticker: "D", via: "alias" },
+      ],
+      "D",
+    );
+    expect(about.map((l) => l.ticker)).toEqual(["D", "A"]);
+    expect(related.map((l) => l.ticker)).toEqual(["B", "C"]);
   });
 
   it("toggles values", () => {

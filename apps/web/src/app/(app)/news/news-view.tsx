@@ -42,16 +42,19 @@ import { dayLabel, eventTypeCounts, groupByDay, storyEventType } from "@/lib/new
 import {
   byLead,
   EMPTY_FILTERS,
+  feedScope,
   filtersToSearch,
   groupByStory,
   isFiltered,
   parseFilters,
+  splitLinks,
   toggle,
   type FeedFilters,
 } from "@/lib/news/feed-filters";
 import { CONFIDENCES, eventLabel, SEVERITY, STATUS_LABELS, TIERS } from "@/lib/news/labels";
 import { priceReaction, storyDay, type ClosePoint } from "@/lib/news/price-reaction";
 import { activePreset, healthSummary, PRESETS, presetFilters, sourceBars, storyTime } from "@/lib/news/stats";
+import { shortTicker } from "@/lib/portfolio/ticker";
 import { appendUnique } from "@/lib/portfolio/transactions";
 import { hostOf, isExternalUrl } from "@/lib/sources/sources";
 import { cn } from "@/lib/utils";
@@ -85,9 +88,11 @@ function message(err: unknown): string {
 }
 
 function query(filters: FeedFilters, beforeId: number | null) {
+  const scope = feedScope(filters);
   return {
     ticker: filters.ticker ?? undefined,
-    severity: filters.severities.length ? filters.severities : undefined,
+    direct: scope.direct,
+    severity: scope.severity,
     confidence: filters.confidences.length ? filters.confidences : undefined,
     tier: filters.tiers.length ? filters.tiers : undefined,
     story: filters.story ?? undefined,
@@ -332,12 +337,11 @@ export function NewsView() {
         <Blueprint as="section" aria-label="News stories">
           <div
             aria-hidden="true"
-            className="hidden border-b border-border-soft px-5 py-2.5 text-xs text-text-muted lg:grid lg:grid-cols-[4rem_7rem_minmax(0,1fr)_9rem_4.5rem_8.5rem_8.5rem] lg:gap-x-4"
+            className="hidden border-b border-border-soft px-5 py-2.5 text-xs text-text-muted lg:grid lg:grid-cols-[4rem_7rem_minmax(0,1fr)_4.5rem_8.5rem_8.5rem] lg:gap-x-4"
           >
             <span>Time</span>
             <span>Severity</span>
-            <span>Story</span>
-            <span>Holdings</span>
+            <span>Story and holdings</span>
             <span className="text-right">Sources</span>
             <span>Confidence</span>
             <span className="text-right">Price reaction</span>
@@ -471,8 +475,21 @@ function Filters({
           ))}
         </div>
       </fieldset>
+      <fieldset className="space-y-1">
+        <legend className="kicker">Also show</legend>
+        <div className="flex flex-wrap gap-1">
+          <label className={chip(Boolean(filters.related))} title="Stories that reach a holding only through a rival, supplier, customer or watch topic">
+            <input type="checkbox" className="sr-only" checked={Boolean(filters.related)} onChange={() => onChange({ ...filters, story: null, related: !filters.related })} />
+            About rivals, suppliers and customers
+          </label>
+          <label className={chip(Boolean(filters.ignored))} title="Stories the classifier judged not worth a digest line (severity 0)">
+            <input type="checkbox" className="sr-only" checked={Boolean(filters.ignored)} onChange={() => onChange({ ...filters, story: null, ignored: !filters.ignored })} />
+            Ignored stories
+          </label>
+        </div>
+      </fieldset>
       {isFiltered(filters) ? (
-        <Button variant="ghost" size="sm" className="self-end" onClick={() => onChange(EMPTY_FILTERS)}>
+        <Button variant="ghost" size="sm" className="self-end" onClick={() => onChange({ ...EMPTY_FILTERS, related: filters.related, ignored: filters.ignored })}>
           <XIcon aria-hidden="true" />
           Clear filters
         </Button>
@@ -519,7 +536,7 @@ function StoryRow({
 
   return (
     <li className="border-b border-border-soft last:border-0">
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 px-5 py-3.5 hover:bg-surface-muted lg:grid lg:grid-cols-[4rem_7rem_minmax(0,1fr)_9rem_4.5rem_8.5rem_8.5rem]">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 px-5 py-3.5 hover:bg-surface-muted lg:grid lg:grid-cols-[4rem_7rem_minmax(0,1fr)_4.5rem_8.5rem_8.5rem]">
         <time dateTime={lead.published_at} className="num font-mono text-xs text-text-muted" title={published.toLocaleString()}>
           {storyTime(published, now)}
         </time>
@@ -549,23 +566,8 @@ function StoryRow({
               <FeedbackControl target={{ kind: "story", id: story.id }} label={`story “${decodeEntities(lead.headline)}”`} />
             </span>
           </p>
+          <StoryHoldings links={lead.links} storyTicker={story.ticker} />
         </div>
-        <span className="flex flex-wrap gap-1">
-          {lead.links.map((link) => (
-            <Link
-              key={link.ticker}
-              href={`/companies/${encodeURIComponent(link.ticker)}`}
-              title={`Linked by ${link.via}: ${link.term}`}
-              className={cn(
-                "border border-border px-1.5 py-0.5 font-mono text-xs hover:border-accent",
-                link.ticker === story.ticker && "bg-surface-muted",
-              )}
-            >
-              {link.ticker}
-              {link.via !== "name" && link.via !== "source" ? <span className="font-sans text-text-muted"> · {link.via}</span> : null}
-            </Link>
-          ))}
-        </span>
         <SourceCount count={story.source_count} onClick={hasMore ? () => onStory(story.id) : undefined} />
         <span>
           <ConfidenceBadge confidence={story.confidence} />
@@ -632,6 +634,36 @@ function StoryRow({
         </div>
       </details>
     </li>
+  );
+}
+
+/**
+ * The holdings a story is about as short ticker links; those it reaches only through a rival,
+ * supplier, customer or topic folded into one muted line, named in full on hover.
+ */
+function StoryHoldings({ links, storyTicker }: { links: NewsItemOut["links"]; storyTicker: string | null | undefined }) {
+  const { about, related } = splitLinks(links, storyTicker);
+  if (about.length === 0 && related.length === 0) return null;
+  const relatedText = related.map((l) => `${shortTicker(l.ticker)} (${l.via}: ${l.term})`).join(", ");
+  return (
+    <p className="mt-1.5 flex flex-wrap items-center gap-1.5 text-xs">
+      {about.map((link) => (
+        <Link
+          key={link.ticker}
+          href={`/companies/${encodeURIComponent(link.ticker)}`}
+          title={`Named as ${link.term}`}
+          className="rounded-sm bg-accent-soft px-1.5 py-0.5 font-semibold text-text hover:text-accent-ink"
+        >
+          {shortTicker(link.ticker)}
+        </Link>
+      ))}
+      {related.length > 0 ? (
+        <span className="text-text-muted" title={relatedText}>
+          {about.length > 0 ? "also reaches " : "reaches "}
+          {related.length <= 2 ? related.map((l) => `${shortTicker(l.ticker)} as ${l.via}`).join(", ") : `${related.length} holdings through rivals, suppliers or customers`}
+        </span>
+      ) : null}
+    </p>
   );
 }
 

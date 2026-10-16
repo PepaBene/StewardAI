@@ -123,6 +123,15 @@ def feed_where(filters: FeedFilters) -> tuple[str, list[Any]]:
                 + " and not (l->>'via' = any(?::text[])))",
                 sorted(INDIRECT_VIA),
             )
+    elif filters.direct:
+        # Across holdings: items about at least one holding itself, not only reached through
+        # a rival, supplier, customer or watch topic.
+        clauses.append("i.relevant is not false")
+        add(
+            "exists (select 1 from jsonb_array_elements(i.links) l"
+            " where not (l->>'via' = any(?::text[])))",
+            sorted(INDIRECT_VIA),
+        )
     if filters.severities:
         add("c.severity = any(?::smallint[])", filters.severities)
     if filters.confidences:

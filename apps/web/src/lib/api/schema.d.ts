@@ -49804,7 +49804,7 @@ export interface operations {
                 /** @description Only this story's items. */
                 story?: number | null;
                 before_id?: number | null;
-                /** @description With a ticker: only items about the company itself, not ones reached through a rival, supplier, customer or watch topic. */
+                /** @description Only items about the company itself (with a ticker) or about at least one holding itself (without), not ones reached only through a rival, supplier, customer or watch topic. */
                 direct?: boolean;
                 limit?: number;
             };
