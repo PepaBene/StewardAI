@@ -70,10 +70,12 @@ Decisions:
 right kind of link, the right direction). {confirm_extra}
 - reject: the citation plainly shows the suggestion is wrong (a different company, a different \
 kind of link, the opposite direction, a mere mention such as a competitor list or a risk \
-factor when a business link is claimed, or an event that was cancelled).
-- defer: anything else. When unsure, defer: a deferred item waits for the owner and costs \
-nothing. Always defer when the citation is missing, cut off, only a link with no text, or does \
-not mention the counterparty.
+factor when a business link is claimed, or an event that was cancelled). A passage about \
+another business or thing that shares the name (a painting firm called Cisco, a country or a \
+region read as a customer, "non-US customers 46%" read as a named customer) shows the \
+suggestion is wrong: reject it. A clear rejection is as useful as a confirmation; never defer it.
+- defer: only when the citation cannot settle it either way: missing, cut off before the \
+claim, or only a link with no text. A deferred item waits for the owner.
 
 Never confirm without a citation: if <citation> holds no text that states the claim, answer \
 defer. A name that merely looks similar is not a match.
@@ -110,7 +112,12 @@ RELATIONSHIP_SYSTEM = _COMMON.format(
     tag="relationship",
     confirm_extra="A confirmed competitor, supplier or customer is added to the holding's "
     "news profile, so a wrong one pollutes the news feed: be strict about those. A source "
-    "such as Wikidata or a filing is a claim to check, not proof by itself.",
+    "such as Wikidata or a filing is a claim to check, not proof by itself. A Wikidata "
+    "ownership statement (the detail names the property) about the holding's own group may be "
+    "confirmed on that statement. A competitor the detail calls 'Inferred, not stated' rests "
+    "only on a shared industry label and index: confirm it only when you know the two "
+    "companies sell the same kind of product to the same customers, and reject it when their "
+    "businesses differ (a design-software maker is not a phone maker's competitor).",
 )
 
 
