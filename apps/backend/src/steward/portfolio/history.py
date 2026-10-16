@@ -31,16 +31,21 @@ class DailyValue:
 
 def flow_adjusted_index(days: list[DailyValue]) -> list[tuple[dt.date, float]]:
     """One point per day, in the order given (must already be sorted by date), indexed to
-    100 on the first day. A day whose prior total_base is zero or negative (nothing to
-    measure a return against yet, e.g. the day money first arrived) carries the index
-    forward unchanged rather than dividing by zero."""
+    100 on the first day. A day's flow counts as arriving at the start of its period, so
+    it is part of the base the period's gain is measured against: a deposit is usually
+    invested before the market moves (a weekend deposit always is), and measuring that
+    move against the old, smaller base turns a CZK 50 gain on CZK 10,109 into +46% on
+    CZK 109. A day whose base (prior total_base plus the flow) is zero or negative
+    (nothing to measure a return against yet, e.g. the day money first arrived) carries
+    the index forward unchanged rather than dividing by zero."""
     if not days:
         return []
     index = Decimal(100)
     points = [(days[0].date, float(index))]
     for prev, cur in pairwise(days):
-        if prev.total_base > 0:
-            daily_return = (cur.total_base - cur.flow_base) / prev.total_base - 1
+        base = prev.total_base + cur.flow_base
+        if prev.total_base > 0 and base > 0:
+            daily_return = (cur.total_base - cur.flow_base - prev.total_base) / base
             index *= 1 + daily_return
         points.append((cur.date, float(index)))
     return points

@@ -79,6 +79,18 @@ def test_a_withdrawal_does_not_show_up_as_a_loss() -> None:
     assert [round(v, 4) for _, v in index] == [100.0, 100.0, 110.0]
 
 
+def test_a_large_deposit_on_a_small_base_is_measured_against_the_new_base() -> None:
+    # Production, 2026-08-03: 109 in the account, 10,000 deposited over the weekend and
+    # invested before Monday's move, 10,159 at Monday's close. The gain is 50 on 10,109,
+    # not 50 on 109.
+    values = [
+        DailyValue(day(0), Decimal(109), Decimal(0)),
+        DailyValue(day(1), Decimal(10159), Decimal(10000)),
+    ]
+    index = flow_adjusted_index(values)
+    assert [round(v, 2) for _, v in index] == [100.0, 100.49]
+
+
 def test_a_real_loss_still_shows_as_a_loss() -> None:
     values = [
         DailyValue(day(0), Decimal(100), Decimal(0)),
