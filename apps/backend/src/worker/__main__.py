@@ -33,7 +33,12 @@ from steward.db import create_pool
 from steward.heartbeat import HEARTBEAT_SECONDS, beat
 from steward.jobs import queue
 from steward.jobs.registry import JOB_HANDLERS
-from steward.jobs.runner import JobTrigger, fail_interrupted_scheduled_runs, run_job
+from steward.jobs.runner import (
+    JobTrigger,
+    fail_interrupted_scheduled_runs,
+    is_database_outage,
+    run_job,
+)
 from steward.logging import configure_logging
 from steward.notify.alerts import dispatch_due
 from steward.notify.channels import channels_from_settings
@@ -56,6 +61,8 @@ QUEUE_BUSY_DELAY_SECONDS = 30
 # A message whose run hit an error outside the job (the database, say) is retried after this.
 QUEUE_RETRY_SECONDS = 60
 QUEUE_MAX_READS = 3
+# A scheduled run that failed because the database restarted is tried once more after this.
+SCHEDULE_RETRY_SECONDS = 300
 MAX_CONCURRENT_QUEUED_JOBS = 4
 DISPATCH_SECONDS = 15
 
@@ -67,7 +74,32 @@ class Worker:
         self._slots = asyncio.Semaphore(MAX_CONCURRENT_QUEUED_JOBS)
 
     async def run_scheduled(self, job_type: str) -> None:
-        await self._run(job_type, "schedule", None)
+        """A scheduled run that the database dropped out of (a Postgres restart) is tried
+        again a few minutes later instead of waiting for its next slot, which for a daily job
+        such as portfolio_sync is a whole day away. Any other failure is the job's own."""
+        try:
+            if await self._run(job_type, "schedule", None) != "failed":
+                return
+            error = await self.pool.fetchval(
+                "select error from public.job where job_type = $1 and trigger = 'schedule'"
+                " order by id desc limit 1",
+                job_type,
+            )
+        except (OSError, asyncpg.PostgresError, TimeoutError) as exc:
+            # The job row itself could not be written or read: the database is out.
+            error = f"connection refused ({type(exc).__name__})"
+        if not is_database_outage(error):
+            return
+        logger.warning(
+            "scheduled %s failed on a database outage; retrying in %ss",
+            job_type,
+            SCHEDULE_RETRY_SECONDS,
+        )
+        await asyncio.sleep(SCHEDULE_RETRY_SECONDS)
+        try:
+            await self._run(job_type, "schedule", None)
+        except (OSError, asyncpg.PostgresError, TimeoutError):
+            logger.exception("retrying scheduled %s failed; next slot will run it", job_type)
 
     async def _run(
         self,

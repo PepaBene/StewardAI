@@ -444,7 +444,8 @@ async def statements(pool: asyncpg.Pool, now: dt.datetime) -> list[Finding]:
         " on l.ticker = a.ticker and l.period_end = a.period_end and l.accession = a.accession"
         " and l.statement = 'balance_sheet' and l.concept = any($3)"
         " where a.statement = 'balance_sheet' and a.concept = any($2) and a.known_at >= $1"
-        " and a.dimensions = '{}'::jsonb and l.dimensions = '{}'::jsonb"
+        " and coalesce(a.dimensions->'members', '[]'::jsonb) = '[]'::jsonb"
+        " and coalesce(l.dimensions->'members', '[]'::jsonb) = '[]'::jsonb"
         " and a.value is not null and l.value is not null and a.ticker is not null"
         " order by a.ticker, a.period_end limit 100",
         since,
@@ -457,7 +458,10 @@ async def statements(pool: asyncpg.Pool, now: dt.datetime) -> list[Finding]:
         "select n.ticker, n.concept, n.period_end, o.value as before, n.value as after"
         " from public.financial_statement_fact n join public.financial_statement_fact o"
         " on o.id = n.amends_fact_id where n.known_at >= $1 and n.value is not null"
-        " and o.value is not null and n.ticker is not null and n.dimensions = '{}'::jsonb"
+        " and o.value is not null and n.ticker is not null"
+        " and coalesce(n.dimensions->'members', '[]'::jsonb) = '[]'::jsonb"
+        # Pay figures from proxy statements are not financial statements to audit.
+        " and n.form not like 'DEF 14A%'"
         " order by n.ticker, n.period_end limit 100",
         since,
     ):

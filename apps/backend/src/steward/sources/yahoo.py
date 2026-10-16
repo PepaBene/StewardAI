@@ -312,3 +312,149 @@ async def yahoo_daily(
     period = (start, now.date()) if name == "max" else None
     chart = await yahoo_chart(http, symbol, range_=name, interval="1d", period=period)
     return chart, [b for b in daily_bars(chart, now) if b.date >= start]
+
+
+# ------------------------------------------------------------ dividend events (insight I1.3)
+#
+# `events=div` adds `events.dividends` to the chart answer: one entry per ex-date (`date`, a UNIX
+# time) with the cash `amount` per share in the chart's `meta.currency`. Yahoo adjusts these
+# amounts for later splits, which Twelve Data does not, so a cross-check may disagree after a
+# split; the disagreement is listed rather than resolved. Requests go through `governed_http`
+# (provider `yahoo`, endpoint `chart_dividends`): the first call is the access probe, and the rows
+# are stored as `suggested` corporate actions only.
+
+DIVIDEND_SOURCE = "yahoo"
+DIVIDEND_RANGE = "10y"
+DIVIDEND_BUDGET_PER_MINUTE = 6
+DIVIDEND_BUDGET_DAILY = 120
+
+
+@dataclass(frozen=True)
+class YahooDividend:
+    ex_date: dt.date
+    amount: Decimal
+    raw: dict[str, Any]
+
+
+async def yahoo_symbol_for(pool: Any, ticker: str) -> tuple[int, str, str] | None:
+    """(listing id, listing ticker, Yahoo symbol) of a holding with a confirmed listing: the
+    profile's `yahoo_symbol`, else derived from the Stooq symbol or the listing. None: no call."""
+    from steward.config.holding_profiles import HoldingProfilesConfig
+    from steward.config.store import load_active
+    from steward.reference.price_series import yahoo_from_listing, yahoo_from_stooq
+
+    row = await pool.fetchrow(
+        "select m.listing_id, l.ticker as listing_ticker, l.mic, i.price_symbol"
+        " from public.instrument_security_link m"
+        " join public.security_listing l on l.id = m.listing_id"
+        " join public.instrument i on i.t212_ticker = m.ticker"
+        " where m.ticker = $1 and m.status = 'confirmed'",
+        ticker,
+    )
+    if row is None:
+        return None
+    stored = await load_active(pool, "holding_profiles", HoldingProfilesConfig)
+    profile = (stored.body if stored else HoldingProfilesConfig()).for_ticker(ticker)
+    ysym = (
+        (profile.yahoo_symbol if profile else None)
+        or yahoo_from_stooq(row["price_symbol"])
+        or yahoo_from_listing(row["listing_ticker"], row["mic"])
+    )
+    if not ysym:
+        return None
+    return row["listing_id"], row["listing_ticker"], ysym
+
+
+def iso_currency(code: str | None) -> str | None:
+    """Yahoo's `GBp` (pence) is stored as the Trading212 code `GBX`; anything else upper-cased."""
+    if not code:
+        return None
+    if code == "GBp":
+        return "GBX"
+    up = code.upper()
+    return up if len(up) == 3 and up.isalpha() else None
+
+
+def parse_dividend_events(body: Any) -> tuple[str | None, list[YahooDividend]]:
+    """(currency, dividends) from a chart body with `events=div`. A body with no `events`
+    has no dividends on record (an empty list, not an error)."""
+    problem = _error(body)
+    if problem is not None:
+        raise problem
+    result = body["chart"]["result"][0]
+    meta = result.get("meta") or {}
+    events = ((result.get("events") or {}).get("dividends")) or {}
+    out: list[YahooDividend] = []
+    if isinstance(events, dict):
+        for row in events.values():
+            if not isinstance(row, dict):
+                continue
+            stamp = _ts(row.get("date"))
+            amount = _dec(row.get("amount"))
+            if stamp is None or amount is None or amount <= 0:
+                continue
+            out.append(YahooDividend(stamp.date(), amount, dict(row)))
+    out.sort(key=lambda d: d.ex_date)
+    return iso_currency(meta.get("currency")), out
+
+
+async def collect_yahoo_dividends(
+    pool: Any,
+    http: httpx.AsyncClient,
+    *,
+    listing_id: int,
+    symbol: str,
+    yahoo_symbol: str,
+) -> dict[str, int]:
+    """Ten years of dividend events of one listing into `corporate_action` as `suggested`
+    (source `yahoo`). An existing row is never touched, so an owner decision stays."""
+    from steward.sources.governed_http import governed_get
+    from steward.sources.governor import Budget
+
+    response = await governed_get(
+        pool,
+        http,
+        provider="yahoo",
+        endpoint="chart_dividends",
+        url=CHART_URL.format(symbol=yahoo_symbol),
+        params={"range": DIVIDEND_RANGE, "interval": "1mo", "events": "div"},
+        budget=Budget(
+            per_minute=Decimal(DIVIDEND_BUDGET_PER_MINUTE), daily=Decimal(DIVIDEND_BUDGET_DAILY)
+        ),
+    )
+    if response is None:
+        return {"proposals": 0, "new": 0}
+    try:
+        body = response.json()
+    except ValueError as exc:
+        raise YahooError("Yahoo returned no JSON") from exc
+    currency, dividends = parse_dividend_events(body)
+    url = f"{CHART_URL.format(symbol=yahoo_symbol)}?events=div&range={DIVIDEND_RANGE}"
+    stored = 0
+    for d in dividends:
+        status = await pool.fetchval(
+            """insert into public.corporate_action
+               (listing_id,symbol,action_type,ex_date,cash_amount,currency,source,source_url,status,raw)
+               values($1,$2,'cash_dividend',$3,$4,$5,$6,$7,'suggested',$8::jsonb)
+               on conflict(listing_id,action_type,ex_date,source,source_url) do nothing
+               returning status""",
+            listing_id,
+            symbol,
+            d.ex_date,
+            d.amount,
+            currency,
+            DIVIDEND_SOURCE,
+            url,
+            json.dumps(
+                {
+                    "per": "listed_line",
+                    "amount_basis": "split-adjusted by Yahoo",
+                    "provider_row": d.raw,
+                    "provider_currency": currency,
+                    "yahoo_symbol": yahoo_symbol,
+                },
+                default=str,
+            ),
+        )
+        stored += 1 if status else 0
+    return {"proposals": len(dividends), "new": stored}

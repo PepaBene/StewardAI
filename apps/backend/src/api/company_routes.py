@@ -5,6 +5,7 @@ the only writes are the owner's saved peer groups, valuation scenarios and cited
 """
 
 import datetime as dt
+from decimal import Decimal
 from functools import partial
 from typing import Annotated, Any, Literal
 
@@ -17,6 +18,7 @@ from steward.ai import AINotConfigured
 from steward.company import (
     autoevidence,
     evidence,
+    multiple_path,
     ratios,
     report,
     rubric,
@@ -31,12 +33,14 @@ from steward.company.statements import (
     csv_text,
     load_rows,
 )
+from steward.config.checks import load_checks
 from steward.config.jobs import JobsConfig
 from steward.config.store import load_active
 from steward.fx.history import load_fx_history
 from steward.llm.client import create_llm
 from steward.settings import get_settings
 from steward.thesis import draft as thesis_draft
+from steward.valuation import pictures
 
 router = APIRouter(prefix="/companies", tags=["companies"])
 
@@ -550,6 +554,128 @@ async def save_scenarios(
         )
     except service.VersionConflict as err:
         raise HTTPException(status.HTTP_409_CONFLICT, str(err)) from err
+
+
+# --------------------------------------------------------------- multiple path (I6)
+
+
+async def _peer_ratios(pool: Pool, company: service.Company, owner_id: Any) -> ratios.RatiosView:
+    peer_values, label, excluded = await service.peer_values_for(
+        pool, company, "global", owner_id, None
+    )
+    return ratios.build_ratios(
+        company.ticker,
+        company.annual,
+        company.quarterly,
+        company.market,
+        sector=company.sector,
+        industry=company.industry,
+        peers=peer_values,
+        peer_scope=label,
+        peer_excluded=excluded,
+    )
+
+
+@router.get(
+    "/{ticker}/valuation/multiple/defaults", response_model=list[multiple_path.MultipleAssumptions]
+)
+async def multiple_defaults(
+    ticker: TickerPath, pool: Pool, owner: Owner
+) -> list[multiple_path.MultipleAssumptions]:
+    """Bear/base/bull starting inputs seeded from the company's history and its peers."""
+    company = await _company(pool, ticker)
+    view = await _peer_ratios(pool, company, owner.user_id)
+    return multiple_path.default_scenarios(company.annual, view)
+
+
+@router.post("/{ticker}/valuation/multiple", response_model=multiple_path.MultipleValuation)
+async def run_multiple(
+    ticker: TickerPath, body: multiple_path.MultipleRequest, pool: Pool, owner: Owner
+) -> multiple_path.MultipleValuation:
+    """Revenue x margin x exit P/E, discounted: per-year path, calculation chain and the reverse
+    solve (exit P/E and growth that give today's price). Empty `scenarios` uses the defaults."""
+    company = await _company(pool, ticker)
+    view = await _peer_ratios(pool, company, owner.user_id)
+    return multiple_path.build(
+        ticker, company.annual, company.quarterly, company.market, view, body
+    )
+
+
+@router.get("/{ticker}/valuation/multiple/saved", response_model=list[service.SavedMultiple])
+async def list_saved_multiple(
+    ticker: TickerPath, pool: Pool, owner: Owner
+) -> list[service.SavedMultiple]:
+    return await service.list_multiple(pool, owner.user_id, ticker)
+
+
+@router.post(
+    "/{ticker}/valuation/multiple/saved",
+    response_model=service.SavedMultiple,
+    status_code=status.HTTP_201_CREATED,
+)
+async def save_multiple(
+    ticker: TickerPath, body: service.SaveMultipleIn, pool: Pool, owner: Owner
+) -> service.SavedMultiple:
+    """Saves an immutable version of the multiple-path set with the figures it produced."""
+    if not body.request.scenarios:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Save at least one scenario.")
+    company = await _company(pool, ticker)
+    view = await _peer_ratios(pool, company, owner.user_id)
+    result = multiple_path.build(
+        ticker, company.annual, company.quarterly, company.market, view, body.request
+    )
+    try:
+        return await service.save_multiple(
+            pool,
+            owner.user_id,
+            ticker,
+            body,
+            multiple_path.request_hash(body.request, company.annual.input_hash),
+            result.model_dump(mode="json"),
+        )
+    except service.VersionConflict as err:
+        raise HTTPException(status.HTTP_409_CONFLICT, str(err)) from err
+
+
+@router.get("/{ticker}/valuation/multiple/drift", response_model=multiple_path.Drift | None)
+async def multiple_drift(
+    ticker: TickerPath, pool: Pool, owner: Owner
+) -> multiple_path.Drift | None:
+    """Whether the latest saved multiple-path set is stale (age) or drifting (last four quarters
+    against the assumed first-year growth and margin). Null when nothing is saved."""
+    saved = await service.list_multiple(pool, owner.user_id, ticker)
+    if not saved:
+        return None
+    latest = max(saved, key=lambda s: s.created_at)
+    company = await _company(pool, ticker)
+    rules, _ = await load_checks(pool)
+    return multiple_path.drift(
+        latest.assumptions,
+        latest.selected,
+        latest.created_at,
+        company.quarterly,
+        stale_after_days=rules.fair_value.stale_after_days,
+        band=Decimal(str(rules.fair_value.drift_band)),
+        today=dt.date.today(),
+    )
+
+
+@router.get("/{ticker}/valuation/pictures", response_model=pictures.ValuationPictures)
+async def valuation_pictures(
+    ticker: TickerPath,
+    pool: Pool,
+    owner: Owner,
+    scope: Literal["confirmed", "group", "home_market", "global"] = "global",
+    group_id: int | None = None,
+) -> pictures.ValuationPictures:
+    """The key multiple beside peers, inside the sector of the covered universe, against the
+    company's own history and a peer regression (insight I7). Each picture is absent with the
+    reason when the data is too thin."""
+    company = await _company(pool, ticker)
+    rules, _ = await load_checks(pool)
+    return await pictures.valuation_pictures(
+        pool, owner.user_id, company, scope, group_id, min_r2=rules.fair_value.fair_multiple_min_r2
+    )
 
 
 @router.get("/{ticker}/estimates", response_model=evidence.Estimates)

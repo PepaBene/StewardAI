@@ -23,6 +23,7 @@ from steward.xray import (
     supply_chain,
 )
 from steward.xray.benchmark import XrayBenchmark
+from steward.xray.diversification import Diversification
 from steward.xray.exports import xray_csv
 from steward.xray.fund_relative import FundRelative
 from steward.xray.index_weights import IndexComparisons
@@ -106,6 +107,29 @@ async def get_concentration(
     """Top-10, HHI and effective holdings at security, issuer, sector, country and fund level,
     with benchmark-relative over- and underweights where the classification is like-for-like."""
     return concentration_response(await _loaded(pool, owner, as_of))
+
+
+@router.get("/diversification")
+async def get_diversification(pool: Pool, owner: Owner, as_of: AsOf = None) -> Diversification:
+    """Sector to industry to holding flows, revenue by country with its coverage, and the
+    concentration verdict (three largest issuers, effective holdings, the largest name)."""
+    from steward.xray import diversification
+    from steward.xray.metrics import concentration_levels
+    from steward.xray.views import build_view
+
+    loaded = await _loaded(pool, owner, as_of)
+    ctx = service.view_context(loaded)
+    try:
+        revenue = build_view("revenue_country", ctx)
+    except Exception:  # a view that cannot be built is reported as no data, not a 500
+        revenue = None
+    return diversification.build(
+        loaded.day.isoformat(),
+        loaded.leafset,
+        revenue,
+        concentration_levels(loaded.leafset),
+        loaded.notes,
+    )
 
 
 @router.get("/fundamentals")

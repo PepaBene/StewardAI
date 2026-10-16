@@ -10,6 +10,7 @@ from steward.approvals.ai import ai_approvals_handler
 from steward.autopilot.job import autopilot_calibration_handler, autopilot_handler
 from steward.changes.alerts import change_alerts_handler
 from steward.chat.assistant import chat_handler
+from steward.checks.service import checks_refresh_handler
 from steward.disclosure.jobs import (
     disclosure_alerts_handler,
     disclosure_deals_handler,
@@ -19,6 +20,7 @@ from steward.disclosure.jobs import (
     disclosure_ingest_handler,
     disclosure_sources_handler,
 )
+from steward.dividends.service import dividend_forecast_handler
 from steward.earnings.calendar import (
     earnings_calendar_full_handler,
     earnings_calendar_handler,
@@ -66,6 +68,7 @@ from steward.research.web_facts import gap_research_handler
 from steward.retrieval.job import document_index_handler
 from steward.review.monthly import monthly_review_handler
 from steward.sources.audit import source_audit_handler
+from steward.sources.consensus import consensus_snapshot_handler, insight_access_probe_handler
 from steward.sources.fund_probes import fund_probes_handler
 from steward.sources.provider_jobs import (
     alpha_vantage_statements_handler,
@@ -74,10 +77,12 @@ from steward.sources.provider_jobs import (
     epo_patents_handler,
     fmp_company_handler,
     twelve_data_corporate_actions_handler,
+    yahoo_dividends_handler,
 )
 from steward.thesis.job import thesis_handler
 from steward.thesis.review import review_handler
 from steward.valuation.collect import valuation_refresh_handler
+from steward.valuation.fair_value import fair_value_snapshot_handler
 from steward.verify_sources.jobs import (
     raw_retention_handler,
     shadow_report_handler,
@@ -161,6 +166,12 @@ JobType = Literal[
     "watchdog",
     "thesis",
     "portfolio_review",
+    "dividend_forecast",
+    "yahoo_dividends",
+    "consensus_snapshot",
+    "insight_access_probe",
+    "fair_value_snapshot",
+    "checks_refresh",
 ]
 
 JOB_HANDLERS: dict[str, JobHandler] = {
@@ -239,4 +250,10 @@ JOB_HANDLERS: dict[str, JobHandler] = {
     "disclosure_alerts": disclosure_alerts_handler,
     "thesis": thesis_handler,
     "portfolio_review": review_handler,
+    "dividend_forecast": dividend_forecast_handler,
+    "yahoo_dividends": yahoo_dividends_handler,
+    "consensus_snapshot": consensus_snapshot_handler,
+    "insight_access_probe": insight_access_probe_handler,
+    "fair_value_snapshot": fair_value_snapshot_handler,
+    "checks_refresh": checks_refresh_handler,
 }

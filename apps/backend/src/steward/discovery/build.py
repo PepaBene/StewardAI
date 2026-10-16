@@ -53,6 +53,18 @@ class StockInputs:
     # restate earlier years for a split, so it shows a split no corporate action records.
     restated_shares: list[tuple[dt.date, Decimal]] = field(default_factory=list)
     statement_currency: str | None = None
+    # Latest cached company checks (axis -> 0-6 score or None) and failed risk checks; empty when
+    # the issuer has never been checked.
+    check_scores: dict[str, Decimal | None] = field(default_factory=dict)
+    check_risk_flags: int | None = None
+    # Insight I10.5. Annual filed flows by period end (cash-flow statement, absolute values).
+    dividends_paid: list[tuple[dt.date, Decimal]] = field(default_factory=list)
+    buybacks_paid: list[tuple[dt.date, Decimal]] = field(default_factory=list)
+    depreciation: list[tuple[dt.date, Decimal]] = field(default_factory=list)
+    # Split-adjusted dividends per share by trailing year: index 0 is the last 12 months, 1 the
+    # 12 before, ... 5. A year with no confirmed dividend is absent, not zero.
+    dividends_by_year: dict[int, Decimal] = field(default_factory=dict)
+    insider_sellers_90d: int | None = None
 
 
 TRACKING_UNSET = (
@@ -291,6 +303,24 @@ def stock_record(member: UniverseMember, data: StockInputs, as_of: dt.date) -> R
         values["price_to_book"] = _mv(
             market_cap / equity, period_end=pe, basis=basis, source="filed_statements"
         )
+    revenue = inputs.get("revenue")
+    net_income = inputs.get("net_income")
+    if revenue is None or net_income is None:
+        values["net_margin"] = _mv(None, reason="missing revenue or net income", period_end=pe)
+    elif revenue <= 0:
+        values["net_margin"] = _mv(None, reason="n/m: non-positive revenue", period_end=pe)
+    else:
+        values["net_margin"] = _mv(
+            net_income / revenue, period_end=pe, basis=basis, source="filed_statements"
+        )
+    if market_cap is None or revenue is None:
+        values["price_to_sales"] = _mv(None, reason="missing market cap or revenue", period_end=pe)
+    elif revenue <= 0:
+        values["price_to_sales"] = _mv(None, reason="n/m: non-positive revenue", period_end=pe)
+    else:
+        values["price_to_sales"] = _mv(
+            market_cap / revenue, period_end=pe, basis=basis, source="filed_statements"
+        )
 
     # Assets and shares over time.
     assets_now = None
@@ -461,6 +491,25 @@ def stock_record(member: UniverseMember, data: StockInputs, as_of: dt.date) -> R
             fwd, fwd_reason = price[0] / data.forward_eps, None
     values["forward_pe"] = _mv(fwd, reason=fwd_reason, source="published_analyst_consensus")
 
+    _parity(values, data, period, inputs, market_cap, price, pe, basis)
+
+    checked = bool(data.check_scores)
+    for axis in ("value", "future", "past", "health", "dividend"):
+        score = data.check_scores.get(axis)
+        values[f"checks_{axis}_score"] = _mv(
+            score,
+            reason=None
+            if score is not None
+            else "no applicable checks on this axis"
+            if checked
+            else "company checks not computed yet",
+            source="company_check_snapshot",
+        )
+    values["checks_risk_flags"] = _mv(
+        Decimal(data.check_risk_flags) if data.check_risk_flags is not None else None,
+        reason=None if data.check_risk_flags is not None else "company checks not computed yet",
+        source="company_check_snapshot",
+    )
     values["qvm_score"] = _mv(None, reason="not computed until the universe is ranked")
     values["data_coverage"] = _mv(None)
     no_data = None
@@ -477,6 +526,177 @@ def stock_record(member: UniverseMember, data: StockInputs, as_of: dt.date) -> R
         values=values,
         no_data_reason=no_data,
     )
+
+
+def _at(series: Series, period_end: dt.date | None) -> Decimal | None:
+    """The filed annual value for the period ending on `period_end` (within a week)."""
+    if period_end is None:
+        return None
+    hit = nearest(series, period_end, 7)
+    return abs(hit[1]) if hit else None
+
+
+def _parity(
+    values: dict[str, MetricValue],
+    data: StockInputs,
+    period: dict[str, Any] | None,
+    inputs: dict[str, Decimal],
+    market_cap: Decimal | None,
+    price: tuple[Decimal, str] | None,
+    pe: dt.date | None,
+    basis: str | None,
+) -> None:
+    """Insight I10.5 metrics. The cash-flow lines are matched to the same annual period as the
+    other statement metrics; a line that is not filed for that period leaves the metric unknown."""
+    annual = period is not None and _is_annual(period["duration_days"])
+    div = _at(data.dividends_paid, pe) if annual else None
+    buy = _at(data.buybacks_paid, pe) if annual else None
+    kw: dict[str, Any] = {"period_end": pe, "basis": basis, "source": "filed_statements"}
+    no_year = (
+        "latest filed period is not a full fiscal year"
+        if period is not None
+        else "no filed statements"
+    )
+
+    def over_cap(num: Decimal | None, what: str) -> MetricValue:
+        if not annual:
+            return _mv(None, reason=no_year, period_end=pe)
+        if num is None:
+            return _mv(None, reason=f"{what} not filed for the latest fiscal year", period_end=pe)
+        if market_cap is None:
+            return _mv(None, reason=values["market_cap"].reason or "no market cap", period_end=pe)
+        if market_cap <= 0:
+            return _mv(None, reason="n/m: non-positive market cap", period_end=pe)
+        return _mv(num / market_cap, **kw)
+
+    values["buyback_yield"] = over_cap(buy, "share repurchases paid")
+    values["shareholder_yield"] = over_cap(
+        div + buy if div is not None and buy is not None else None,
+        "dividends paid" if div is None else "share repurchases paid",
+    )
+    ni = inputs.get("net_income")
+    if not annual:
+        values["payout_ratio"] = _mv(None, reason=no_year, period_end=pe)
+    elif div is None:
+        values["payout_ratio"] = _mv(
+            None, reason="dividends paid not filed for the latest fiscal year", period_end=pe
+        )
+    elif ni is None or ni <= 0:
+        values["payout_ratio"] = _mv(
+            None, reason="n/m: net income missing or not positive", period_end=pe
+        )
+    else:
+        values["payout_ratio"] = _mv(div / ni, **kw)
+    cfo, capex = inputs.get("cfo"), inputs.get("capex")
+    fcf = cfo - abs(capex) if cfo is not None and capex is not None else None
+    if not annual:
+        values["payout_ratio_fcf"] = _mv(None, reason=no_year, period_end=pe)
+    elif div is None:
+        values["payout_ratio_fcf"] = _mv(
+            None, reason="dividends paid not filed for the latest fiscal year", period_end=pe
+        )
+    elif fcf is None or fcf <= 0:
+        values["payout_ratio_fcf"] = _mv(
+            None, reason="n/m: free cash flow missing or not positive", period_end=pe
+        )
+    else:
+        values["payout_ratio_fcf"] = _mv(div / fcf, **kw)
+
+    da = _at(data.depreciation, pe) if annual else None
+    op, debt, cash = inputs.get("operating_income"), inputs.get("debt"), inputs.get("cash")
+    if is_financial_issuer(data.sector, data.industry):
+        values["net_debt_to_ebitda"] = _mv(
+            None, reason="EBITDA is not meaningful for banks and insurers", period_end=pe
+        )
+    elif not annual:
+        values["net_debt_to_ebitda"] = _mv(None, reason=no_year, period_end=pe)
+    elif op is None or da is None or debt is None or cash is None:
+        values["net_debt_to_ebitda"] = _mv(
+            None,
+            reason="missing operating income, depreciation and amortisation, debt or cash",
+            period_end=pe,
+        )
+    elif op + da <= 0:
+        values["net_debt_to_ebitda"] = _mv(None, reason="n/m: EBITDA not positive", period_end=pe)
+    else:
+        values["net_debt_to_ebitda"] = _mv((debt - cash) / (op + da), **kw)
+
+    by_year = data.dividends_by_year
+    src = "corporate_action (split-adjusted)"
+    if not by_year:
+        why = "no dividend history stored"
+        values["dividend_growth_1y"] = _mv(None, reason=why, source=src)
+        values["dividend_growth_5y"] = _mv(None, reason=why, source=src)
+    else:
+        now = by_year.get(0)
+        for mid, years in (("dividend_growth_1y", 1), ("dividend_growth_5y", 5)):
+            then = by_year.get(years)
+            if now is None:
+                values[mid] = _mv(None, reason="no dividend in the last 12 months", source=src)
+            elif then is None or then <= 0:
+                values[mid] = _mv(
+                    None,
+                    reason=f"no dividend in the 12 months {years} "
+                    f"year{'s' if years > 1 else ''} earlier",
+                    source=src,
+                )
+            elif years == 1:
+                values[mid] = _mv(now / then - ONE, source=src)
+            else:
+                values[mid] = _mv(Decimal(str(float(now / then) ** (1 / years))) - ONE, source=src)
+
+    buyers, sellers = data.insider_buyers_90d, data.insider_sellers_90d
+    if buyers is None:
+        values["insider_buy_ratio_90d"] = _mv(
+            None, reason="no insider filings stored (US issuers only)", source="insider_transaction"
+        )
+    elif buyers + (sellers or 0) == 0:
+        values["insider_buy_ratio_90d"] = _mv(
+            None,
+            reason="no open-market insider buys or sells in 90 days",
+            source="insider_transaction",
+        )
+    else:
+        values["insider_buy_ratio_90d"] = _mv(
+            Decimal(buyers) / Decimal(buyers + (sellers or 0)), source="insider_transaction"
+        )
+
+    shares = data.shares[-1] if data.shares else None
+    if data.forward_eps is None:
+        values["forward_eps_growth"] = _mv(
+            None, reason="estimates source not available", source="published_analyst_consensus"
+        )
+    elif ni is None or shares is None or shares[1] <= 0 or not annual:
+        values["forward_eps_growth"] = _mv(
+            None,
+            reason="no latest annual net income and diluted share count",
+            source="published_analyst_consensus",
+        )
+    elif price is None or (data.forward_currency is not None and data.forward_currency != price[1]):
+        values["forward_eps_growth"] = _mv(
+            None,
+            reason="consensus currency differs from the listing currency",
+            source="published_analyst_consensus",
+        )
+    elif market_cap is None:
+        values["forward_eps_growth"] = _mv(
+            None,
+            reason="statement currency differs from the listing currency",
+            source="published_analyst_consensus",
+        )
+    else:
+        factor, _ = split_factor(shares, data.splits, data.restated_shares)
+        trailing = ni / (shares[1] * factor)
+        if trailing <= 0:
+            values["forward_eps_growth"] = _mv(
+                None, reason="n/m: trailing EPS not positive", source="published_analyst_consensus"
+            )
+        else:
+            values["forward_eps_growth"] = _mv(
+                data.forward_eps / trailing - ONE,
+                period_end=pe,
+                source="published_analyst_consensus",
+            )
 
 
 def finalize_coverage(records: Sequence[Record]) -> None:

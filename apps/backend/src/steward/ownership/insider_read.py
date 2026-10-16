@@ -140,9 +140,62 @@ class JurisdictionCoverage(BaseModel):
     detail: str | None
 
 
+class InsiderMonth(BaseModel):
+    """Open-market discretionary buying and selling in one calendar month (the rows that count
+    toward the headline figure). Values are at reported prices; a month with an unpriced row has
+    `value_complete` false and its values are floors."""
+
+    month: dt.date = Field(description="The first day of the month.")
+    bought_shares: Decimal
+    sold_shares: Decimal
+    bought_value: Decimal
+    sold_value: Decimal
+    net_value: Decimal
+    buys: int
+    sells: int
+    value_complete: bool
+
+
+def monthly(
+    rows: list[dict[str, Any]], counted: list[bool], since: dt.date, until: dt.date
+) -> list[InsiderMonth]:
+    """One entry per calendar month from `since` to `until`, empty months included, so a strip
+    of bars has no gaps."""
+    months: dict[dt.date, dict[str, Any]] = {}
+    cursor = since.replace(day=1)
+    while cursor <= until:
+        months[cursor] = {
+            "bought_shares": Decimal(0), "sold_shares": Decimal(0), "bought_value": Decimal(0),
+            "sold_value": Decimal(0), "buys": 0, "sells": 0, "value_complete": True,
+        }  # fmt: skip
+        cursor = (cursor + dt.timedelta(days=32)).replace(day=1)
+    for row, counts in zip(rows, counted, strict=True):
+        day = row["transaction_date"] or row["filed"]
+        if not counts or day is None:
+            continue
+        entry = months.get(day.replace(day=1))
+        if entry is None:
+            continue
+        buy = row["economic_class"] == "open_market_buy"
+        shares = row["shares"] or Decimal(0)
+        price = row["price_per_share"]
+        side = "bought" if buy else "sold"
+        entry[f"{side}_shares"] += shares
+        entry["buys" if buy else "sells"] += 1
+        if price is None or price <= 0:
+            entry["value_complete"] = False
+        else:
+            entry[f"{side}_value"] += shares * price
+    return [
+        InsiderMonth(month=m, net_value=e["bought_value"] - e["sold_value"], **e)
+        for m, e in sorted(months.items())
+    ]
+
+
 class InsiderActivityOut(BaseModel):
     ticker: str
     net_discretionary: NetDiscretionary
+    monthly: list[InsiderMonth] = Field(default_factory=list)
     transactions: list[InsiderTransactionRow]
     jurisdiction_coverage: list[JurisdictionCoverage]
     limitations: list[str]
@@ -396,6 +449,7 @@ async def holding_insider_activity(
     return InsiderActivityOut(
         ticker=ticker,
         net_discretionary=summary,
+        monthly=monthly(rows, counted, since, until),
         transactions=out,
         jurisdiction_coverage=coverage(uk_access),
         limitations=list(LIMITATIONS),

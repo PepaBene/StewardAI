@@ -39,7 +39,8 @@ export type SettingsKey =
   | "ownership"
   | "valuation"
   | "look_through"
-  | "xbrl";
+  | "xbrl"
+  | "fsds";
 type Settings<S extends SettingsKey> = NonNullable<JobsConfig[S]>;
 
 /** Labels and the backend's default cron per known schedule (apps/backend/src/steward/config/jobs.py). */
@@ -254,8 +255,8 @@ export const SCHEDULES: Record<
   sec_fsds_backfill: {
     label: "SEC statements backfill",
     description:
-      "Backfill statements and notes from the SEC Financial Statement and Notes datasets. Off by default.",
-    cron: "0 4 15 * *",
+      "Reads older statements and notes from the SEC Financial Statement and Notes data sets, a couple of sets a day, newest first, until the history set under SEC statement history is in. After that it reads each new month's set.",
+    cron: "0 4 * * *",
   },
   pdmr_uk: {
     label: "UK director dealings",
@@ -304,6 +305,42 @@ export const SCHEDULES: Record<
     description:
       "Dividends and splits of holdings with a confirmed listing, stored as suggestions for you to confirm. Off by default; also needs the Twelve Data provider enabled.",
     cron: "50 10 * * 6",
+  },
+  yahoo_dividends: {
+    label: "Yahoo dividends",
+    description:
+      "Ten years of dividend events from Yahoo for holdings with a confirmed listing, stored as suggestions and cross-checked against Twelve Data where your plan has it. Keyless; runs daily, a few holdings each time, so every holding is refreshed about weekly.",
+    cron: "20 11 * * *",
+  },
+  dividend_forecast: {
+    label: "Dividend forecast",
+    description:
+      "Confirms dividend events a Trading212 payment matches (when your Checks rule allows it), records each holding's forward schedule and lists events still to confirm under Needs you.",
+    cron: "30 8 * * *",
+  },
+  consensus_snapshot: {
+    label: "Consensus snapshot",
+    description:
+      "Records analyst price targets and stored estimates per holding from the endpoints that passed the access test, daily so the target chart fills in weeks. An endpoint you cannot reach is recorded as such, never as zero.",
+    cron: "40 11 * * *",
+  },
+  insight_access_probe: {
+    label: "Insight access test",
+    description:
+      "Tests the dividend and price-target endpoints with one request each and records the verdict with its date.",
+    cron: "0 11 * * 0",
+  },
+  fair_value_snapshot: {
+    label: "Fair-value history",
+    description:
+      "Records today's fair value of every holding and watchlist name on each basis you have (DCF, multiple path, thesis, peers, consensus). History starts on the first run.",
+    cron: "15 9 * * *",
+  },
+  checks_refresh: {
+    label: "Company checks",
+    description:
+      "Recomputes the five-axis checks and risk checks of every holding and watchlist name, so the scorecard, dividend tiers and screener agree with the company page.",
+    cron: "45 9 * * *",
   },
   ai_approvals: {
     label: "AI approvals",
@@ -893,6 +930,11 @@ export const DEFAULT_JOBS: JobsConfig = {
     quarterly: true,
     read_ads_ratio: true,
     max_document_mb: 40,
+  },
+  fsds: {
+    enabled: true,
+    history_months: 60,
+    datasets_per_run: 2,
   },
 };
 
@@ -2426,6 +2468,35 @@ export const SETTINGS: {
         kind: "int",
         min: 1,
         max: 200,
+      },
+    ],
+  },
+  fsds: {
+    title: "SEC statement history",
+    description:
+      "Older statements of US filers from the SEC Financial Statement and Notes data sets (official). The XBRL job reads only the latest annual and quarterly report, about three fiscal years; this fills in the years before.",
+    fields: [
+      {
+        key: "enabled",
+        label: "Read the SEC data sets",
+        kind: "bool",
+        hint: "Off: the scheduled run does nothing.",
+      },
+      {
+        key: "history_months",
+        label: "History to read (months)",
+        kind: "int",
+        min: 12,
+        max: 180,
+        hint: "Each 10-K carries three years of comparatives: 60 months give about seven fiscal years.",
+      },
+      {
+        key: "datasets_per_run",
+        label: "Data sets per run",
+        kind: "int",
+        min: 1,
+        max: 6,
+        hint: "A quarter's set is 450-650 MB, a month's about 50 MB.",
       },
     ],
   },

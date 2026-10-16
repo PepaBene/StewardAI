@@ -65,6 +65,12 @@ const FULL: JobsConfig = {
   companies_house_filings: { enabled: false, cron: "10 10 * * 6", timezone: "UTC" },
   edinet_filings: { enabled: false, cron: "30 10 * * *", timezone: "UTC" },
   twelve_data_corporate_actions: { enabled: false, cron: "50 10 * * 6", timezone: "UTC" },
+  yahoo_dividends: { enabled: true, cron: "20 11 * * 1", timezone: "UTC" },
+  dividend_forecast: { enabled: false, cron: "31 8 * * *", timezone: "UTC" },
+  consensus_snapshot: { enabled: true, cron: "40 11 * * 1", timezone: "UTC" },
+  insight_access_probe: { enabled: false, cron: "1 11 * * 0", timezone: "UTC" },
+  fair_value_snapshot: { enabled: true, cron: "16 9 * * *", timezone: "UTC" },
+  checks_refresh: { enabled: false, cron: "46 9 * * *", timezone: "UTC" },
   ai_approvals: { enabled: true, cron: "10 7 * * *", timezone: "UTC" },
   autopilot: { enabled: true, cron: "20 */6 * * *", timezone: "UTC" },
   autopilot_calibration: { enabled: true, cron: "40 7 * * 0", timezone: "UTC" },
@@ -284,6 +290,7 @@ const FULL: JobsConfig = {
     keep_snapshots: 4,
   },
   xbrl: { enabled: false, quarterly: false, read_ads_ratio: false, max_document_mb: 20 },
+  fsds: { enabled: false, history_months: 36, datasets_per_run: 3 },
 };
 
 describe("jobs form", () => {

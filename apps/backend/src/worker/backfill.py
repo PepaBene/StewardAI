@@ -11,6 +11,10 @@ just those, so it is also how to run a fetch from your own machine when a site r
 worker's cloud address (investor sites on shared hosting often do):
 
     uv run python -m worker.backfill ir_releases
+
+`--param key=value` (repeatable) is passed to every named job, e.g. one SEC data set:
+
+    uv run python -m worker.backfill sec_fsds_backfill --param quarter=2024q4
 """
 
 import argparse
@@ -97,7 +101,20 @@ async def _run_with_progress(pool: asyncpg.Pool, job_type: str, job_id: int) -> 
     return await task
 
 
-async def backfill(job_types: list[str], ownership_runs: int) -> int:
+def parse_params(pairs: list[str]) -> dict[str, str]:
+    """`["quarter=2024q4", "ticker=KO_US_EQ"]` -> params; a pair without `=` is an error."""
+    params: dict[str, str] = {}
+    for pair in pairs:
+        key, sep, value = pair.partition("=")
+        if not sep or not key.strip():
+            raise ValueError(f"--param needs key=value, got {pair!r}")
+        params[key.strip()] = value.strip()
+    return params
+
+
+async def backfill(
+    job_types: list[str], ownership_runs: int, params: dict[str, str] | None = None
+) -> int:
     settings = get_settings()
     if settings.database_url is None:
         print("DATABASE_URL is not set.", file=sys.stderr)
@@ -126,7 +143,9 @@ async def backfill(job_types: list[str], ownership_runs: int) -> int:
             for run in range(runs):
                 label = f"{job_type} (run {run + 1})" if runs > 1 else job_type
                 started = time.monotonic()
-                job_id = await create_job(pool, job_type, "manual", params=BACKFILL_TAG)
+                job_id = await create_job(
+                    pool, job_type, "manual", params={**(params or {}), **BACKFILL_TAG}
+                )
                 outcome = await _run_with_progress(pool, job_type, job_id)
                 job = await pool.fetchrow("select id, error from public.job where id = $1", job_id)
                 took = time.monotonic() - started
@@ -152,10 +171,21 @@ def main() -> None:
         default=MAX_OWNERSHIP_RUNS,
         help="Most 13F runs; it repeats until the configured history is loaded.",
     )
+    parser.add_argument(
+        "--param",
+        action="append",
+        default=[],
+        metavar="KEY=VALUE",
+        help="A job parameter for every named job (repeatable), e.g. quarter=2024q4.",
+    )
     args = parser.parse_args()
+    try:
+        params = parse_params(args.param)
+    except ValueError as exc:
+        parser.error(str(exc))
     settings = get_settings()
     configure_logging(settings.log_level, settings.secret_values())
-    sys.exit(asyncio.run(backfill(args.job_types, max(1, args.ownership_runs))))
+    sys.exit(asyncio.run(backfill(args.job_types, max(1, args.ownership_runs), params)))
 
 
 if __name__ == "__main__":

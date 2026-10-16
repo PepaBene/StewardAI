@@ -17,6 +17,7 @@ from steward.performance.reports import (
     AttributionResponse,
     LotsResponse,
     PerformanceResponse,
+    PositionsResponse,
     SleevesResponse,
 )
 from steward.performance.settings import PerformanceSettings, load_settings, save_settings
@@ -47,6 +48,14 @@ async def get_lots(pool: Pool, owner: Owner) -> LotsResponse:
     return await service.lots_report(pool, settings)
 
 
+@router.get("/portfolio/performance/positions", tags=["portfolio"])
+async def get_positions(pool: Pool, owner: Owner) -> PositionsResponse:
+    """Open and closed positions per ticker with their transactions (buys, sells, dividends,
+    fees and entered splits), realised and unrealised gain and the annualised return."""
+    settings, _ = await load_settings(pool, owner.user_id)
+    return await service.positions_report(pool, settings)
+
+
 @router.get("/portfolio/performance/attribution", tags=["portfolio"])
 async def get_attribution(
     pool: Pool, owner: Owner, days: Annotated[int, Query(ge=7, le=3650)] = 365
@@ -67,7 +76,7 @@ async def get_sleeves(
     return await service.sleeves_report(pool, settings, years)
 
 
-ExportKind = Literal["ledger", "lots", "realized", "attribution"]
+ExportKind = Literal["ledger", "lots", "realized", "attribution", "closed_positions", "positions"]
 
 
 @router.get("/portfolio/performance/export", tags=["portfolio"], response_class=PlainTextResponse)
@@ -84,6 +93,11 @@ async def export_performance(
         body = exports.ledger_csv(await service.ledger_entries(pool, settings))
     elif kind == "attribution":
         body = exports.attribution_csv(await service.attribution_report(pool, settings, days))
+    elif kind in ("closed_positions", "positions"):
+        positions = await service.positions_report(pool, settings)
+        body = exports.positions_csv(
+            positions.closed if kind == "closed_positions" else [*positions.open, *positions.closed]
+        )
     else:
         report = await service.lots_report(pool, settings)
         body = exports.lots_csv(report) if kind == "lots" else exports.realized_csv(report)

@@ -3,6 +3,9 @@
 import { useMemo, useState } from "react";
 
 import { AlertMessage } from "@/components/alert-message";
+import { WaterfallChart, type WaterfallStep } from "@/components/charts/waterfall";
+import { ChartWithFooter } from "@/components/insight/chart-footer";
+import { formatCompact } from "@/lib/charts/format";
 import { Absent, ResourceGate } from "@/components/company/primitives";
 import { RangeButtons } from "@/components/portfolio/range-buttons";
 import { Blueprint, PanelHeading } from "@/components/ui/blueprint";
@@ -96,6 +99,18 @@ function Body({ data }: { data: AttributionData }) {
     ...Object.entries(b.components).map(([key, value]) => ({ label: COMPONENT_LABEL[key] ?? key, value })),
     { label: "Not assigned", value: b.residual, note: "interest, cash translation and broker rounding the stored data cannot split" },
   ];
+  const fx = b.components.fx ?? 0;
+  const income = b.components.income ?? 0;
+  const fees = b.components.fees ?? 0;
+  const steps: WaterfallStep[] = [
+    { id: "unrealised", label: "Unrealised", value: b.price_unrealised, kind: "delta" },
+    { id: "realised", label: "Realised", value: b.price_realised, kind: "delta" },
+    { id: "income", label: "Dividends", value: income, kind: "delta" },
+    { id: "fx", label: "Currency", value: fx, kind: "delta" },
+    { id: "fees", label: "Fees", value: fees, kind: "delta" },
+    { id: "residual", label: "Not assigned", value: b.residual, kind: "delta", derived: true },
+    { id: "total", label: "Total", value: b.price_unrealised + b.price_realised + income + fx + fees + b.residual, kind: "total" },
+  ];
   const groupNames = Object.keys(data.groups);
   const active = groupNames.includes(dimension) ? dimension : groupNames[0];
   const group = active ? Object.entries(data.groups[active]).sort((a, c) => c[1] - a[1]) : [];
@@ -125,11 +140,25 @@ function Body({ data }: { data: AttributionData }) {
           <div><dt className="text-xs text-text-muted">Value now</dt><dd className="num text-lg font-semibold"><Money value={b.end_value} currency={currency} /></dd></div>
           <div><dt className="text-xs text-text-muted">Bought minus sold</dt><dd className="num text-lg font-semibold"><Money value={b.net_trading} currency={currency} signed /></dd></div>
         </dl>
-        <div className="mt-5">
-          <Bars rows={rows} currency={currency} />
-        </div>
+        <ChartWithFooter
+          className="mt-5"
+          chart={
+            <WaterfallChart
+              steps={steps}
+              width={640}
+              height={220}
+              label={`Where the gain came from, ${currency ?? "base currency"}`}
+              formatValue={(v) => formatCompact(v)}
+            />
+          }
+          table={<Bars rows={rows} currency={currency} />}
+          dataset="Daily position snapshots and fills"
+          asOf={data.end ? formatDate(data.end) : null}
+          source="Trading212 account history"
+          learnHref="/methods/realised_unrealised"
+        />
         <p className="mt-3 text-xs text-text-muted">
-          The parts add up to the gain. “Bought minus sold” is money moved between cash and holdings, so it is not a gain or a loss.
+          The parts add up to the gain. Realised is the price gain on units sold in the window; unrealised is the price move on units still held. “Not assigned” (dashed) is the balancing figure. “Bought minus sold” is money moved between cash and holdings, so it is not a gain or a loss.
           {b.gain.coverage !== null && b.gain.coverage !== undefined && b.gain.coverage < 1
             ? ` ${formatPercent(b.gain.coverage, { decimals: 0 })} of the portfolio's value is attributed.`
             : ""}
@@ -149,6 +178,7 @@ function Body({ data }: { data: AttributionData }) {
               <tr className="bg-surface-muted">
                 <th scope="col" className={TH_LEFT}>Holding</th>
                 <th scope="col" className={TH}>Price</th>
+                <th scope="col" className={TH}>Of which realised</th>
                 <th scope="col" className={TH}>Exchange rate</th>
                 <th scope="col" className={TH}>Dividends</th>
                 <th scope="col" className={TH}>Fees</th>
@@ -167,6 +197,7 @@ function Body({ data }: { data: AttributionData }) {
                   {h.attributed ? (
                     <>
                       <td className={TD}><Money value={h.price} currency={currency} signed decimals={2} /></td>
+                      <td className={TD}>{h.realised ? <Money value={h.realised} currency={currency} signed decimals={2} /> : <span className="text-text-muted">—</span>}</td>
                       <td className={TD}><Money value={h.fx} currency={currency} signed decimals={2} /></td>
                       <td className={TD}><Money value={h.income} currency={currency} signed decimals={2} /></td>
                       <td className={TD}><Money value={h.fees} currency={currency} signed decimals={2} /></td>
@@ -183,7 +214,7 @@ function Body({ data }: { data: AttributionData }) {
                       ) : null}
                     </>
                   ) : (
-                    <td colSpan={data.benchmark ? 7 : 6} className="px-3 py-1.5 text-right"><Absent reason="missing: units changed without a stored fill" /></td>
+                    <td colSpan={data.benchmark ? 8 : 7} className="px-3 py-1.5 text-right"><Absent reason="missing: units changed without a stored fill" /></td>
                   )}
                 </tr>
               ))}

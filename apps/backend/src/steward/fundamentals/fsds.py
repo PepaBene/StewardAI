@@ -4,8 +4,10 @@ The SEC publishes every quarter's XBRL financial statements and notes as a zip o
 tab-separated files (https://www.sec.gov/dera/data/financial-statement-and-notes-data-sets).
 This module reads the documented layout and writes `financial_statement_fact` rows with
 `source='sec_fsds'`, so filings older than the live XBRL job's reach (or its gaps) have the
-same statement history. It is an optional job (`sec_fsds_backfill`, params
-`{"quarter": "2025q3"}` or `{"url": ...}`, optionally `{"ticker": ...}`): nothing schedules it.
+same statement history. The `sec_fsds_backfill` job runs daily: it reads the sets it has not
+read yet, newest first, a couple a run, back `history_months` (Jobs config `fsds`), and keeps
+what it read in `sync_state`; params `{"quarter": "2025q3"}` (or `"2026_09"`) or `{"url": ...}`,
+optionally `{"ticker": ...}`, read one set by hand.
 
 Layout read (names are the SEC's; a column that is absent is treated as empty):
 
@@ -26,20 +28,21 @@ What is kept: standard-taxonomy concepts of the shared statement catalog
 the same classification, fiscal period, reconciliation and lineage as the live path; the one
 check this source cannot run is the companyfacts comparison.
 
-Not verified against a live download (the file was not fetched in development): the file
-extension (`.tsv` in the Notes sets, `.txt` in the older Financial Statement sets, both are
-accepted), the zip file name (`{year}q{n}_notes.zip`), and rare columns. The fixture follows
-the documentation exactly.
+The URLs were checked against the SEC site (2026-10-16); the file contents follow the
+documentation (the fixture does too): `.tsv` in the Notes sets, `.txt` in the older Financial
+Statement sets, both accepted.
 """
 
 from __future__ import annotations
 
+import asyncio
 import contextlib
 import csv
 import dataclasses
 import datetime as dt
 import hashlib
 import io
+import json
 import os
 import tempfile
 import zipfile
@@ -54,6 +57,8 @@ import asyncpg
 import httpx
 
 from steward import __version__
+from steward.config.jobs import FsdsSettings, JobsConfig
+from steward.config.store import load_active
 from steward.fundamentals.statements import (
     StatementFact,
     apply_reconciliation,
@@ -68,6 +73,7 @@ from steward.jobs.runner import JobContext, JobFailed
 from steward.settings import get_settings
 from steward.sources.edgar import pad_cik
 from steward.sources.xbrl_concepts import (
+    ECD_CONCEPTS,
     STATEMENT_CONCEPTS,
     classify,
     currency_of,
@@ -75,16 +81,100 @@ from steward.sources.xbrl_concepts import (
 )
 
 FORMS = {"10-K", "10-K/A", "10-Q", "10-Q/A", "20-F", "20-F/A", "40-F", "40-F/A"}
+# Proxy statements carry only the pay-versus-performance figures (`ECD_CONCEPTS`).
+PROXY_FORMS = {"DEF 14A", "DEF 14A/A"}
 SOURCE = "sec_fsds"
-URL = "https://www.sec.gov/files/dera/data/financial-statement-and-notes-data-sets/{quarter}_notes.zip"
+# One URL for both kinds of set (checked 2026-10-16): `2026_09_notes.zip` for each of the last
+# twelve months, `2025q3_notes.zip` for each quarter before that (the months are consolidated
+# into their quarter once they are a year old).
+URL = "https://www.sec.gov/files/dera/data/financial-statement-notes-data-sets/{quarter}_notes.zip"
 MAX_ZIP_BYTES = 1500 * 1024 * 1024
 TEXT_BLOCK_CAP = 20_000
 EASTERN = ZoneInfo("America/New_York")
 csv.field_size_limit(50_000_000)
 
+# The scheduled backfill's memory of what it loaded (`sync_state`), per data set: the CIKs it was
+# loaded for, so a holding added later gets its history from the sets already read.
+STATE_KEY = "fsds_datasets"
+MONTHLY_SETS = 12
+MISSING_RECHECK = dt.timedelta(days=3)
+MAX_MISSES_PER_RUN = 4
+
+Month = tuple[int, int]
+
 
 class FsdsError(Exception):
-    pass
+    def __init__(self, message: str, status: int | None = None) -> None:
+        super().__init__(message)
+        self.status = status
+
+
+def _month_back(month: Month, n: int) -> Month:
+    total = month[0] * 12 + (month[1] - 1) - n
+    return total // 12, total % 12 + 1
+
+
+def monthly_token(month: Month) -> str:
+    return f"{month[0]}_{month[1]:02d}"
+
+
+def quarterly_token(month: Month) -> str:
+    return f"{month[0]}q{(month[1] - 1) // 3 + 1}"
+
+
+def token_months(token: str) -> list[Month]:
+    """The calendar months a data set covers: one for `2026_09`, three for `2025q3`."""
+    year, sep, rest = token.partition("_")
+    if sep and year.isdigit() and rest.isdigit() and 1 <= int(rest) <= 12:
+        return [(int(year), int(rest))]
+    year, sep, rest = token.partition("q")
+    if sep and year.isdigit() and rest in ("1", "2", "3", "4"):
+        first = (int(rest) - 1) * 3 + 1
+        return [(int(year), first + i) for i in range(3)]
+    raise ValueError(f"not a data set name: {token!r} (2026_09 or 2025q3)")
+
+
+def plan_datasets(
+    today: dt.date,
+    history_months: int,
+    ciks: set[str],
+    loaded: dict[str, set[str]],
+    missing: dict[str, dt.date],
+) -> list[tuple[str, set[str]]]:
+    """The data sets still to read, newest first, each with the CIKs it is needed for.
+
+    The window is the last `history_months` complete months. A month counts as read for a CIK
+    once any loaded set covering it was read for that CIK. A month of the last twelve is read
+    from its monthly set, an older one from its quarter's set; a set that answered 404 within
+    `MISSING_RECHECK` is passed over for the other kind (around the one-year line the SEC may
+    not have consolidated a quarter yet), and skipped when both are missing."""
+    if not ciks:
+        return []
+    newest = _month_back((today.year, today.month), 1)
+    read: dict[Month, set[str]] = {}
+    for token, done in loaded.items():
+        for month in token_months(token):
+            read.setdefault(month, set()).update(done)
+
+    def recently_missing(token: str) -> bool:
+        seen = missing.get(token)
+        return seen is not None and today - seen < MISSING_RECHECK
+
+    plan: dict[str, set[str]] = {}
+    for age in range(history_months):
+        month = _month_back(newest, age)
+        need = ciks - read.get(month, set())
+        if not need:
+            continue
+        preferred, other = (
+            (monthly_token(month), quarterly_token(month))
+            if age < MONTHLY_SETS
+            else (quarterly_token(month), monthly_token(month))
+        )
+        chosen = next((t for t in (preferred, other) if not recently_missing(t)), None)
+        if chosen is not None:
+            plan.setdefault(chosen, set()).update(need)
+    return list(plan.items())
 
 
 def _date(text: str) -> dt.date | None:
@@ -160,7 +250,7 @@ def _concept(tag: str, version: str, custom: bool) -> str | None:
     if custom or "/" not in version:
         return None  # a company extension: version is the accession number
     taxonomy = version.split("/", 1)[0].lower()
-    if taxonomy in ("us-gaap", "ifrs-full", "dei", "srt"):
+    if taxonomy in ("us-gaap", "ifrs-full", "dei", "srt", "ecd"):
         return f"{taxonomy}:{tag}"
     if taxonomy == "ifrs":
         return f"ifrs-full:{tag}"
@@ -193,7 +283,7 @@ def read_filings(
             form = row.get("form", "").strip().upper()
             cik = row.get("cik", "").strip()
             filed = _date(row.get("filed", ""))
-            if form not in FORMS or not cik.isdigit() or filed is None:
+            if form not in FORMS | PROXY_FORMS or not cik.isdigit() or filed is None:
                 continue
             padded = pad_cik(cik)
             if ciks is not None and padded not in ciks:
@@ -214,16 +304,18 @@ def read_filings(
             )
         if not filings:
             return []
-        customs = {
-            (r.get("tag", ""), r.get("version", ""))
-            for r in _rows(archive, "tag")
-            if r.get("custom", "").strip() == "1"
-        }
-        labels = {
-            (r["tag"], r.get("version", "")): r.get("tlabel", "")
-            for r in _rows(archive, "tag")
-            if r.get("tag")
-        }
+        # One pass, standard-taxonomy tags only: an extension's version is its accession (never
+        # kept, see `_concept`), and a quarter's set lists about a million of them.
+        customs: set[tuple[str, str]] = set()
+        labels: dict[tuple[str, str], str] = {}
+        for r in _rows(archive, "tag"):
+            tag, version = r.get("tag", ""), r.get("version", "")
+            if not tag or "/" not in version:
+                continue
+            if r.get("custom", "").strip() == "1":
+                customs.add((tag, version))
+            else:
+                labels[(tag, version)] = r.get("tlabel", "")
         seen: set[tuple[Any, ...]] = set()
         for row in _rows(archive, "num"):
             filing = filings.get(row.get("adsh", "").strip())
@@ -235,7 +327,10 @@ def read_filings(
             if concept is None or end is None or not row.get("qtrs", "").strip().isdigit():
                 continue
             dimensional = _is_dimensional(row)
-            if concept not in STATEMENT_CONCEPTS:
+            if filing.form in PROXY_FORMS:
+                if concept not in ECD_CONCEPTS or dimensional:
+                    continue  # a proxy statement contributes its pay-versus-performance rows only
+            elif concept not in STATEMENT_CONCEPTS:
                 continue  # incl. cover-page facts: those come from the live instance path
             try:
                 value = Decimal(row.get("value", "").strip())
@@ -279,6 +374,8 @@ def read_filings(
             end = _date(row.get("ddate", ""))
             text = row.get("value", "").strip()
             if concept is None or end is None or not text or not is_wanted_text_block(concept):
+                continue
+            if filing.form in PROXY_FORMS:
                 continue
             quarters = int(row["qtrs"]) if row.get("qtrs", "").strip().isdigit() else 0
             dims = {"members": []}
@@ -454,7 +551,9 @@ async def download(http: httpx.AsyncClient, url: str, headers: dict[str, str]) -
         with os.fdopen(handle, "wb") as out:
             async with http.stream("GET", url, headers=headers, follow_redirects=True) as response:
                 if response.status_code != 200:
-                    raise FsdsError(f"{url} returned HTTP {response.status_code}")
+                    raise FsdsError(
+                        f"{url} returned HTTP {response.status_code}", response.status_code
+                    )
                 async for chunk in response.aiter_bytes():
                     size += len(chunk)
                     if size > MAX_ZIP_BYTES:
@@ -466,39 +565,44 @@ async def download(http: httpx.AsyncClient, url: str, headers: dict[str, str]) -
     return Path(name)
 
 
-async def run_fsds_backfill(
-    ctx: JobContext, http: httpx.AsyncClient | None, *, archive: Path | BinaryIO | None = None
-) -> None:
-    """Backfill from one data set. `archive` (tests) replaces the download."""
-    quarter = str(ctx.params.get("quarter") or "")
-    url = str(ctx.params.get("url") or (URL.format(quarter=quarter) if quarter else ""))
-    only = ctx.params.get("ticker")
-    async with ctx.step("select_holdings") as step:
-        rows = await ctx.pool.fetch(
-            """select t212_ticker, cik from public.instrument
-               where cik is not null and ($1::text is null or t212_ticker=$1)""",
-            only if isinstance(only, str) and only else None,
-        )
-        by_cik = {pad_cik(r["cik"]): r["t212_ticker"] for r in rows}
-        step.detail.update(holdings=len(by_cik), source=url or "supplied archive")
-    if not by_cik:
-        return
+async def read_dataset(
+    ctx: JobContext,
+    http: httpx.AsyncClient | None,
+    url: str,
+    by_cik: dict[str, str],
+    label: str,
+    *,
+    archive: Path | BinaryIO | None = None,
+) -> dict[str, int]:
+    """Download (unless `archive` is given), parse and store one data set for `by_cik`.
+    Raises FsdsError with status 404 when the set is not published (its step says so)."""
     temp: Path | None = None
     try:
         if archive is None:
-            if not url:
-                raise JobFailed("params need a quarter ('2025q3') or a url")
             if http is None:
                 raise JobFailed("no HTTP client")
             agent = get_settings().sec_user_agent
             if not agent or "@" not in agent:
                 raise JobFailed("SEC_USER_AGENT must include a contact email address")
-            async with ctx.step("download") as step:
-                temp = await download(http, url, {"User-Agent": agent})
-                step.detail["bytes"] = temp.stat().st_size
+            not_published: FsdsError | None = None
+            async with ctx.step(f"download:{label}") as step:
+                try:
+                    temp = await download(http, url, {"User-Agent": agent})
+                except FsdsError as exc:
+                    if exc.status != 404:
+                        raise
+                    not_published = exc
+                    step.detail["not_published"] = True
+                else:
+                    step.detail["bytes"] = temp.stat().st_size
+            if not_published is not None:
+                raise not_published
             archive = temp
-        async with ctx.step("parse") as step:
-            filings = read_filings(archive, ciks=set(by_cik))
+        assert archive is not None
+        async with ctx.step(f"parse:{label}") as step:
+            # A quarter's num file is gigabytes of rows: parsed off the event loop, so the
+            # worker's heartbeat and alert dispatch keep running meanwhile.
+            filings = await asyncio.to_thread(read_filings, archive, ciks=set(by_cik))
             step.detail["filings"] = len(filings)
         amends = amends_map(filings)
         stored = skipped = failed = 0
@@ -517,27 +621,154 @@ async def run_fsds_backfill(
                     skipped += 1
                 else:
                     stored += 1
-        async with ctx.step("summary") as step:
-            step.detail.update(stored=stored, skipped_live=skipped, failed=failed)
+        return {
+            "filings": len(filings),
+            "stored": stored,
+            "skipped_live": skipped,
+            "failed": failed,
+        }
     finally:
         if temp is not None:
             _remove(temp)
 
 
+async def load_state(pool: asyncpg.Pool) -> tuple[dict[str, set[str]], dict[str, dt.date]]:
+    """(data set -> CIKs it was read for, data set -> date it last answered 404)."""
+    raw = await pool.fetchval("select value from public.sync_state where key = $1", STATE_KEY)
+    value = json.loads(raw) if isinstance(raw, str) else (raw or {})
+    loaded = {
+        token: set(entry.get("ciks") or [])
+        for token, entry in (value.get("loaded") or {}).items()
+        if isinstance(entry, dict)
+    }
+    missing: dict[str, dt.date] = {}
+    for token, day in (value.get("missing") or {}).items():
+        with contextlib.suppress(TypeError, ValueError):
+            missing[token] = dt.date.fromisoformat(str(day))
+    return loaded, missing
+
+
+async def save_state(
+    pool: asyncpg.Pool, loaded: dict[str, set[str]], missing: dict[str, dt.date]
+) -> None:
+    value = {
+        "loaded": {t: {"ciks": sorted(c)} for t, c in sorted(loaded.items())},
+        "missing": {t: d.isoformat() for t, d in sorted(missing.items())},
+    }
+    await pool.execute(
+        "insert into public.sync_state (key, value) values ($1, $2::jsonb)"
+        " on conflict (key) do update set value = excluded.value",
+        STATE_KEY,
+        json.dumps(value),
+    )
+
+
+async def run_fsds_backfill(
+    ctx: JobContext,
+    http: httpx.AsyncClient | None,
+    *,
+    archive: Path | BinaryIO | None = None,
+    settings: FsdsSettings | None = None,
+    today: dt.date | None = None,
+) -> None:
+    """Backfill statement history from the SEC data sets.
+
+    With `{"quarter": "2025q3"}` (or `"2026_09"`), `{"url": ...}` or a supplied `archive`
+    (tests): that one set. Otherwise (the schedule, catch-up): the sets `plan_datasets` still
+    lists, newest first, `datasets_per_run` of them; what was read is kept in `sync_state`."""
+    quarter = str(ctx.params.get("quarter") or "")
+    url_param = str(ctx.params.get("url") or "")
+    only = ctx.params.get("ticker")
+    manual = archive is not None or bool(quarter or url_param)
+    async with ctx.step("select_holdings") as step:
+        rows = await ctx.pool.fetch(
+            """select t212_ticker, cik from public.instrument
+               where cik is not null and ($1::text is null or t212_ticker=$1)""",
+            only if isinstance(only, str) and only else None,
+        )
+        by_cik = {pad_cik(r["cik"]): r["t212_ticker"] for r in rows}
+        step.detail.update(holdings=len(by_cik), mode="one data set" if manual else "planned")
+    if not by_cik:
+        return
+    if manual:
+        url = url_param or (URL.format(quarter=quarter) if quarter else "")
+        result = await read_dataset(ctx, http, url, by_cik, quarter or "dataset", archive=archive)
+        if quarter and archive is None:
+            with contextlib.suppress(ValueError):
+                token_months(quarter)
+                loaded, missing = await load_state(ctx.pool)
+                loaded[quarter] = loaded.get(quarter, set()) | set(by_cik)
+                missing.pop(quarter, None)
+                await save_state(ctx.pool, loaded, missing)
+        async with ctx.step("summary") as step:
+            step.detail.update(result)
+        return
+
+    settings = settings or FsdsSettings()
+    if not settings.enabled:
+        async with ctx.step("summary") as step:
+            step.detail["skipped"] = "the backfill is switched off in the Jobs config"
+        return
+    today = today or dt.datetime.now(dt.UTC).date()
+    loaded, missing = await load_state(ctx.pool)
+    plan = plan_datasets(today, settings.history_months, set(by_cik), loaded, missing)
+    async with ctx.step("plan") as step:
+        step.detail.update(
+            due=len(plan),
+            next=[token for token, _ in plan[:8]],
+            already_read=len(loaded),
+            history_months=settings.history_months,
+        )
+    read: list[str] = []
+    not_published: list[str] = []
+    totals = {"filings": 0, "stored": 0, "skipped_live": 0, "failed": 0}
+    for token, need in plan:
+        if len(read) >= settings.datasets_per_run or len(not_published) >= MAX_MISSES_PER_RUN:
+            break
+        subset = {cik: by_cik[cik] for cik in need}
+        try:
+            result = await read_dataset(ctx, http, URL.format(quarter=token), subset, token)
+        except FsdsError as exc:
+            if exc.status != 404:
+                raise JobFailed(f"{token}: {exc}") from exc
+            missing[token] = today
+            not_published.append(token)
+            await save_state(ctx.pool, loaded, missing)
+            continue
+        loaded[token] = loaded.get(token, set()) | need
+        missing.pop(token, None)
+        read.append(token)
+        for key in totals:
+            totals[key] += result.get(key, 0)
+        await save_state(ctx.pool, loaded, missing)
+    async with ctx.step("summary") as step:
+        step.detail.update(
+            read=read,
+            not_published=not_published,
+            still_due=len(plan) - len(read) - len(not_published),
+            **totals,
+        )
+
+
 async def sec_fsds_backfill_handler(ctx: JobContext) -> None:
+    stored = await load_active(ctx.pool, "jobs", JobsConfig)
+    settings = (stored.body if stored else JobsConfig()).fsds
     async with httpx.AsyncClient(
         timeout=httpx.Timeout(60.0, read=600.0),
         headers={"User-Agent": f"StewardAI/{__version__}"},
         follow_redirects=True,
     ) as http:
-        await run_fsds_backfill(ctx, http)
+        await run_fsds_backfill(ctx, http, settings=settings)
 
 
 __all__ = [
     "FsdsError",
     "FsdsFiling",
     "amends_map",
+    "plan_datasets",
+    "read_dataset",
     "read_filings",
     "run_fsds_backfill",
     "sec_fsds_backfill_handler",
+    "token_months",
 ]

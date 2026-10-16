@@ -692,6 +692,22 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
         },
     },
     {
+        "name": "holding_notes",
+        "description": "Search the owner's own free-text notes on their holdings (newest "
+        "first), optionally for one ticker. The notes are the owner's words, kept exactly as "
+        "written: quote them as theirs, never as findings.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "query": {"type": "string", "description": "Words to find in the notes."},
+                "ticker": {"type": "string"},
+                "limit": {"type": "integer", "description": "At most 20."},
+            },
+            "required": ["query"],
+            "additionalProperties": False,
+        },
+    },
+    {
         "name": "data_freshness",
         "description": "When each research dataset (portfolio snapshot, news, macro, "
         "fundamentals, prices, FX, insider filings, transactions) was last updated, which are "
@@ -983,6 +999,49 @@ class ChatTools:
 
     async def _tool_thesis_and_reports(self, ticker: str) -> dict[str, Any]:
         return await research_tools.thesis_and_reports(self.pool, self.registry, ticker)
+
+    async def _tool_holding_notes(
+        self, query: str, ticker: str | None = None, limit: int = 10
+    ) -> dict[str, Any]:
+        from steward.portfolio.holding_insight import search_notes
+
+        owner = await self._owner()
+        if owner is None:
+            return {"error": "this conversation has no owner"}
+        if not query.strip():
+            return {"error": "bad arguments: query is empty"}
+        notes = await search_notes(
+            self.pool,
+            owner,
+            query.strip(),
+            ticker.upper() if ticker else None,
+            max(1, min(int(limit), 20)),
+        )
+        out = []
+        for n in notes:
+            sid = self.registry.add(
+                "observation",
+                f"holding_note:{n.id}",
+                f"Owner's note on {n.ticker}",
+                app_path=f"/holdings?drawer={n.ticker}&tab=notes",
+                tier=1,
+                snippet=n.body[:500],
+                as_of=n.updated_at.date(),
+            )
+            out.append(
+                {
+                    "source_id": sid,
+                    "id": n.id,
+                    "ticker": n.ticker,
+                    "body": n.body[:2000],
+                    "edited": n.updated_at,
+                }
+            )
+        return {
+            "notes": out,
+            "count": len(out),
+            "note": "The owner's own words, unchanged; they are not verified facts.",
+        }
 
     async def _tool_data_freshness(self) -> dict[str, Any]:
         return await research_tools.data_freshness(self.pool)

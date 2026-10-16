@@ -7,7 +7,6 @@ import { AlertMessage } from "@/components/alert-message";
 import { Absent, ResourceGate, SourceLink } from "@/components/company/primitives";
 import { Blueprint, PanelHeading } from "@/components/ui/blueprint";
 import { getBrowserApiClient } from "@/lib/api/client";
-import { usePageSelection } from "@/lib/chat/page-selection-store";
 import {
   fractionToPercent,
   gridMatrix,
@@ -21,6 +20,8 @@ import {
 import { formatDate } from "@/lib/format";
 import { useApiResource } from "@/lib/hooks/use-api-resource";
 import { cn } from "@/lib/utils";
+
+import type { Headline } from "./multiple-view";
 
 type Draft = {
   name: string;
@@ -330,7 +331,7 @@ function Saved({ ticker, items, onLoad, onSaved, currentRequest }: { ticker: str
   );
 }
 
-export function ValuationView({ ticker }: { ticker: string }) {
+export function DcfView({ ticker, onHeadline }: { ticker: string; onHeadline: (h: Headline | null) => void }) {
   const defaultsFetcher = useCallback(() => getBrowserApiClient().GET("/companies/{ticker}/valuation/defaults", { params: { path: { ticker } } }), [ticker]);
   const { state: defaults } = useApiResource(defaultsFetcher);
   const savedFetcher = useCallback(() => getBrowserApiClient().GET("/companies/{ticker}/valuation/saved", { params: { path: { ticker } } }), [ticker]);
@@ -340,7 +341,7 @@ export function ValuationView({ ticker }: { ticker: string }) {
   const [edited, setDrafts] = useState<Draft[] | null>(null);
   const drafts = edited ?? (defaults.kind === "ok" ? sortScenarios(defaults.data).map(toDraft) : null);
   const [selected, setSelected] = useState<string>("base");
-  usePageSelection(`scenario ${selected}`);
+  const [version, setVersion] = useState<number | null>(null);
   const [result, setResult] = useState<Valuation | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const [running, setRunning] = useState(false);
@@ -358,7 +359,7 @@ export function ValuationView({ ticker }: { ticker: string }) {
   }, [drafts, selected]);
 
   const run = useCallback(
-    async (body?: { scenarios: Assumptions[]; selected: string | null }) => {
+    async (body?: { scenarios: Assumptions[]; selected: string | null }, ver: number | null = null) => {
       const req = body ?? request();
       if (typeof req === "string") {
         setProblem(req);
@@ -373,8 +374,10 @@ export function ValuationView({ ticker }: { ticker: string }) {
         return;
       }
       setResult(data);
+      const s = data.scenarios.find((x) => x.selected) ?? data.scenarios[0];
+      onHeadline(s ? { method: "DCF", scenario: s.name, version: ver, value: toNumber(s.value_per_share.value), currency: data.currency ?? null, price: toNumber(data.price) } : null);
     },
-    [request, ticker],
+    [request, ticker, onHeadline],
   );
 
   useEffect(() => {
@@ -388,7 +391,8 @@ export function ValuationView({ ticker }: { ticker: string }) {
     setDrafts(items.map(toDraft));
     const sel = s.selected ?? "base";
     setSelected(sel);
-    void run({ scenarios: items, selected: sel });
+    setVersion(s.version);
+    void run({ scenarios: items, selected: sel }, s.version);
   }
 
   return (
@@ -405,7 +409,7 @@ export function ValuationView({ ticker }: { ticker: string }) {
                   ))}
                 </div>
                 <div className="flex items-center gap-3">
-                  <button type="button" onClick={() => run()} disabled={running} className="border border-accent bg-surface px-4 py-1.5 text-sm font-semibold hover:bg-surface-muted disabled:opacity-50">
+                  <button type="button" onClick={() => run(undefined, version)} disabled={running} className="border border-accent bg-surface px-4 py-1.5 text-sm font-semibold hover:bg-surface-muted disabled:opacity-50">
                     {running ? "Computing…" : "Compute values"}
                   </button>
                   {problem ? <p role="alert" className="text-sm text-loss">{problem}</p> : null}

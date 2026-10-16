@@ -12,6 +12,8 @@ import { companyHref, formatRatio, toNumber, type Overview, type RatiosView } fr
 import { formatDate } from "@/lib/format";
 import { useApiResource } from "@/lib/hooks/use-api-resource";
 
+import { EarningsSummaryPanel } from "./insight-panels";
+
 const KEY_RATIOS = ["revenue_cagr_3y", "operating_margin", "roic", "fcf_yield", "pe", "net_debt_to_ebitda"] as const;
 
 function KeyRatios({ ticker }: { ticker: string }) {
@@ -270,6 +272,7 @@ export function OverviewView({ ticker }: { ticker: string }) {
         {(o: Overview) => (
           <>
             <KeyRatios ticker={ticker} />
+            <EarningsSummaryPanel ticker={ticker} />
             <div className="grid gap-5 lg:grid-cols-[3fr_2fr]">
               <Profile o={o} />
               <Segments o={o} ticker={ticker} />

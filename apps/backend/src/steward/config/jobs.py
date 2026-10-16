@@ -2332,6 +2332,27 @@ class XbrlSettings(ConfigModel):
     )
 
 
+class FsdsSettings(ConfigModel):
+    """SEC Financial Statement and Notes data sets: the statement history before what the live
+    XBRL job reads (its latest 10-K and 10-Q only, so about three fiscal years)."""
+
+    enabled: bool = True
+    history_months: int = Field(
+        default=60,
+        ge=12,
+        le=180,
+        description="How far back data sets are read. Each 10-K carries three years of "
+        "comparatives, so 60 months give about seven fiscal years of statements.",
+    )
+    datasets_per_run: int = Field(
+        default=2,
+        ge=1,
+        le=6,
+        description="Data sets read per run (a quarter's set is 450-650 MB, a month's about "
+        "50 MB). The first full backfill takes about two weeks at two a day.",
+    )
+
+
 class JobsConfig(ConfigModel):
     """Schedules for the worker's timed jobs. Stored as `config_version` rows, domain `jobs`.
 
@@ -2524,10 +2545,11 @@ class JobsConfig(ConfigModel):
         ),
     )
     sec_fsds_backfill: JobSchedule = Field(
-        default_factory=lambda: JobSchedule(cron="0 4 15 * *", enabled=False),
+        default_factory=lambda: JobSchedule(cron="0 4 * * *"),
         description=(
-            "Backfill statements and notes from the SEC Financial Statement and Notes "
-            "datasets. Off by default."
+            "Backfill statements and notes from the SEC Financial Statement and Notes data "
+            "sets: the sets not read yet, newest first, a couple a run (settings under `fsds`). "
+            "Once the history is in, each run only reads the newest month's set."
         ),
     )
     pdmr_uk: JobSchedule = Field(
@@ -2591,6 +2613,54 @@ class JobsConfig(ConfigModel):
             "suggested corporate actions for the owner to confirm. Runs when TWELVE_DATA_API_KEY "
             "is set. A few holdings per run inside the Basic plan's credits; a plan denial "
             "latches the endpoint as paid-only."
+        ),
+    )
+    yahoo_dividends: JobSchedule = Field(
+        default_factory=lambda: JobSchedule(cron="20 11 * * *"),
+        description=(
+            "Ten years of Yahoo dividend events of holdings with a confirmed listing, stored as "
+            "suggested corporate actions: the keyless dividend source, cross-checked against "
+            "Twelve Data where that endpoint is on the plan. Daily, at most 15 holdings a run, "
+            "stalest first, so each holding is refreshed about weekly."
+        ),
+    )
+    dividend_forecast: JobSchedule = Field(
+        default_factory=lambda: JobSchedule(cron="30 8 * * *"),
+        description=(
+            "Dividend income engine: confirms suggested dividend events that a Trading212 "
+            "payment matches (when the Checks rule allows it), writes each holding's forward "
+            "schedule snapshot and lists events still to confirm under Needs you. Daily 08:30."
+        ),
+    )
+    consensus_snapshot: JobSchedule = Field(
+        default_factory=lambda: JobSchedule(cron="40 11 * * *"),
+        description=(
+            "Analyst consensus price targets and the stored estimates of each holding, from "
+            "the endpoints that passed the access test (FMP, Finnhub, Twelve Data). An endpoint "
+            "that is not accessible is recorded with its access state, never as zero. Daily, so "
+            "the target chart (eight snapshots) and its track record fill in weeks, not months."
+        ),
+    )
+    insight_access_probe: JobSchedule = Field(
+        default_factory=lambda: JobSchedule(cron="0 11 * * 0"),
+        description=(
+            "Access test of the dividend and price-target endpoints the insight features use: "
+            "one governed request each, recording the verdict with its date. Weekly."
+        ),
+    )
+    fair_value_snapshot: JobSchedule = Field(
+        default_factory=lambda: JobSchedule(cron="15 9 * * *"),
+        description=(
+            "Records today's fair value of every holding and watchlist name on each available "
+            "basis (default and saved DCF, multiple path, thesis, peer multiple, consensus). "
+            "History starts on the first run; nothing is back-filled. Daily 09:15."
+        ),
+    )
+    checks_refresh: JobSchedule = Field(
+        default_factory=lambda: JobSchedule(cron="45 9 * * *"),
+        description=(
+            "Recomputes the five-axis checks and risk checks of every holding and watchlist "
+            "name, so the scorecard, dividend tiers and screener read today's results. Daily."
         ),
     )
     valuation_refresh: JobSchedule = Field(
@@ -2760,6 +2830,7 @@ class JobsConfig(ConfigModel):
     valuation: ValuationSettings = Field(default_factory=ValuationSettings)
     look_through: LookThroughSettings = Field(default_factory=LookThroughSettings)
     xbrl: XbrlSettings = Field(default_factory=XbrlSettings)
+    fsds: FsdsSettings = Field(default_factory=FsdsSettings)
 
     def schedules(self) -> dict[str, JobSchedule]:
         return {
@@ -2827,6 +2898,12 @@ class JobsConfig(ConfigModel):
             "disclosure_estimates": self.disclosure_estimates,
             "disclosure_alerts": self.disclosure_alerts,
             "twelve_data_corporate_actions": self.twelve_data_corporate_actions,
+            "yahoo_dividends": self.yahoo_dividends,
+            "dividend_forecast": self.dividend_forecast,
+            "consensus_snapshot": self.consensus_snapshot,
+            "insight_access_probe": self.insight_access_probe,
+            "fair_value_snapshot": self.fair_value_snapshot,
+            "checks_refresh": self.checks_refresh,
             "etf_look_through": self.etf_look_through,
             "sec_xbrl": self.sec_xbrl,
         }

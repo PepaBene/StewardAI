@@ -886,7 +886,7 @@ async def capital_allocation(
     note_repurchased: dict[dt.date, Decimal] = {}
     for r in await pool.fetch(
         """select distinct on (period_end) period_end, value from public.financial_statement_fact
-           where ticker=$1 and statement='note' and value is not null and dimensions = '{}'::jsonb
+           where ticker=$1 and statement='note' and value is not null and coalesce(dimensions->'members', '[]'::jsonb) = '[]'::jsonb
              and concept in ('us-gaap:StockRepurchasedAndRetiredDuringPeriodValue','us-gaap:StockRepurchasedDuringPeriodValue')
              and period_start is not null and period_end - period_start between 330 and 380
            order by period_end, known_at desc""",
@@ -1070,7 +1070,7 @@ async def governance(pool: asyncpg.Pool, ticker: str) -> Governance:
     rp_facts = await pool.fetch(
         """select distinct on (concept) concept, value, currency, period_end
            from public.financial_statement_fact
-           where ticker=$1 and statement='note' and value is not null and dimensions = '{}'::jsonb
+           where ticker=$1 and statement='note' and value is not null and coalesce(dimensions->'members', '[]'::jsonb) = '[]'::jsonb
              and concept = any($2::text[])
            order by concept, period_end desc, known_at desc""",
         ticker,

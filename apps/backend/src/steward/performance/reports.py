@@ -254,6 +254,55 @@ class LotsResponse(BaseModel):
     freshness: FreshnessOut | None = None
 
 
+# --- positions (insight I11.3) -------------------------------------------------------------------
+
+
+class PositionTransactionOut(BaseModel):
+    day: dt.date
+    kind: Literal["buy", "sell", "dividend", "fee", "split"]
+    quantity: float | None
+    price: float | None
+    cash: float = Field(description="Signed cash effect on the account: a buy is negative.")
+    running_quantity: float = Field(description="Units held after this row, in today's units.")
+    note: str | None = None
+
+
+class PositionOut(BaseModel):
+    ticker: str
+    name: str | None
+    status: Literal["open", "closed"]
+    first_trade: dt.date | None
+    last_trade: dt.date | None
+    quantity: float
+    invested: float = Field(description="Cash paid for buys, fees included.")
+    proceeds: float
+    dividends: float
+    fees: float
+    realised_gain: float
+    value: float | None
+    unrealised_gain: float | None
+    total_gain: float | None = Field(description="Realised + unrealised + dividends.")
+    annualised_return: float | None = Field(
+        description="Money-weighted (XIRR) annual return of the holding's own cash flows."
+    )
+    annualised_reason: str | None
+    days_held: int | None
+    transactions: list[PositionTransactionOut]
+    warnings: list[str]
+
+
+class PositionsResponse(BaseModel):
+    status: ReportStatus
+    as_of: dt.date | None
+    currency: str | None
+    open: list[PositionOut]
+    closed: list[PositionOut]
+    closed_realised: float = Field(description="Realised gain over every closed position.")
+    closed_dividends: float
+    warnings: list[str]
+    explain: PerformanceExplain
+
+
 # --- attribution -------------------------------------------------------------------------------
 
 
@@ -267,6 +316,7 @@ class ContributionOut(BaseModel):
     total: float
     pct_of_start: float | None
     attributed: bool
+    realised: float = Field(default=0.0, description="Price effect earned on units sold.")
     benchmark_equivalent: float | None = Field(
         default=None,
         description="What this holding's opening value would have gained in the benchmark.",
@@ -300,6 +350,12 @@ class BridgeOut(BaseModel):
     components: dict[str, float]
     residual: float
     unattributed_tickers: list[str]
+    price_realised: float = Field(
+        default=0.0, description="Part of the price component earned on units sold in the window."
+    )
+    price_unrealised: float = Field(
+        default=0.0, description="Part of the price component on units still held."
+    )
 
 
 class AttributionResponse(BaseModel):

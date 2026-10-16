@@ -128,6 +128,28 @@
   --chart-line: var(--accent);
   --chart-benchmark: #8a919c;
   --chart-grid: rgba(20, 23, 28, 0.08);
+
+  /* Insight layer (insight plan I0.6). Forecast = estimated or analyst figures, always a
+     lighter shade of the history's accent and never shown without an "estimated" label.
+     Fair value = a stepped line over price: its own magenta so it never reads as the price
+     or as a state. Tiers reuse the state roles: low = loss, medium = warning, high = gain.
+     The score mark is a sequential accent ramp; an unscored axis is a gap, never a colour.
+     Validated with the dataviz validator: fair value vs accent passes every check in both
+     themes; forecast is under 3:1 in light, so it always carries a label, an outline and a
+     table twin. */
+  --chart-forecast: #7fa3ff;
+  --chart-fair-value: #b4359b;
+  --tier-low: var(--loss);
+  --tier-low-subtle: var(--loss-subtle);
+  --tier-medium: var(--warning-signal);
+  --tier-medium-subtle: var(--warning-signal-subtle);
+  --tier-high: var(--gain);
+  --tier-high-subtle: var(--gain-subtle);
+  --score-mark-strong: var(--accent-ramp-1);
+  --score-mark: var(--accent-ramp-2);
+  --score-mark-soft: var(--accent-ramp-5);
+  --score-mark-track: var(--surface-muted);
+  --score-mark-gap: var(--text-faint);
 }
 
 .dark {
@@ -205,6 +227,20 @@
   --chart-line: var(--accent);
   --chart-benchmark: #9aa3b1;
   --chart-grid: rgba(232, 235, 240, 0.08);
+
+  --chart-forecast: #9dbaff;
+  --chart-fair-value: #c24fb0;
+  --tier-low: var(--loss);
+  --tier-low-subtle: var(--loss-subtle);
+  --tier-medium: var(--warning-signal);
+  --tier-medium-subtle: var(--warning-signal-subtle);
+  --tier-high: var(--gain);
+  --tier-high-subtle: var(--gain-subtle);
+  --score-mark-strong: var(--accent-ramp-1);
+  --score-mark: var(--accent-ramp-2);
+  --score-mark-soft: var(--accent-ramp-5);
+  --score-mark-track: var(--surface-muted);
+  --score-mark-gap: var(--text-faint);
 }
 
 /* Drop Tailwind's default palette so only token colours exist. */
@@ -284,6 +320,19 @@
   --color-chart-line: var(--chart-line);
   --color-chart-benchmark: var(--chart-benchmark);
   --color-chart-grid: var(--chart-grid);
+  --color-chart-forecast: var(--chart-forecast);
+  --color-chart-fair-value: var(--chart-fair-value);
+  --color-tier-low: var(--tier-low);
+  --color-tier-low-subtle: var(--tier-low-subtle);
+  --color-tier-medium: var(--tier-medium);
+  --color-tier-medium-subtle: var(--tier-medium-subtle);
+  --color-tier-high: var(--tier-high);
+  --color-tier-high-subtle: var(--tier-high-subtle);
+  --color-score-mark-strong: var(--score-mark-strong);
+  --color-score-mark: var(--score-mark);
+  --color-score-mark-soft: var(--score-mark-soft);
+  --color-score-mark-track: var(--score-mark-track);
+  --color-score-mark-gap: var(--score-mark-gap);
 
   /* White stays available for type reversed onto the accent (hero card, primary). */
   --color-white: #ffffff;

@@ -9,6 +9,7 @@ import {
   HistoryIcon,
   IdCardIcon,
   LightbulbIcon,
+  ListChecksIcon,
   MessageSquareTextIcon,
   RssIcon,
   ShieldCheckIcon,
@@ -36,6 +37,7 @@ const ICONS: Record<ConfigNavKey, LucideIcon> = {
   budget: WalletIcon,
   prompts: MessageSquareTextIcon,
   verification: ShieldCheckIcon,
+  checks: ListChecksIcon,
   calendar: CalendarIcon,
   history: HistoryIcon,
 };

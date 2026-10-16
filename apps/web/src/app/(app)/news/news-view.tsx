@@ -50,11 +50,14 @@ import { priceReaction, storyDay, type ClosePoint } from "@/lib/news/price-react
 import { activePreset, healthSummary, PRESETS, presetFilters, sourceBars, storyTime } from "@/lib/news/stats";
 import { appendUnique } from "@/lib/portfolio/transactions";
 import { hostOf, isExternalUrl } from "@/lib/sources/sources";
+import { UpdatesFeedPanel } from "@/components/insight/updates-feed";
 import { cn } from "@/lib/utils";
 
 const PAGE = 50;
 const STATS_DAYS = 14;
 const PRICE_DAYS = 30;
+// The news-like updates; dividends, valuation and risk cards live on the dashboard and Inbox.
+const NEWS_FEED_TYPES = ["news", "earnings", "analyst", "insider"] as const;
 
 type NewsStats = components["schemas"]["NewsStats"];
 type SourcesHealth = components["schemas"]["SourcesHealth"];
@@ -132,6 +135,7 @@ export function NewsView() {
   const [queueError, setQueueError] = useState<string | null>(null);
   const [queueing, setQueueing] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
+  const [feedOpen, setFeedOpen] = useState(false);
   const now = useNow();
   // Only the newest load's answers are applied (filters can change while a page loads).
   const sequence = useRef(0);
@@ -282,6 +286,12 @@ export function NewsView() {
       {queueError ? <AlertMessage title="Not queued">{queueError}</AlertMessage> : null}
 
       <NewsSummary stats={stats} health={health} trust={trust} now={now} />
+
+      <details className="group" onToggle={(e) => setFeedOpen(e.currentTarget.open)}>
+        <summary className="cursor-pointer text-sm text-accent-ink">Updates on your holdings, as typed cards</summary>
+        {/* Mounted on first open so the feed is only fetched when it is read. */}
+        {feedOpen ? <UpdatesFeedPanel className="mt-3" title="Updates on your holdings" limit={20} types={NEWS_FEED_TYPES} /> : null}
+      </details>
 
       <Filters filters={filters} holdings={holdings} onChange={setFilters} />
 

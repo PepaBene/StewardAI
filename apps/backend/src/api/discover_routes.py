@@ -21,6 +21,7 @@ from steward.analytics.contract import input_hash, rounded
 from steward.analytics.versions import version
 from steward.discovery import baselines as bl
 from steward.discovery import build, composite, read
+from steward.discovery import parse as screen_parse
 from steward.discovery.backtest import run_backtest
 from steward.discovery.engine import DiscoveryResult, Missing, Record, run_discovery
 from steward.discovery.export import to_csv
@@ -126,6 +127,13 @@ class MetricInfo(BaseModel):
     needs_provider: str | None = Field(
         default=None,
         description="Optional provider whose key this metric depends on; null = key-free.",
+    )
+    ticks: list[Decimal] | None = Field(
+        default=None,
+        description="Range-slider ticks in the metric's unit, spaced evenly on the slider (non-linear scale).",
+    )
+    aliases: list[str] = Field(
+        default_factory=list, description="Plain-English names the screen parser maps here."
     )
 
 
@@ -288,6 +296,8 @@ async def catalogue(
                 known=cover[m.id],
                 total=len(records),
                 needs_provider=m.needs_provider,
+                ticks=list(m.ticks) if m.ticks else None,
+                aliases=list(m.aliases),
             )
         )
     providers: dict[str, list[str]] = {}
@@ -317,6 +327,38 @@ async def catalogue(
             "forward P/E needs an accessible FMP estimates endpoint. A metric whose source is missing shows as disabled, not as zero."
         ),
     )
+
+
+class ParseRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    text: str = Field(min_length=3, max_length=1000)
+
+
+@router.post("/parse", response_model=screen_parse.ParseResult)
+async def parse_screen_request(
+    body: ParseRequest, pool: Pool, owner: Owner
+) -> screen_parse.ParseResult:
+    """Turn a plain-English request into a screen draft: filters on catalogue metrics, markets,
+    industries, a sort and the phrases that could not be mapped. One budgeted model call (the
+    chat model), cached per request and logged. It never runs the screen."""
+    from steward.ai import AINotConfigured
+    from steward.config.jobs import JobsConfig
+    from steward.config.store import load_active
+    from steward.llm.client import create_llm
+    from steward.settings import get_settings
+
+    jobs = await load_active(pool, "jobs", JobsConfig)
+    model = (jobs.body if jobs else JobsConfig()).chat.model
+    try:
+        llm = create_llm(get_settings())
+    except AINotConfigured as err:
+        raise HTTPException(status.HTTP_409_CONFLICT, str(err)) from err
+    try:
+        return await screen_parse.parse_screen(pool, owner.user_id, body.text, llm=llm, model=model)
+    except screen_parse.ParseBudgetRefused as err:
+        raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, str(err)) from err
+    except screen_parse.ParseUnavailable as err:
+        raise HTTPException(status.HTTP_409_CONFLICT, str(err)) from err
 
 
 @router.post("/stocks", response_model=DiscoveryResult)
@@ -787,6 +829,23 @@ class ScreenSummary(BaseModel):
     latest_version: int
     updated_at: dt.datetime
     definition_hash: str | None = None
+    last_run_at: dt.datetime | None = None
+    last_matched: int | None = Field(
+        default=None, description="Matches recorded by the latest run (first page)."
+    )
+    new_last_7d: int | None = Field(
+        default=None,
+        description="Matches in the latest run that the last run from 7 or more days earlier did not have; null without such a run.",
+    )
+    new_tickers: list[str] = Field(default_factory=list)
+    new_basis: str | None = Field(
+        default=None, description="What the new-match count compares, or why it is absent."
+    )
+    mark: dict[str, Decimal | None] | None = Field(
+        default=None,
+        description="Equal-weight mean of the latest run's members' cached axis scores (0-6); null axes are unknown.",
+    )
+    mark_covered: dict[str, int] | None = None
 
 
 class ScreenVersion(BaseModel):
@@ -830,7 +889,50 @@ async def list_screens(
         owner.user_id,
         kind,
     )
-    return [ScreenSummary(**dict(r)) for r in rows]
+    out = [ScreenSummary(**dict(r)) for r in rows]
+    await _add_run_facts(pool, owner.user_id, out)
+    return out
+
+
+async def _add_run_facts(
+    pool: asyncpg.Pool, owner_id: object, screens: list[ScreenSummary]
+) -> None:
+    """Latest run, new matches against the last run at least 7 days older (insight I10.6) and the
+    members' aggregate score mark (I4.6). Reads stored runs only; nothing is re-run."""
+    from api.check_routes import aggregate_mark
+
+    if not screens:
+        return
+    runs = await pool.fetch(
+        "select screen_id, run_at, matched_tickers, result_count from public.screen_run"
+        " where owner_id=$1 and screen_id = any($2::bigint[]) order by screen_id, run_at desc",
+        owner_id,
+        [s.id for s in screens],
+    )
+    by_screen: dict[int, list[asyncpg.Record]] = {}
+    for r in runs:
+        by_screen.setdefault(r["screen_id"], []).append(r)
+    for s in screens:
+        mine = by_screen.get(s.id, [])
+        if not mine:
+            s.new_basis = "not run yet"
+            continue
+        latest = mine[0]
+        tickers = list(latest["matched_tickers"] or [])
+        s.last_run_at = latest["run_at"]
+        s.last_matched = latest["result_count"]
+        cutoff = latest["run_at"] - dt.timedelta(days=7)
+        older = next((r for r in mine[1:] if r["run_at"] <= cutoff), None)
+        if older is None:
+            s.new_basis = "needs a run from at least 7 days before the latest to compare"
+        else:
+            before = set(older["matched_tickers"] or [])
+            s.new_tickers = sorted(t for t in tickers if t not in before)
+            s.new_last_7d = len(s.new_tickers)
+            s.new_basis = f"against the run of {older['run_at']:%d %b %Y}"
+        if s.kind == "stock" and tickers:
+            m = await aggregate_mark(pool, owner_id, tickers)
+            s.mark, s.mark_covered = m.axes, m.covered
 
 
 @router.post("/screens", response_model=ScreenSummary, status_code=status.HTTP_201_CREATED)
@@ -1084,3 +1186,100 @@ async def delete_column_set(set_id: Annotated[int, Path(ge=1)], pool: Pool, owne
     )
     if result == "DELETE 0":
         raise HTTPException(404, "Column set not found")
+
+
+# ------------------------------------------------------------- starter screens (insight I10.7)
+
+AXES = ("value", "future", "past", "health", "dividend")
+
+
+class TemplateOut(BaseModel):
+    id: str
+    title: str
+    rationale: str
+    filters: list[DiscoverFilter]
+    sort_by: str | None
+    descending: bool
+    matched: int | None = Field(
+        description="Covered stocks passing today; null when a filter is disabled."
+    )
+    mark: dict[str, Decimal | None] = Field(
+        description="Mean checks score (0-6) per axis over the matches that have one; null where none has."
+    )
+    mark_basis: str
+    disabled: list[str] = Field(
+        description="Filters that cannot run on the current data, with the reason."
+    )
+
+
+class TemplatesOut(BaseModel):
+    as_of: dt.date
+    version_id: int | None = Field(
+        description="Saved version of the templates; null while the defaults apply."
+    )
+    templates: list[TemplateOut]
+    note: str = "Starting points written in the screener's own metrics, not recommendations. Edit them in Settings."
+
+
+@router.get("/templates", response_model=TemplatesOut)
+async def screen_templates(pool: Pool, owner: Owner) -> TemplatesOut:
+    """The curated starter screens with how many covered stocks pass each today and the mean
+    score mark of those matches. Reads only; nothing is saved."""
+    from steward.config.screen_templates import ScreenTemplatesConfig
+    from steward.config.store import load_active
+
+    stored = await load_active(pool, "screen_templates", ScreenTemplatesConfig)
+    cfg = stored.body if stored else ScreenTemplatesConfig()
+    day = _today()
+    access = await read.provider_states(pool)
+    members, _ = scope_for_date(await read.load_universe(pool), day, _today())
+    records, _ = await _stock_records(pool, members, day, None, False, access)
+    cover = _coverage(records, STOCK_CATALOGUE)
+    by_key = {r.key: r for r in records}
+    label, definition = UNIVERSE_TEXT["covered"]
+    out: list[TemplateOut] = []
+    for t in cfg.templates:
+        filters = [DiscoverFilter(metric=f.metric, op=f.op, value=f.value) for f in t.filters]
+        problems = validate_filters(
+            filters, STOCK_CATALOGUE, access=access, coverage=cover, total=len(records)
+        )
+        disabled = [f"{p.metric}: {p.message}" for p in problems]
+        matched: int | None = None
+        mark: dict[str, Decimal | None] = dict.fromkeys(AXES)
+        basis = "not run: a filter is disabled"
+        if not disabled:
+            result = run_discovery(
+                records, STOCK_CATALOGUE, filters, kind="stock", as_of=day, universe_key="covered",
+                universe_label=label, universe_definition=definition, limit=200,
+            )  # fmt: skip
+            matched = result.matched
+            keys = [row.key for row in result.rows]
+            for axis in AXES:
+                vals = [
+                    v.value
+                    for k in keys
+                    if (v := by_key[k].values.get(f"checks_{axis}_score")) is not None
+                    and isinstance(v.value, Decimal)
+                ]
+                mark[axis] = (
+                    (sum(vals, Decimal(0)) / len(vals)).quantize(Decimal("0.1")) if vals else None
+                )
+            scored = sum(
+                1
+                for k in keys
+                if isinstance(
+                    (by_key[k].values.get("checks_value_score") or MetricValue()).value, Decimal
+                )
+            )
+            basis = (
+                f"mean of {scored} of {len(keys)} matches with computed checks"
+                if keys
+                else "no covered stock passes today"
+            )
+        out.append(
+            TemplateOut(
+                id=t.id, title=t.title, rationale=t.rationale, filters=filters, sort_by=t.sort_by,
+                descending=t.descending, matched=matched, mark=mark, mark_basis=basis, disabled=disabled,
+            )
+        )  # fmt: skip
+    return TemplatesOut(as_of=day, version_id=stored.id if stored else None, templates=out)

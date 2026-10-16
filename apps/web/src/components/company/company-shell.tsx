@@ -2,9 +2,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { createContext, useCallback, useContext, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useState, type ReactNode } from "react";
 
+import { AllChecksDialog, CheckStateIcon } from "@/components/insight/check-list";
+import { ScoreMark } from "@/components/insight/score-mark";
 import { Blueprint } from "@/components/ui/blueprint";
+import { useCompanyChecks } from "@/lib/insight/checks";
+import { markPetals } from "@/lib/insight/insight";
 import { getBrowserApiClient } from "@/lib/api/client";
 import { companyHref, TABS, toNumber, type Overview } from "@/lib/company/company";
 import { formatDate } from "@/lib/format";
@@ -55,6 +59,7 @@ function Header({ state, ticker }: { state: ResourceState<Overview>; ticker: str
           ) : null}
         </dl>
       </div>
+      <HeaderVerdict ticker={ticker} name={o?.name ?? o?.legal_name ?? ticker} />
       {o && o.listings.length > 1 ? (
         <p className="mt-3 flex flex-wrap items-center gap-2 border-t border-border pt-3 text-sm">
           <span className="text-text-muted">Other listings of this issuer:</span>
@@ -72,6 +77,49 @@ function Header({ state, ticker }: { state: ResourceState<Overview>; ticker: str
         </p>
       ) : null}
     </Blueprint>
+  );
+}
+
+/**
+ * The header's verdict line (insight I4.4): the 64 px score mark, the strongest and weakest axis
+ * in one sentence, up to three rewards and three risks, and "See all checks" opening the modal.
+ */
+function HeaderVerdict({ ticker, name }: { ticker: string; name: string }) {
+  const { state } = useCompanyChecks(ticker);
+  const [open, setOpen] = useState(false);
+  if (state.kind !== "ok") return null;
+  const c = state.data;
+  return (
+    <div className="mt-4 flex flex-col gap-3 border-t border-border pt-4 sm:flex-row sm:items-start">
+      <Link href={companyHref(ticker, "checks")} className="shrink-0 self-start" aria-label="Open the checks">
+        <ScoreMark petals={markPetals(c.axes)} size="header" label={name} />
+      </Link>
+      <div className="min-w-0 flex-1">
+        <p className="text-sm leading-snug">{c.verdict}</p>
+        <div className="mt-2 grid gap-x-6 gap-y-1 text-xs sm:grid-cols-2">
+          <ul className="space-y-1">
+            {c.rewards.slice(0, 3).map((r) => (
+              <li key={r.id} className="flex gap-1.5">
+                <CheckStateIcon state="pass" className="size-3.5" />
+                <span>{r.sentence}</span>
+              </li>
+            ))}
+          </ul>
+          <ul className="space-y-1">
+            {c.risk_highlights.slice(0, 3).map((r) => (
+              <li key={r.id} className="flex gap-1.5">
+                <CheckStateIcon state="fail" className="size-3.5" />
+                <span>{r.sentence}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+        <button type="button" onClick={() => setOpen(true)} className="mt-2 text-xs font-medium text-accent-ink underline underline-offset-2">
+          See all checks
+        </button>
+      </div>
+      <AllChecksDialog checks={c.checks} risks={c.risks} ticker={ticker} name={name} open={open} onClose={() => setOpen(false)} />
+    </div>
   );
 }
 

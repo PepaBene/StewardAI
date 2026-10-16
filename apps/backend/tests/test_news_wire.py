@@ -402,6 +402,27 @@ async def test_refused_page_fails_and_is_not_worked_around() -> None:
     assert result.state == "failed" and result.note
 
 
+async def test_page_timeout_fails_the_article_not_the_job() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/robots.txt":
+            return httpx.Response(404)
+        raise httpx.ReadTimeout("read timed out", request=request)
+
+    async def render(url: str) -> str | None:
+        return ARTICLE_HTML
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        fetcher = PoliteFetcher(client, min_interval=0)
+        timed_out = await acquire_fulltext(
+            "https://news.test/a", FetchPolicy(rungs=[2]), fetcher=fetcher
+        )
+        rescued = await acquire_fulltext(
+            "https://news.test/a", FetchPolicy(rungs=[2, 3]), fetcher=fetcher, render=render
+        )
+    assert timed_out.state == "failed" and "ReadTimeout" in (timed_out.note or "")
+    assert (rescued.state, rescued.rung) == ("full", 3)
+
+
 async def test_browser_rung_runs_only_when_allowed_and_earlier_rungs_failed() -> None:
     rendered: list[str] = []
 

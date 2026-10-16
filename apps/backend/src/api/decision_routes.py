@@ -18,6 +18,7 @@ from steward.decision import rebalance as rb
 from steward.decision import service as svc
 from steward.decision import whatif
 from steward.decision.risk_report import RiskReport, build_report
+from steward.decision.risk_score_view import RiskHeadline
 from steward.decision.series import load_bundle
 from steward.decision.shocks import ShockAssumptions, ShockSet
 from steward.decision.themes import ThemeDefinition, ThemeExposure, theme_exposure
@@ -68,6 +69,47 @@ async def get_risk_report(
     the largest holdings and a diversification benefit. Each figure carries its sample size and is
     withheld below the minimum."""
     return build_report(await load_bundle(pool, days, benchmark), rolling)
+
+
+@router.get("/risk/score")
+async def get_risk_score(
+    pool: Pool,
+    owner: Owner,
+    days: Annotated[int, Query(ge=120, le=1100)] = 365,
+    benchmark: Annotated[str | None, Query(max_length=32)] = None,
+) -> RiskHeadline:
+    """The headline risk score (method `risk_score`) with each input, its market reference and
+    sub-score; metric tiles with a verdict line; per-holding volatility, drawdown and beta; and
+    the holdings that move most and least together. Unknown, with the reason, when an input is
+    missing."""
+    from decimal import Decimal
+
+    from steward.decision.risk_score_view import build_headline, top3_from_weights
+    from steward.xray.metrics import concentration_levels
+
+    bundle = await load_bundle(pool, days, benchmark)
+    report = build_report(bundle)
+    top3: Decimal | None = None
+    basis = "issuer, through funds (X-Ray)"
+    reason: str | None = None
+    try:
+        loaded = await xray_service.load_cached(pool, owner.user_id)
+        issuer = next(
+            (c for c in concentration_levels(loaded.leafset) if c.level == "issuer"), None
+        )
+        # X-Ray weights are shares of the whole portfolio, cash included; the score's references
+        # (and the direct-position fallback) are shares of the invested equity, so rebase.
+        equity = sum(x.weight for x in loaded.leafset.leaves if x.is_equity)
+        if issuer and issuer.top_items and equity > 0:
+            top3 = Decimal(str(sum(i.weight for i in issuer.top_items[:3]) / equity))
+            basis = "issuer, through funds (X-Ray), as a share of the identified equity"
+        else:
+            reason = "no identified equity holdings in the X-Ray"
+    except Exception:
+        top3 = top3_from_weights(dict(bundle.weights))
+        basis = "direct positions (the X-Ray could not be loaded; a fund counts as one holding)"
+        reason = None if top3 is not None else "no position weights stored"
+    return build_headline(bundle, report, top3, basis, reason)
 
 
 # --------------------------------------------------------------------------------- scenarios

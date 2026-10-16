@@ -8,14 +8,17 @@ frontend's TypeScript types.
 from pydantic import BaseModel
 
 from steward.config.budget import BudgetConfig
+from steward.config.checks import ChecksConfig
 from steward.config.event_rules import EventRulesConfig
 from steward.config.holding_profiles import HoldingProfile, HoldingProfilesConfig
+from steward.config.holdings_views import HoldingsViewsConfig
 from steward.config.jobs import JobSchedule, JobsConfig
 from steward.config.news_sources import NewsSourcesConfig
 from steward.config.notifications import NotificationsConfig
 from steward.config.performance import PerformanceSettings
 from steward.config.prompts import PromptsConfig
 from steward.config.research import ResearchProfile, ResearchProfilesConfig
+from steward.config.screen_templates import ScreenTemplatesConfig
 from steward.config.strategy import StrategyConfig
 from steward.config.thesis import ThesesConfig, ThesisConfig, ThesisKPI
 from steward.config.verification import VerificationConfig
@@ -34,14 +37,19 @@ CONFIG_MODELS: dict[str, type[BaseModel]] = {
     "research_profiles": ResearchProfilesConfig,
     "prompts": PromptsConfig,
     "performance": PerformanceSettings,
+    "checks": ChecksConfig,
+    "holdings_views": HoldingsViewsConfig,
+    "screen_templates": ScreenTemplatesConfig,
 }
 
 __all__ = [
     "CONFIG_MODELS",
     "BudgetConfig",
+    "ChecksConfig",
     "EventRulesConfig",
     "HoldingProfile",
     "HoldingProfilesConfig",
+    "HoldingsViewsConfig",
     "JobSchedule",
     "JobsConfig",
     "NewsSourcesConfig",
@@ -49,6 +57,7 @@ __all__ = [
     "PromptsConfig",
     "ResearchProfile",
     "ResearchProfilesConfig",
+    "ScreenTemplatesConfig",
     "StrategyConfig",
     "ThesesConfig",
     "ThesisConfig",

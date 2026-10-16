@@ -239,3 +239,28 @@ counted in the job step.
    `provider_access.state`. Preserve the last good observation in every case.
 4. Never retry a paid/authentication denial until configuration changes. Redact query keys and
    headers from logs and evidence.
+
+## Insight access tests (insight plan I0.2)
+
+Added **2026-10-16**. The dividend engine's second source and the analyst price-target chain may
+only rely on an endpoint whose dated verdict in `provider_access` is `available`. The job
+`insight_access_probe` (manual, or on its configured schedule) sends **one** request per candidate
+with a held symbol, applies the classification in step 3 above, and records the verdict; a latched
+`paid_only` endpoint is not called again. The verdicts are listed on **Data quality → Endpoint
+access verdicts** (`GET /sources/insight-access`) with the date tested, HTTP status and detail.
+
+| Provider / endpoint key | Request shape (secret redacted) | Feeds | Seed state | If it fails |
+| --- | --- | --- | --- | --- |
+| Yahoo `chart_dividends` | `query1.finance.yahoo.com/v8/finance/chart/<symbol>?range=10y&interval=1mo&events=div` through `governed_http` (keyless) | second dividend source: rows go to `corporate_action` as `suggested` with `source='yahoo'` and are cross-checked against Twelve Data | `access_unverified` until the first success | dividend history stays single-source; disagreements cannot be flagged and foreign payers stay `partial` |
+| FMP `price_target_consensus` | `stable/price-target-consensus?symbol=AAPL&apikey=…` | `consensus_snapshot` (high, low, consensus, median; FMP gives no analyst count) | `access_unverified` | consensus is `unavailable` for that holding; the snapshot row records the state, never a zero |
+| Finnhub `price_target` | `api/v1/stock/price-target?symbol=AAPL&token=…` | `consensus_snapshot` with analyst count | `access_unverified` (documented as premium) | a plan denial latches `paid_only` |
+| Twelve Data `price_target` | `price_target?symbol=AAPL&apikey=…` | `consensus_snapshot` | `access_unverified` (documented for higher plans) | a plan denial latches `paid_only` |
+
+The verdict list also shows the existing `twelve_data.corporate_actions` and `fmp.analyst_estimates`
+rows, because the dividend engine and the forward checks read them.
+
+**Verdict as of this commit:** no live account has been probed from this repository, so every row
+above is `access_unverified`. Nothing downstream assumes access: the consensus screens, agreement
+and track-record views show "unavailable" with the recorded state until a `complete` snapshot
+exists, and the dividend engine works from Twelve Data plus the owner's received payments alone.
+After the first probe run, the dated result in `provider_access` supersedes this paragraph.

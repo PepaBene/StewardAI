@@ -46,12 +46,15 @@ export function toNumber(v: Num): number | null {
 
 export const TABS = [
   { slug: "", label: "Overview" },
+  { slug: "checks", label: "Checks" },
   { slug: "financials", label: "Financials" },
+  { slug: "dividends", label: "Dividends" },
   { slug: "ratios", label: "Ratios" },
   { slug: "peers", label: "Peers" },
   { slug: "segments", label: "Segments" },
   { slug: "assessment", label: "Assessment" },
   { slug: "valuation", label: "Valuation" },
+  { slug: "consensus", label: "Analyst targets" },
   { slug: "allocation", label: "Capital allocation" },
   { slug: "estimates", label: "Estimates" },
   { slug: "network", label: "Network and patents" },

@@ -19,6 +19,7 @@ import {
 } from "@/lib/reference/holding-charts";
 import { parseSessions } from "@/lib/reference/price-coverage";
 import { SessionStrip } from "./holding-coverage";
+import { InsiderTimeline } from "./insider-timeline";
 
 function dataOf<T>(state: ResourceState<T>): T | null {
   return state.kind === "ok" ? state.data : state.kind === "error" ? state.previous : null;
@@ -102,6 +103,7 @@ export function InsiderActivityChart({ ticker }: { ticker: string }) {
           </p>
         </>
       )}
+      {raw ? <InsiderTimeline data={raw} /> : null}
     </div>
   );
 }
