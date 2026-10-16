@@ -138,6 +138,8 @@ function IncomeChart({ data }: { data: PortfolioDividends }) {
   const byMonth = useMemo(() => new Map(data.months.map((m) => [m.month, m])), [data.months]);
   const fmt = (v: number) => money(v, ccy, 0);
   const payments = data.months.flatMap((m) => m.payments.map((p) => ({ ...p, month: m.month })));
+  const historyMonths = data.months.filter((m) => m.phase === "history").length;
+  const received = historyMonths === 1 ? "1 month" : `${historyMonths} months`;
   const detail = (bar: ForecastBar) => {
     const month = byMonth.get(bar.key);
     if (!month) return <p className="text-xs text-text-muted">Annual total; switch to Monthly to list payments.</p>;
@@ -163,7 +165,7 @@ function IncomeChart({ data }: { data: PortfolioDividends }) {
   return (
     <Blueprint className="px-[22px] py-4">
       <PanelHeading
-        kicker={`${ccy ?? "Account currency"} · 36 months received, 12 months ahead`}
+        kicker={`${ccy ?? "Account currency"} · ${received} since the first dividend, 12 months ahead`}
         title="Dividend income by month"
         action={
           <div role="group" aria-label="Period" className="flex border border-border text-xs">

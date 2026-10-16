@@ -705,9 +705,12 @@ def build_portfolio(ctx: Context, scores: dict[str, DividendScore]) -> Portfolio
             if k in fut:
                 lines_by_month[k].append(_line(ctx, r))
     current = mx.month_key(today)
+    # History starts at the first dividend: the months before it were not lean, there was no
+    # account (or nothing in it paid yet).
+    first = min((k for k, v in hist.items() if v), default=current)
     months: list[MonthBar] = []
     for k, v in hist.items():
-        if k == current:
+        if k == current or k < first:
             continue
         months.append(MonthBar(month=k, phase="history", received=rounded(v, "money") or ZERO, declared=ZERO, estimated=ZERO,
                                payments=sorted(lines_by_month[k], key=lambda x: x.date)))  # fmt: skip
