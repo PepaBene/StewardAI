@@ -98,6 +98,13 @@ def _places() -> frozenset[str]:
     return frozenset(name.casefold() for name in Locale("en").territories.values())
 
 
+# Short company names that are mostly words in other names ("Man United", "Delta variant",
+# "American Express", "General Motors"): only the full name ("United Airlines") links.
+_AMBIGUOUS_SHORT = frozenset(
+    {"united", "delta", "american", "general", "national", "continental", "southwest",
+     "frontier", "spirit", "alaska", "allegiant", "republic", "royal", "standard", "global"}
+)  # fmt: skip
+
 _PUBLIC_BODY = re.compile(r"\s+(?:governments?|armed forces|army|navy|military|ministry)$", re.I)
 
 
@@ -106,7 +113,7 @@ def names_a_company(term: str) -> bool:
     A place or its state ("Ukraine", "Germany government") is in every story about the place,
     and a common noun ("bottlers") in every story about the trade: neither is linked."""
     text = term.strip()
-    if not any(ch.isupper() for ch in text):
+    if not any(ch.isupper() for ch in text) or text.casefold() in _AMBIGUOUS_SHORT:
         return False
     return _PUBLIC_BODY.sub("", text).casefold() not in _places()
 

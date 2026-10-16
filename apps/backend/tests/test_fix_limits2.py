@@ -348,5 +348,13 @@ def test_places_and_common_nouns_are_not_linked_as_customers_or_rivals() -> None
     assert not names_a_company("Germany government")
     assert not names_a_company("Europe")
     assert not names_a_company("bottlers")
-    for company in ("Rheinmetall", "NATO governments", "Czech Army", "TSMC", "McDonald's"):
+    assert not names_a_company("United")  # "Man United"; "United Airlines" links
+    for company in (
+        "United Airlines",
+        "Rheinmetall",
+        "NATO governments",
+        "Czech Army",
+        "TSMC",
+        "McDonald's",
+    ):
         assert names_a_company(company), company
