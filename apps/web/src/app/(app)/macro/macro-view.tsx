@@ -18,6 +18,8 @@ import { useApiResource } from "@/lib/hooks/use-api-resource";
 import { groupMacro } from "@/lib/macro/groups";
 import { BASIS_LABEL, BASIS_SHORT, indexView, orderSeries, seriesView, type SeriesOrder, type SeriesView } from "@/lib/macro/series";
 
+import { MacroDashboard } from "./macro-dashboard";
+
 const SELECT = "h-9 rounded-control border border-border bg-surface-muted px-2 text-sm text-text focus-visible:border-focus focus-visible:ring-2 focus-visible:ring-focus/30 focus-visible:outline-none";
 
 const ORDERS: readonly { id: SeriesOrder; label: string }[] = [
@@ -27,12 +29,37 @@ const ORDERS: readonly { id: SeriesOrder; label: string }[] = [
 ];
 
 /**
- * Macro series: country and market indicators as small multiples. Each chart draws the latest
- * value against the first value on record, so revisions are visible instead of silently
- * overwritten. Where only one vintage exists the chart says so; it never implies a revision
- * history that was not recorded.
+ * The macro page: the dashboard of every series first; the revision history (which values the
+ * statistics offices later changed) below it, loaded only when opened.
  */
 export function MacroView() {
+  const params = useSearchParams();
+  const [revisions, setRevisions] = useState(params.has("geography") || params.get("view") === "revisions");
+  return (
+    <div className="flex flex-col gap-5">
+      <PageHeader title="Macro" description="Rates, inflation, growth, credit, commodities and currencies, each set against its own one-, five- and ten-year history." />
+      <div className="blueprint px-5 py-5">
+        <BlueprintCorners />
+        <MacroDashboard />
+      </div>
+      <details open={revisions} onToggle={(e) => setRevisions(e.currentTarget.open)} className="blueprint px-5 py-4">
+        <summary className="cursor-pointer text-[15px] font-semibold">Revision history</summary>
+        <p className="mt-1 max-w-[72ch] text-sm text-text-muted">
+          How the first published value of each period compares with the latest, for the series whose publishers keep past versions.
+        </p>
+        {revisions ? <RevisionsView /> : null}
+      </details>
+      <MacroCoverageSummary />
+    </div>
+  );
+}
+
+/**
+ * Revisions: each chart draws the latest value against the first value on record, so revisions
+ * are visible instead of silently overwritten. Where only one vintage exists the chart says so;
+ * it never implies a revision history that was not recorded.
+ */
+function RevisionsView() {
   const [geography, setGeography] = useState(useSearchParams().get("geography") ?? "");
   const [order, setOrder] = useState<SeriesOrder>("recent");
   const [sharedScale, setSharedScale] = useState(false);
@@ -59,18 +86,10 @@ export function MacroView() {
   const anyVintages = views.some((v) => v.hasVintages);
 
   return (
-    <div className="flex flex-col gap-5">
-      <PageHeader
-        title="Macro"
-        description="Indicators for the countries you are exposed to. Each chart sets the latest value against the first value on record, and marks periods that were revised."
-      />
-
-      <section aria-labelledby="macro-heading" className="blueprint space-y-4 px-5 py-5">
-        <BlueprintCorners />
+    <div className="mt-4">
+      <section aria-label="Revisions by series" className="space-y-4">
         <div className="flex flex-wrap items-end gap-4">
-          <h2 id="macro-heading" className="mr-auto text-[22px] leading-tight font-semibold">
-            Revisions by series
-          </h2>
+          <span className="mr-auto" />
           <label className="flex flex-col gap-1 text-xs text-text-muted">
             Country code
             <Input value={geography} onChange={(e) => setGeography(e.target.value)} placeholder="All, or e.g. US, DE" maxLength={16} className="h-9 w-40" />
@@ -140,7 +159,6 @@ export function MacroView() {
           </section>
         ))}
       </section>
-      <MacroCoverageSummary />
     </div>
   );
 }
