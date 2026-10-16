@@ -76,6 +76,9 @@ def configure_logging(level: str = "INFO", secrets: Iterable[str] = ()) -> None:
     # A line per scheduled run ("Running job ...", "executed successfully") says nothing the
     # job table does not; its warnings (a missed run) still show.
     logging.getLogger("apscheduler").setLevel(logging.WARNING)
+    # Likewise a line per outbound HTTP request: hundreds per research run, none of them news.
+    for name in ("httpx", "httpcore"):
+        logging.getLogger(name).setLevel(logging.WARNING)
     # uvicorn installs its own non-propagating stderr handlers before the app is imported: its
     # server log goes through ours instead, and the access log keeps its own, scrubbed too.
     for name in ("uvicorn", "uvicorn.error"):
