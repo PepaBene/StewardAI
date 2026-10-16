@@ -41,6 +41,7 @@ logger = logging.getLogger("steward.thesis")
 Mode = Literal["held", "buy"]
 STANCE_TASK = "thesis_stance"
 MAX_OUTPUT_TOKENS = 12000
+AUTHOR_ATTEMPTS = 2
 
 
 async def _thesis_settings(ctx: JobContext) -> ThesisSettings:
@@ -120,28 +121,40 @@ async def author_from_report(
     usage = Usage(model=cfg.model)
     corrections = await overrides.lessons(pool, "theses", "theses the engine wrote")
     async with ctx.step("author_thesis") as step:
-        try:
-            response = await client.messages.parse(
-                model=cfg.model,
-                system=author.system_for(mode) + ("\n\n" + corrections if corrections else ""),
-                messages=[{"role": "user", "content": prompt}],
-                output_format=author.ThesisDraft,
-                **effort_kwargs(cfg.model, cfg.effort, MAX_OUTPUT_TOKENS),
-            )
-        except LLMError as exc:
-            raise JobFailed(f"the model call failed: {str(exc)[:200]}") from exc
-        usage.add(response.usage)
-        step.usage = usage.step_usage()
-        draft = response.parsed_output
-        if draft is None:
-            raise JobFailed("the model gave no parseable thesis")
         today = dt.datetime.now(dt.UTC).date()
-        try:
-            thesis = author.build_thesis(
-                draft, ticker, pos["currency"], today, today_price=pos["price"], mode=mode
-            )
-        except author.AuthorError as exc:
-            raise JobFailed(f"the thesis was refused: {exc}") from exc
+        ask = prompt
+        # A draft the rules refuse (scenario values out of order, say) is asked for once more
+        # with the reason: the research behind it is already paid for.
+        for attempt in range(AUTHOR_ATTEMPTS):
+            try:
+                response = await client.messages.parse(
+                    model=cfg.model,
+                    system=author.system_for(mode)
+                    + ("\n\n" + corrections if corrections else ""),
+                    messages=[{"role": "user", "content": ask}],
+                    output_format=author.ThesisDraft,
+                    **effort_kwargs(cfg.model, cfg.effort, MAX_OUTPUT_TOKENS),
+                )
+            except LLMError as exc:
+                raise JobFailed(f"the model call failed: {str(exc)[:200]}") from exc
+            usage.add(response.usage)
+            step.usage = usage.step_usage()
+            draft = response.parsed_output
+            if draft is None:
+                raise JobFailed("the model gave no parseable thesis")
+            try:
+                thesis = author.build_thesis(
+                    draft, ticker, pos["currency"], today, today_price=pos["price"], mode=mode
+                )
+                break
+            except author.AuthorError as exc:
+                if attempt + 1 == AUTHOR_ATTEMPTS:
+                    raise JobFailed(f"the thesis was refused: {exc}") from exc
+                step.detail["retried_because"] = str(exc)[:300]
+                ask = (
+                    f"{prompt}\n\nYour previous draft was refused: {exc}. "
+                    "Write the whole thesis again with that fixed."
+                )
         valid = {str(s.get("id")) for s in report.get("sources", [])}
         memo = author.clean_memo(draft, valid)
         version_id = await _save_held(pool, thesis, draft, report_id) if mode == "held" else None

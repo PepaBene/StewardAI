@@ -9,6 +9,7 @@ every figure in the shared envelope so a missing value, a stale one and a zero s
 
 import datetime as dt
 from collections import defaultdict
+from decimal import Decimal
 from typing import Any
 
 import asyncpg
@@ -35,6 +36,15 @@ ACTION_TYPES = (
 
 def _today() -> dt.date:
     return dt.datetime.now(dt.UTC).date()
+
+
+def _plain(value: Any) -> str:
+    """A stored figure in plain digits: a numeric column comes back as a Decimal that prints as
+    "1.286400E+10", which neither the writer nor the claim checker reads as 12,864 million."""
+    if isinstance(value, Decimal):
+        text = format(value, "f")
+        return text.rstrip("0").rstrip(".") if "." in text else text
+    return str(value)
 
 
 def _not_covered(ticker: str) -> dict[str, Any]:
@@ -320,7 +330,10 @@ async def statement_lines(
             f"{ticker} {r['label'] or r['concept']} {r['period_end']}"[:200],
             url=r["source_url"],
             tier=1,
-            snippet=f"{r['concept']} {r['value']} {r['unit']} for period ending {r['period_end']}",
+            snippet=(
+                f"{r['concept']} {_plain(r['value'])} {r['unit']}"
+                f" for period ending {r['period_end']}"
+            ),
             as_of=str(r["known_at"].date()),
         )
         lines.append(
@@ -419,7 +432,7 @@ async def segment_revenue(
             url=r["instance_url"],
             tier=1,
             snippet=(
-                f"{r['label']} ({r['kind']}) {r['value']} {r['unit']} "
+                f"{r['label']} ({r['kind']}) {_plain(r['value'])} {r['unit']} "
                 f"for {r['period_start']}..{r['period_end']}"
             ),
             as_of=str(r["period_end"]),

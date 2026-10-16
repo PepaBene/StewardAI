@@ -31,7 +31,7 @@ from steward.chat import catalog
 from steward.config.research import ResearchProfilesConfig
 from steward.research import ledger, plan, source_policy, untrusted, writer
 from steward.research.sources import CitedSentence, Registry
-from steward.verify.claims import SYSTEM as VERIFIER_SYSTEM
+from steward.verify.claims import RESEARCH_SYSTEM as VERIFIER_SYSTEM
 
 SRC = Path(__file__).resolve().parents[1]
 BACKEND = SRC.parents[1]

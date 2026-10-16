@@ -125,7 +125,7 @@ from steward.thesis.proposal import (
     build_proposal,
     review_thesis,
 )
-from steward.verify.claims import SYSTEM as VERIFIER_SYSTEM
+from steward.verify.claims import RESEARCH_SYSTEM as VERIFIER_SYSTEM
 from steward.verify.claims import (
     Claim,
     ClaimCheckSummary,

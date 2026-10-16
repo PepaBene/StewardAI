@@ -151,7 +151,7 @@ def full_data_calls(ticker: str, name: str) -> list[PlannedCall]:
         ("listing_liquidity", {"ticker": ticker}),
         ("latest_quote", {"ticker": ticker}),
         ("start_size", {"ticker": ticker}),
-        ("risk_history", {}),
+        ("risk_history", {"kind": "ex_ante"}),
         ("stress_test", {}),
         ("performance_explain", {}),
         ("decision_scorecard", {}),
