@@ -7,6 +7,7 @@ requires-python = ">=3.12,<3.13"
 dependencies = [
     "apscheduler>=3.11,<4",
     "asyncpg>=0.31.0",
+    "babel>=2.18.0",
     "fastapi>=0.141.1",
     "feedparser>=6.0.14",
     "fpdf2>=2.8.9",

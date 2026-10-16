@@ -10,6 +10,7 @@ the owner even when the holding is not mentioned. Items that match nothing are d
 import re
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
+from functools import cache
 
 from steward.config.holding_profiles import HoldingProfile
 
@@ -90,6 +91,26 @@ class HoldingTerms:
         return self.names[0] if self.names else self.ticker
 
 
+@cache
+def _places() -> frozenset[str]:
+    from babel import Locale
+
+    return frozenset(name.casefold() for name in Locale("en").territories.values())
+
+
+_PUBLIC_BODY = re.compile(r"\s+(?:governments?|armed forces|army|navy|military|ministry)$", re.I)
+
+
+def names_a_company(term: str) -> bool:
+    """Whether a customer, supplier or competitor term can stand for its company in a story.
+    A place or its state ("Ukraine", "Germany government") is in every story about the place,
+    and a common noun ("bottlers") in every story about the trade: neither is linked."""
+    text = term.strip()
+    if not any(ch.isupper() for ch in text):
+        return False
+    return _PUBLIC_BODY.sub("", text).casefold() not in _places()
+
+
 def holding_terms(
     ticker: str,
     profile: HoldingProfile | None,
@@ -114,9 +135,16 @@ def holding_terms(
         terms.relations = [
             *(("executive", e) for e in profile.executives),
             *(("brand", b) for b in profile.brands),
-            *(("competitor", c) for c in profile.competitors),
-            *(("supplier", s) for s in profile.suppliers),
-            *(("customer", c) for c in profile.customers),
+            *(
+                (via, term)
+                for via, names in (
+                    ("competitor", profile.competitors),
+                    ("supplier", profile.suppliers),
+                    ("customer", profile.customers),
+                )
+                for term in names
+                if names_a_company(term)
+            ),
         ]
         terms.topics = list(profile.watch_topics)
     return terms

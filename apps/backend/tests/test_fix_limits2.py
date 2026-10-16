@@ -339,3 +339,14 @@ def test_a_venue_lei_from_firds_is_not_taken_for_a_foreign_issuer() -> None:
     assert plausible_issuer(
         _lei_entity("Y", "Nu Holdings Ltd.", "KY"), "US67066G1040", "Nu Holdings"
     )
+
+
+def test_places_and_common_nouns_are_not_linked_as_customers_or_rivals() -> None:
+    from steward.news.link import names_a_company
+
+    assert not names_a_company("Ukraine")
+    assert not names_a_company("Germany government")
+    assert not names_a_company("Europe")
+    assert not names_a_company("bottlers")
+    for company in ("Rheinmetall", "NATO governments", "Czech Army", "TSMC", "McDonald's"):
+        assert names_a_company(company), company

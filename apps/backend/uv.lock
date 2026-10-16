@@ -1067,6 +1067,7 @@ source = { editable = "." }
 dependencies = [
     { name = "apscheduler" },
     { name = "asyncpg" },
+    { name = "babel" },
     { name = "fastapi" },
     { name = "feedparser" },
     { name = "fpdf2" },
@@ -1098,6 +1099,7 @@ dev = [
 requires-dist = [
     { name = "apscheduler", specifier = ">=3.11,<4" },
     { name = "asyncpg", specifier = ">=0.31.0" },
+    { name = "babel", specifier = ">=2.18.0" },
     { name = "fastapi", specifier = ">=0.141.1" },
     { name = "feedparser", specifier = ">=6.0.14" },
     { name = "fpdf2", specifier = ">=2.8.9" },
