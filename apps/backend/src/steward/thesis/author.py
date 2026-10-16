@@ -235,7 +235,14 @@ Decide a stance first: keep, add, trim or exit, against the owner's goals, horiz
 and the position's weight. Exit is a legitimate answer: when the report shows the case is weak, \
 the price already assumes too much, or the holding does not fit the strategy, say so in \
 why_owned and stance_reason instead of inventing a reason to hold. Do not favour keeping a \
-position because it is already owned."""
+position because it is already owned.
+
+Rest a trim or exit on what the report shows, not on what it lacks: a broken business trend, a \
+valuation the report computes that the price exceeds, a breached position limit, or the \
+strategy's own rotation rule met by the figures given. A figure the report does not have (no \
+intrinsic value computed, no guidance, a missing filing) is an open question to name and a \
+reason for lower conviction, never by itself a reason to trim or exit. When the evidence is \
+mixed or thin, the stance is keep with low conviction and the open questions listed."""
 
 _BUY_INTRO = """\
 You write the investment thesis for a stock the owner does not hold and is considering buying, \
@@ -273,8 +280,9 @@ trend), not on a round number you like.
 - exit_conditions: plain-words events that end the thesis.
 - pre_mortem: exactly three likeliest reasons the stock loses 40%.
 - scenarios: bear, base and bull value per share in the position's currency with probabilities \
-that add to 1. Anchor them on the report's computed valuation figures and the current price; \
-never use a number the report does not support.
+that add to 1, with bear strictly below base and base strictly below bull (even for an exit: \
+the bear case is the lowest value, whatever the stance). Anchor them on the report's computed \
+valuation figures and the current price; never use a number the report does not support.
 - sell_target above buy_target, both in the same currency; leave one out if the report gives no \
 basis for it.
 - conviction 1 to 5 and the main reason; review_in_months by how fast the facts change.

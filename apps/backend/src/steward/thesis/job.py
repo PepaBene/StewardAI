@@ -129,8 +129,7 @@ async def author_from_report(
             try:
                 response = await client.messages.parse(
                     model=cfg.model,
-                    system=author.system_for(mode)
-                    + ("\n\n" + corrections if corrections else ""),
+                    system=author.system_for(mode) + ("\n\n" + corrections if corrections else ""),
                     messages=[{"role": "user", "content": ask}],
                     output_format=author.ThesisDraft,
                     **effort_kwargs(cfg.model, cfg.effort, MAX_OUTPUT_TOKENS),
@@ -152,7 +151,8 @@ async def author_from_report(
                     raise JobFailed(f"the thesis was refused: {exc}") from exc
                 step.detail["retried_because"] = str(exc)[:300]
                 ask = (
-                    f"{prompt}\n\nYour previous draft was refused: {exc}. "
+                    f"{prompt}\n\nYour previous draft was refused: {exc}. Its scenarios were "
+                    f"{draft.scenarios.model_dump_json()}. "
                     "Write the whole thesis again with that fixed."
                 )
         valid = {str(s.get("id")) for s in report.get("sources", [])}
