@@ -111,8 +111,15 @@ def peer_cand(
 ) -> Candidate:
     own = {"cik": 1, "title": "Acme Corp"}
     info = {"cik": kw.pop("cik", 2), "title": title}
-    row = {"id": 9, "ticker": "ACME_US_EQ", "peer_ticker": "RIVL"}
+    row = {"id": 9, "ticker": "ACME_US_EQ", "peer_ticker": kw.pop("peer", "RIVL")}
     return approvals.peer_candidate(row, PROFILE, own, info, sic, own_sic, kw.pop("have", ["BETA"]))
+
+
+def test_a_peer_off_the_sec_list_is_the_holding_when_its_symbol_is_the_holdings() -> None:
+    home = approvals.peer_rule(peer_cand(cik=None, sic=None, peer="ACME.AS"))
+    assert home is not None and home.decision == "reject"
+    assert approvals.peer_rule(peer_cand(cik=None, sic=None, peer="ACM.AS")) is None
+    assert approvals.peer_rule(peer_cand(cik=None, sic=None, peer="2330.TW")) is None
 
 
 def test_peer_candidate_prompt_and_evidence() -> None:
