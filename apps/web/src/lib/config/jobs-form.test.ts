@@ -65,6 +65,7 @@ const FULL: JobsConfig = {
   companies_house_filings: { enabled: false, cron: "10 10 * * 6", timezone: "UTC" },
   edinet_filings: { enabled: false, cron: "30 10 * * *", timezone: "UTC" },
   twelve_data_corporate_actions: { enabled: false, cron: "50 10 * * 6", timezone: "UTC" },
+  yahoo_dividends: { enabled: true, cron: "20 11 * * 1", timezone: "UTC" },
   ai_approvals: { enabled: true, cron: "10 7 * * *", timezone: "UTC" },
   autopilot: { enabled: true, cron: "20 */6 * * *", timezone: "UTC" },
   autopilot_calibration: { enabled: true, cron: "40 7 * * 0", timezone: "UTC" },

@@ -23858,6 +23858,8 @@ export interface components {
             edinet_filings?: components["schemas"]["JobSchedule"];
             /** @description Twelve Data dividends and splits of holdings with a confirmed listing, stored as suggested corporate actions for the owner to confirm. Runs when TWELVE_DATA_API_KEY is set. A few holdings per run inside the Basic plan's credits; a plan denial latches the endpoint as paid-only. */
             twelve_data_corporate_actions?: components["schemas"]["JobSchedule"];
+            /** @description Ten years of Yahoo dividend events of holdings with a confirmed listing, stored as suggested corporate actions: the keyless dividend source, cross-checked against Twelve Data where that endpoint is on the plan. Daily, at most 15 holdings a run, stalest first, so each holding is refreshed about weekly. */
+            yahoo_dividends?: components["schemas"]["JobSchedule"];
             /** @description Fundamentals (SEC XBRL, ESEF) of holdings that filed since the last read (all of them weekly) and the ETF providers' fund P/E and P/B. Default: daily 07:45. */
             valuation_refresh?: components["schemas"]["JobSchedule"];
             /** @description ETF look-through: the funds' holdings from iShares and Vanguard, skipped when the as-of date has not moved. Default: Saturdays 06:40. */
