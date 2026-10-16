@@ -76,7 +76,7 @@ export function HoldersByHolding() {
         </>
       ) : null}
 
-      {data && data.uncovered.length > 0 ? (
+      {data?.uncovered && data.uncovered.length > 0 ? (
         <p className="text-xs text-text-muted">
           {`Not covered by Form 13F (listed outside the US, or a European fund): ${data.uncovered.map(shortTicker).join(", ")}.`}
         </p>
@@ -91,7 +91,7 @@ export function HoldersByHolding() {
 
 function HoldingRow({ holding: h, scale }: { holding: Holding; scale: number }) {
   const net = netHolders(h);
-  const moves = orderMoves(h.tracked);
+  const moves = orderMoves(h.tracked ?? []);
   const moved = moves.filter((m) => m.change !== "unchanged" && m.change !== "unknown");
   const still = moves.filter((m) => m.change === "unchanged");
   return (

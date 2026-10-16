@@ -215,6 +215,8 @@ export function DisclosuresView() {
         </p>
       ) : null}
 
+      {!sample ? <PortfolioSummary issuers={live.length} /> : null}
+
       {!sample && live.length > 1 ? (
         <label className="flex items-center gap-2 text-sm">
           <span className="font-medium">Show company</span>
@@ -237,14 +239,6 @@ export function DisclosuresView() {
           </select>
         </label>
       ) : null}
-
-      {!sample && issuer ? (
-        <Panel id="ingest" title="Ingest filings" description="Fetch this company’s newest annual and quarterly filings now. Each filing’s result, including gaps and failures, is listed.">
-          <IngestFilings key={issuer.issuer_id} issuerId={issuer.issuer_id} issuerName={issuer.display_name} onDone={() => issuers.reload()} />
-        </Panel>
-      ) : null}
-
-      {!sample ? <PortfolioSummary issuers={live.length} /> : null}
 
       <SectionNav sections={SECTIONS} />
 
@@ -294,6 +288,16 @@ export function DisclosuresView() {
           <p className="text-sm text-text-muted">Loading statements…</p>
         ) : null}
       </Panel>
+
+      {!sample && issuer ? (
+        <details className="blueprint px-5 py-4">
+          <summary className="cursor-pointer text-[15px] font-semibold">Fetch {issuer.display_name}’s newest filings now</summary>
+          <p className="mt-1 mb-3 max-w-[72ch] text-sm text-text-muted">
+            The filings job does this on its schedule. Run it by hand only to pick up a filing published since. Each filing’s result, including gaps and failures, is listed.
+          </p>
+          <IngestFilings key={issuer.issuer_id} issuerId={issuer.issuer_id} issuerName={issuer.display_name} onDone={() => issuers.reload()} />
+        </details>
+      ) : null}
 
       <Panel id="coverage" title="Coverage" description={`What we could and could not read, as of ${formatDay(new Date(cutoff).toISOString())}. A gap is named, not hidden.`}>
         <CoverageRibbon coverage={view.coverage} />

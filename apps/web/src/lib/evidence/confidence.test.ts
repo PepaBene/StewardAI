@@ -11,6 +11,7 @@ import {
   formatObserved,
   formatTarget,
   humanizeMetric,
+  metricLabel,
   isLongStandingVerified,
   tallyConfidence,
   tallyConfidenceLabel,
@@ -64,6 +65,10 @@ describe("formatting", () => {
     expect(formatObserved(null, "%")).toBe("—");
     expect(humanizeMetric("revenue_growth_yoy")).toBe("Revenue growth YoY");
     expect(humanizeMetric("eps_diluted")).toBe("EPS diluted");
+    expect(metricLabel("concept:us-gaap:ResearchAndDevelopmentExpense")).toBe("Research and development expense");
+    expect(metricLabel("concept:us-gaap:ConcentrationRiskPercentage1")).toBe("Concentration risk percentage");
+    expect(metricLabel("concept:ifrs-full:EBITDAMargin")).toBe("EBITDA margin");
+    expect(metricLabel("cost_of_revenue")).toBe("Cost of revenue");
   });
 });
 

@@ -1,9 +1,11 @@
 "use client";
 
 import { AlertTriangleIcon, BanIcon, CheckCircle2Icon, CircleDashedIcon, ClockIcon, ExternalLinkIcon, HelpCircleIcon, LockIcon, SearchXIcon } from "lucide-react";
+import { useState } from "react";
 
 import { callApi, DecisionForm } from "@/app/(app)/relationships/decision-form";
 import { getBrowserApiClient } from "@/lib/api/client";
+import { metricLabel } from "@/lib/evidence/confidence";
 import {
   COVERAGE_STATES,
   coverageInfo,
@@ -88,7 +90,7 @@ export function CoverageRibbon({ coverage }: { coverage: readonly Coverage[] }) 
           <tbody>
             {coverage.map((c, i) => (
               <tr key={`${c.metric}-${c.period}-${i}`} className="border-b border-border-soft align-top">
-                <td className="py-1.5 pr-3">{c.metric}</td>
+                <td className="py-1.5 pr-3">{metricLabel(c.metric)}</td>
                 <td className="num py-1.5 pr-3">{c.period}</td>
                 <td className="py-1.5 pr-3"><StateBadge state={c.state} /></td>
                 <td className="py-1.5 pr-3 text-text-muted">{c.reason || coverageInfo(c.state).help}</td>
@@ -105,12 +107,17 @@ export function CoverageRibbon({ coverage }: { coverage: readonly Coverage[] }) 
 // -------------------------------------------------------------------------------------- filings
 const STATUS_LABEL = { current: "Current", superseded: "Replaced", amendment: "Amendment", quarantined: "Could not be read" } as const;
 
-export function FilingsTable({ filings, selectedId, onSelect }: { filings: readonly Filing[]; selectedId: number | null; onSelect: (id: number) => void }) {
-  if (filings.length === 0) {
+export function FilingsTable({ filings: all, selectedId, onSelect }: { filings: readonly Filing[]; selectedId: number | null; onSelect: (id: number) => void }) {
+  // Earlier reads of a filing the same document later replaced are kept for the replay, but
+  // listed only on request: five rows of one 8-K read five times say nothing new.
+  const [showReplaced, setShowReplaced] = useState(false);
+  if (all.length === 0) {
     return <p className="text-sm text-text-muted">Nothing had been published for this issuer by the chosen date.</p>;
   }
+  const replaced = all.filter((f) => f.superseded_by_id != null && f.version_id !== selectedId).length;
+  const filings = showReplaced ? all : all.filter((f) => f.superseded_by_id == null || f.version_id === selectedId);
   return (
-    <div className="overflow-x-auto">
+    <div className="space-y-2 overflow-x-auto">
       <table className="w-full min-w-[640px] border-collapse text-sm">
         <caption className="sr-only">Filings known at the chosen date, newest first</caption>
         <thead>
@@ -145,6 +152,11 @@ export function FilingsTable({ filings, selectedId, onSelect }: { filings: reado
           ))}
         </tbody>
       </table>
+      {replaced > 0 ? (
+        <button type="button" onClick={() => setShowReplaced((v) => !v)} className="text-xs text-accent-ink hover:underline">
+          {showReplaced ? "Hide earlier reads" : `Show ${replaced} earlier ${replaced === 1 ? "read" : "reads"} of these filings`}
+        </button>
+      ) : null}
     </div>
   );
 }
@@ -180,12 +192,22 @@ export function DatesTable({ filing }: { filing: Filing }) {
 }
 
 // ------------------------------------------------------------------------------------ values
-export function ValuesTable({ observations, claims, onEvidence }: { observations: readonly Observation[]; claims: readonly Claim[]; onEvidence: (kind: "observation" | "claim", id: number) => void }) {
-  if (observations.length === 0 && claims.length === 0) {
+const VALUES_SHOWN = 15;
+
+export function ValuesTable({ observations: allObservations, claims, onEvidence }: { observations: readonly Observation[]; claims: readonly Claim[]; onEvidence: (kind: "observation" | "claim", id: number) => void }) {
+  const [all, setAll] = useState(false);
+  if (allObservations.length === 0 && claims.length === 0) {
     return <p className="text-sm text-text-muted">No values or relationships had been read by the chosen date.</p>;
   }
+  // The headline line items (revenue, net income...) before the long tail of raw XBRL concepts,
+  // each newest period first; the rest on request.
+  const ordered = [...allObservations].sort(
+    (a, b) => Number(a.metric.startsWith("concept:")) - Number(b.metric.startsWith("concept:")) || (b.period_end ?? "").localeCompare(a.period_end ?? ""),
+  );
+  const observations = all ? ordered : ordered.slice(0, VALUES_SHOWN);
+  const hidden = ordered.length - observations.length;
   return (
-    <div className="overflow-x-auto">
+    <div className="space-y-2 overflow-x-auto">
       <table className="w-full min-w-[640px] border-collapse text-sm">
         <caption className="sr-only">Values and relationships known at the chosen date</caption>
         <thead>
@@ -200,8 +222,8 @@ export function ValuesTable({ observations, claims, onEvidence }: { observations
         <tbody>
           {observations.map((o) => (
             <tr key={`o${o.id}`} className="border-b border-border-soft align-top">
-              <th scope="row" className="py-1.5 pr-3 text-left font-medium">
-                {o.metric}
+              <th scope="row" className="py-1.5 pr-3 text-left font-medium" title={o.metric}>
+                {metricLabel(o.metric)}
                 {o.segment ? <span className="block text-xs font-normal text-text-muted">{o.segment}</span> : null}
               </th>
               <td className="num py-1.5 pr-3 whitespace-nowrap">{o.period_end ?? "—"}</td>
@@ -232,6 +254,11 @@ export function ValuesTable({ observations, claims, onEvidence }: { observations
           ))}
         </tbody>
       </table>
+      {hidden > 0 || all ? (
+        <button type="button" onClick={() => setAll((v) => !v)} className="text-xs text-accent-ink hover:underline">
+          {all ? "Show the main line items only" : `Show ${hidden} more values`}
+        </button>
+      ) : null}
     </div>
   );
 }

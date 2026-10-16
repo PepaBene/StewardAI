@@ -140,6 +140,22 @@ const ACRONYMS: Record<string, string> = {
   ttm: "TTM",
 };
 
+/**
+ * A stored disclosure metric for a reader: "concept:us-gaap:ResearchAndDevelopmentExpense" ->
+ * "Research and development expense", "cost_of_revenue" -> "Cost of revenue".
+ */
+export function metricLabel(metric: string): string {
+  const concept = /^concept:[^:]+:(.+)$/.exec(metric);
+  if (!concept) return humanizeMetric(metric);
+  const words = concept[1]
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .replace(/([A-Z]+)([A-Z][a-z])/g, "$1 $2")
+    .replace(/(\D)(\d+)$/, "$1")
+    .split(" ")
+    .map((w, i) => (i > 0 && !/^[A-Z]{2,}$/.test(w) ? w.toLowerCase() : w));
+  return words.join(" ");
+}
+
 /** "revenue_growth_yoy" -> "Revenue growth YoY", "eps_diluted" -> "EPS diluted". */
 export function humanizeMetric(metric: string): string {
   const words = metric.split("_").filter(Boolean).map((w) => ACRONYMS[w] ?? w);
