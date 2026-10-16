@@ -11,6 +11,7 @@ import asyncpg
 from steward.config.event_rules import EventRulesConfig
 from steward.config.notifications import NotificationsConfig
 from steward.config.store import load_active
+from steward.earnings.verdicts import is_current
 from steward.notify.alerts import create_alerts
 from steward.notify.route import AlertRequest
 
@@ -29,10 +30,10 @@ async def alert_breaches(
     if rules.thesis_breach_severity == 0:
         return []
     rows = await pool.fetch(
-        "select v.id, v.ticker, v.kpi_id, v.period, v.observed_value, v.operator, v.threshold,"
+        "select v.id, v.ticker, v.kpi_id, v.period, v.observed_value, v.operator, v.threshold,"  # noqa: S608
         " v.threshold_unit, v.rationale, i.name from public.verdict v"
         " left join public.instrument i on i.t212_ticker = v.ticker"
-        " where v.job_id = $1 and v.status = 'breach' order by v.id",
+        f" where v.job_id = $1 and v.status = 'breach' and {is_current('v')} order by v.id",
         job_id,
     )
     outcomes = []

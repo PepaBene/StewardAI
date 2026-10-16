@@ -35,6 +35,7 @@ from steward.config.strategy import (
     StrategyRule,
 )
 from steward.config.thesis import ThesesConfig
+from steward.earnings.verdicts import NEWEST_PERIOD_FIRST
 from steward.jobs.runner import JobContext
 from steward.journal.service import scorecard as journal_scorecard
 from steward.llm.client import create_llm
@@ -450,8 +451,8 @@ async def kpi_rows(pool: asyncpg.Pool, reg: Registry, theses: ThesesConfig) -> l
         latest = {
             r["kpi_id"]: r
             for r in await pool.fetch(
-                "select distinct on (kpi_id) id, kpi_id, status, period, rationale"
-                " from public.verdict where ticker = $1 order by kpi_id, id desc",
+                "select distinct on (kpi_id) id, kpi_id, status, period, rationale"  # noqa: S608
+                f" from public.verdict where ticker = $1 order by kpi_id, {NEWEST_PERIOD_FIRST}",
                 thesis.ticker,
             )
         }

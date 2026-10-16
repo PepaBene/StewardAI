@@ -17,6 +17,7 @@ import asyncpg
 from pydantic import BaseModel, Field
 
 from steward.analytics.versions import version
+from steward.earnings.verdicts import is_current
 from steward.news.link import INDIRECT_VIA
 
 # The discovery metrics the presets show (formula and coverage are in the screener catalogue).
@@ -170,9 +171,10 @@ async def last_events(
             )
         )
     for r in await pool.fetch(
-        """select distinct on (ticker) ticker, created_at::date as d, metric, status
-           from public.verdict where ticker = any($1::text[]) and status <> 'unknown'
-           order by ticker, created_at desc""",
+        f"""select distinct on (ticker) ticker, created_at::date as d, metric, status
+           from public.verdict v where ticker = any($1::text[]) and status <> 'unknown'
+             and {is_current("v")}
+           order by ticker, created_at desc""",  # noqa: S608
         tickers,
     ):  # fmt: skip
         word = "breached" if r["status"] == "breach" else "passed"

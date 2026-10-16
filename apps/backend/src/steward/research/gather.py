@@ -21,6 +21,7 @@ from steward.config.strategy import StrategyConfig
 from steward.config.thesis import ThesisConfig
 from steward.data_context.research import claim_sentence, company_context
 from steward.earnings.metrics import BASE_METRICS
+from steward.earnings.verdicts import NEWEST_PERIOD_FIRST
 from steward.ownership.read import holding_ownership
 from steward.reference.read import holding_identity, price_history
 from steward.research.sources import CitedSentence, Registry, sec_filing_url
@@ -730,8 +731,8 @@ async def gather(
             f"{thesis.price_target.describe() if thesis.price_target else 'none'}.",
         )
         verdicts = await pool.fetch(
-            "select distinct on (kpi_id) id, kpi_id, status, period, rationale from"
-            " public.verdict where ticker = $1 order by kpi_id, id desc",
+            "select distinct on (kpi_id) id, kpi_id, status, period, rationale from"  # noqa: S608
+            f" public.verdict where ticker = $1 order by kpi_id, {NEWEST_PERIOD_FIRST}",
             ticker,
         )
         for v in verdicts:

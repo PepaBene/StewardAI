@@ -15,6 +15,7 @@ import asyncpg
 from steward.autopilot import ledger
 from steward.decision import service as decision
 from steward.decision.rebalance import RebalancePlan, RebalanceRequest, Trade
+from steward.earnings.verdicts import NEWEST_PERIOD_FIRST
 from steward.ops import tasks
 from steward.settings import get_settings
 
@@ -76,9 +77,9 @@ async def suggest_thesis_breaks(pool: asyncpg.Pool) -> dict[str, Any]:
     verdict job later passes the KPI, or the position is sold."""
     weights = await ledger.holding_weights(pool)
     rows = await pool.fetch(
-        "select ticker, metric, coalesce(period, kpi_period) as period, rationale from ("
+        "select ticker, metric, coalesce(period, kpi_period) as period, rationale from ("  # noqa: S608
         " select distinct on (ticker, kpi_id) ticker, metric, period, kpi_period, status,"
-        "  rationale from public.verdict order by ticker, kpi_id, id desc) latest"
+        f"  rationale from public.verdict order by ticker, kpi_id, {NEWEST_PERIOD_FIRST}) latest"
         " where status = 'breach' and ticker = any($1::text[])",
         list(weights),
     )

@@ -19,6 +19,7 @@ import asyncpg
 from steward.chat.owner import owner_of
 from steward.config.jobs import InboxSettings, JobsConfig
 from steward.config.store import load_active
+from steward.earnings.verdicts import is_current
 from steward.inbox import triggers
 from steward.inbox.agent import InboxAgent
 from steward.inbox.run import build_item
@@ -33,12 +34,13 @@ async def _counts(pool: asyncpg.Pool) -> tuple[int, int]:
 
 async def recent_triggers(pool: asyncpg.Pool, limit: int) -> list[triggers.Trigger]:
     rows = await pool.fetch(
-        "select 'escalation' as kind, id, created_at from public.report where type = 'escalation'"
+        "select 'escalation' as kind, id, created_at from public.report where type = 'escalation'"  # noqa: S608
         " and ticker is not null union all select 'alert', id, created_at from public.alert"
         " where kind = 'thesis_breach' and ticker is not null"
         " union all select 'disclosure', id, known_at from public.disclosure_alert"
         " union all select 'breach', id, first_seen from public.portfolio_breach"
-        " union all select 'verdict', id, created_at from public.verdict where status = 'breach'"
+        " union all select 'verdict', id, created_at from public.verdict v"
+        f" where status = 'breach' and {is_current('v')}"
         " order by created_at desc limit $1",
         limit,
     )

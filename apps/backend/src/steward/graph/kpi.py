@@ -15,6 +15,7 @@ import asyncpg
 
 from steward.config import ThesesConfig
 from steward.config.store import load_active
+from steward.earnings.verdicts import NEWEST_PERIOD_FIRST
 
 CLUSTER_WINDOW = dt.timedelta(days=30)
 
@@ -63,7 +64,9 @@ async def kpi_event_links(
             """select status,observed_value,threshold,operator,fiscal_year,fiscal_period,created_at
                from public.verdict where ticker=$1 and kpi_id=$2
                  and ($3::timestamptz is null or created_at<=$3)
-               order by id desc limit 1""",
+               order by """  # noqa: S608
+            + NEWEST_PERIOD_FIRST
+            + " limit 1",
             ticker,
             ev["thesis_kpi"],
             as_of,

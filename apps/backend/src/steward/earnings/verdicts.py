@@ -26,6 +26,24 @@ ObservedKind = Literal["money", "per_share", "fraction", "ratio", "count"]
 # earnings_check.kpi_history_periods).
 MAX_PERIODS = 8
 
+# A KPI's verdicts, newest period first and then the newest verdict on it. A run writes its
+# periods newest first, so the highest id is the oldest period: "latest" is never the id alone.
+# A verdict with no period (nothing to judge yet) sorts after every judged one.
+NEWEST_PERIOD_FIRST = "coalesce(fiscal_year, -1) desc, coalesce(fiscal_period, '') desc, id desc"
+
+
+def is_current(alias: str) -> str:
+    """SQL that holds when verdict `alias` is its KPI's current reading: no verdict on a later
+    period and no later verdict on the same one. Only the current reading is a live breach; the
+    older periods are the KPI's history, judged against a threshold set after them."""
+    a = alias
+    return (
+        f"not exists (select 1 from public.verdict n where n.ticker = {a}.ticker"  # noqa: S608
+        f" and n.kpi_id = {a}.kpi_id"
+        " and (coalesce(n.fiscal_year, -1), coalesce(n.fiscal_period, ''), n.id)"
+        f" > (coalesce({a}.fiscal_year, -1), coalesce({a}.fiscal_period, ''), {a}.id))"
+    )
+
 
 @dataclass(frozen=True)
 class FactRow:

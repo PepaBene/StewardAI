@@ -33,6 +33,7 @@ from steward.config.store import load_active
 from steward.config.thesis import ThesesConfig
 from steward.config.verification import ClaimVerifierSettings, VerificationConfig
 from steward.earnings.read import EvidenceRelation, FactCheck, evidence_relation
+from steward.earnings.verdicts import NEWEST_PERIOD_FIRST, is_current
 from steward.engine import overrides
 from steward.jobs.runner import JobContext, JobHandler
 from steward.llm.cache import ResultCache
@@ -447,9 +448,9 @@ async def gather(
         ids,
     )
     verdicts = await pool.fetch(
-        "select id, ticker, kpi_id, status, period, observed_value, operator, threshold,"
-        " threshold_unit, fact_ids from public.verdict where created_at >= $1 and created_at < $2"
-        " order by ticker, kpi_id, id",
+        "select id, ticker, kpi_id, status, period, observed_value, operator, threshold,"  # noqa: S608
+        " threshold_unit, fact_ids from public.verdict v where created_at >= $1 and created_at < $2"
+        f" and {is_current('v')} order by ticker, kpi_id, id",
         start,
         end,
     )
@@ -538,13 +539,15 @@ async def portfolio_flags(
 async def thesis_changes(
     pool: asyncpg.Pool, start: dt.datetime, end: dt.datetime
 ) -> list[ThesisChange]:
-    """Each KPI whose latest verdict in the window differs from its latest one before."""
+    """Each KPI whose latest verdict in the window differs from its latest one before, both read
+    on the newest period judged (the unqualified columns are each subquery's own table)."""
     rows = await pool.fetch(
-        "select distinct on (v.ticker, v.kpi_id) v.id, v.ticker, v.kpi_id, v.period, v.status,"
+        "select distinct on (v.ticker, v.kpi_id) v.id, v.ticker, v.kpi_id, v.period, v.status,"  # noqa: S608
         " v.fact_ids, (select p.status from public.verdict p where p.ticker = v.ticker"
-        "   and p.kpi_id = v.kpi_id and p.created_at < $1 order by p.id desc limit 1) as before"
+        f"   and p.kpi_id = v.kpi_id and p.created_at < $1 order by {NEWEST_PERIOD_FIRST}"
+        "   limit 1) as before"
         " from public.verdict v where v.created_at >= $1 and v.created_at < $2"
-        " order by v.ticker, v.kpi_id, v.id desc",
+        f" order by v.ticker, v.kpi_id, {NEWEST_PERIOD_FIRST}",
         start,
         end,
     )

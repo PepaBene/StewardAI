@@ -31,7 +31,9 @@ async def add_breach(pool: asyncpg.Pool, key: str, severity: int = 2) -> int:
     )
 
 
-async def add_verdict(pool: asyncpg.Pool, status: str = "breach") -> int:
+async def add_verdict(
+    pool: asyncpg.Pool, status: str = "breach", year: int = 2026, quarter: str = "Q2"
+) -> int:
     version = await pool.fetchval(
         "select id from public.config_version where domain = 'theses' and active"
     ) or await pool.fetchval(
@@ -40,12 +42,15 @@ async def add_verdict(pool: asyncpg.Pool, status: str = "breach") -> int:
     )
     return int(
         await pool.fetchval(
-            "insert into public.verdict (ticker, kpi_id, metric, basis, kpi_period, status,"
-            " observed_value, operator, threshold, threshold_unit, rationale, config_version_id)"
-            " values ('AAPL_US_EQ', 'services', 'services_growth', 'reported', 'quarter', $1,"
-            " 8.5, '>=', 10, '%', 'growth 8.5% is below 10%', $2) returning id",
+            "insert into public.verdict (ticker, kpi_id, metric, basis, kpi_period, fiscal_year,"
+            " fiscal_period, status, observed_value, operator, threshold, threshold_unit,"
+            " rationale, config_version_id)"
+            " values ('AAPL_US_EQ', 'services', 'services_growth', 'reported', 'quarter', $3, $4,"
+            " $1, 8.5, '>=', 10, '%', 'growth 8.5% is below 10%', $2) returning id",
             status,
             version,
+            year,
+            quarter,
         )
     )
 
@@ -61,10 +66,14 @@ async def test_an_open_breach_and_a_breach_verdict_are_triggers_a_cleared_or_pas
     )
     low = await add_breach(backend_pool, "band:cash", severity=1)
     verdict = await add_verdict(backend_pool)
-    await add_verdict(backend_pool, status="pass")
+    await add_verdict(backend_pool, status="pass", quarter="Q1")
+    # A run writes its periods newest first, so an older quarter's breach can carry the higher
+    # id: it is history judged against a later threshold, not a live breach.
+    history = await add_verdict(backend_pool, year=2025)
     found = {t.key for t in await triggers.pending(backend_pool, 7, 20, 2)}
     assert found == {f"breach:{open_breach}", f"verdict:{verdict}"}
     assert f"breach:{low}" not in found
+    assert await triggers.load(backend_pool, "verdict", history) is None
     breach = await triggers.load(backend_pool, "breach", open_breach)
     assert breach is not None and "risk limit" in breach.material and breach.severity == 2
     kpi = await triggers.load(backend_pool, "verdict", verdict)

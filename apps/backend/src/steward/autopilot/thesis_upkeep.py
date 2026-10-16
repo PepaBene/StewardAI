@@ -25,6 +25,7 @@ from steward.config.research import ResearchProfilesConfig
 from steward.config.store import ConfigConflictError, load_active, save_config
 from steward.config.strategy import StrategyConfig
 from steward.config.thesis import ThesesConfig, ThesisConfig
+from steward.earnings.verdicts import NEWEST_PERIOD_FIRST
 from steward.engine import triggers
 from steward.jobs import queue
 from steward.jobs.runner import create_job
@@ -188,8 +189,8 @@ async def refresh_review_dates(
         verdicts = {
             r["kpi_id"]: r["status"]
             for r in await pool.fetch(
-                "select distinct on (kpi_id) kpi_id, status from public.verdict"
-                " where ticker = $1 order by kpi_id, id desc",
+                "select distinct on (kpi_id) kpi_id, status from public.verdict"  # noqa: S608
+                f" where ticker = $1 order by kpi_id, {NEWEST_PERIOD_FIRST}",
                 thesis.ticker,
             )
         }

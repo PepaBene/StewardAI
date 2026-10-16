@@ -14,6 +14,7 @@ from typing import Any, Literal
 
 import asyncpg
 
+from steward.earnings.verdicts import is_current
 from steward.research.untrusted import neutralise
 
 TriggerKind = Literal["escalation", "alert", "disclosure", "breach", "verdict"]
@@ -43,7 +44,7 @@ def trigger_key(kind: str, ref: int) -> str:
 
 # Every event that may start a run: (kind, ref, created_at). $1 is the severity floor. A kind
 # that has no severity is not filtered by it.
-EVENTS_SQL = """
+EVENTS_SQL = f"""
         select 'escalation' as kind, r.id as ref, r.created_at from public.report r
          where r.type = 'escalation' and r.ticker is not null
         union all
@@ -57,12 +58,12 @@ EVENTS_SQL = """
          where b.cleared_at is null and b.severity >= $1
         union all
         select 'verdict', v.id, v.created_at from public.verdict v
-         where v.status = 'breach'
+         where v.status = 'breach' and {is_current("v")}
            and not exists (select 1 from public.alert a
                             where a.kind = 'thesis_breach' and a.ticker = v.ticker
                               and a.created_at between v.created_at - interval '2 days'
                                                    and v.created_at + interval '2 days')
-        """
+        """  # noqa: S608
 
 # Events with no inbox item and no run already queued or running.
 OPEN_SQL = f"""
@@ -163,9 +164,9 @@ async def _breach(pool: asyncpg.Pool, ref: int) -> Trigger | None:
 
 async def _verdict(pool: asyncpg.Pool, ref: int) -> Trigger | None:
     row = await pool.fetchrow(
-        "select id, ticker, kpi_id, metric, kpi_period, fiscal_year, fiscal_period, observed_value,"
+        "select id, ticker, kpi_id, metric, kpi_period, fiscal_year, fiscal_period, observed_value,"  # noqa: S608
         " operator, threshold, threshold_unit, rationale, created_at"
-        " from public.verdict where id = $1 and status = 'breach'",
+        f" from public.verdict v where id = $1 and status = 'breach' and {is_current('v')}",
         ref,
     )
     if row is None:

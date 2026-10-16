@@ -19,6 +19,7 @@ from pydantic import BaseModel, Field
 
 from steward.config.research import Authoring
 from steward.config.thesis import ThesesConfig, ThesisConfig
+from steward.earnings.verdicts import NEWEST_PERIOD_FIRST
 from steward.research.sources import CitedSentence
 
 ProposalField = Literal["why_owned", "exit_conditions", "pre_mortem"]
@@ -196,8 +197,9 @@ async def review_thesis(
             notes=["There is no thesis for this ticker to review."],
         )
     rows = await pool.fetch(
-        "select distinct on (kpi_id) kpi_id, status, observed_value, period, rationale,"
-        " created_at from public.verdict where ticker = $1 order by kpi_id, id desc",
+        "select distinct on (kpi_id) kpi_id, status, observed_value, period, rationale,"  # noqa: S608
+        " created_at from public.verdict where ticker = $1"
+        f" order by kpi_id, {NEWEST_PERIOD_FIRST}",
         ticker,
     )
     latest = {r["kpi_id"]: r for r in rows}
