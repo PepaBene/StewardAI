@@ -254,6 +254,12 @@ async def load_inputs(pool: asyncpg.Pool, owner_id: Any, ticker: str, *, div_ctx
     # Dividends: event history (when a ledger context is given) and the filed per-share series.
     annual_dps: dict[int, Decimal] = {}
     recent = False
+    if div_ctx is None:
+        # Without the event history the filed series (three fiscal years) decides, and a
+        # ten-year payer reads as "2 years without a cut".
+        from steward.dividends.service import load_context
+
+        div_ctx = await load_context(pool, today, extra=(ticker,))
     if div_ctx is not None and div_ctx.rec is not None:
         from steward.dividends.forecast import history_points, mark_specials
         from steward.dividends.metrics import annual_dps as by_year

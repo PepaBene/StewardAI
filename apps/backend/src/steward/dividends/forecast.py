@@ -40,6 +40,7 @@ from steward.dividends.reconcile import EventGroup, Reconciliation
 
 HORIZON_DAYS = 365
 HISTORY_YEARS = 3
+SUSPENDED_AFTER_CYCLES = 2  # this many missed cycles (plus a month's grace) mean suspended
 SPECIAL_MULTIPLE = Decimal(2)  # a payment over twice the regular median is special
 FREQUENCIES: tuple[tuple[str, int, int, int], ...] = (
     # name, payments a year, min and max median interval in days
@@ -68,6 +69,12 @@ def history_points(
     `single_source` (it is history only: declared rows still need a confirmed event)."""
     points: list[PaymentPoint] = []
     covered: set[int] = set()
+    # The date the money actually arrived, for events whose provider gave only the ex-date.
+    received_on = {
+        id(m.group): m.payment.paid_on
+        for m in rec.matches
+        if m.group is not None and m.payment.ticker == ticker
+    }
     for g in groups:
         e = g.event
         if e.ticker != ticker:
@@ -80,15 +87,17 @@ def history_points(
         if e.status != "confirmed" and not corroborated and not lone:
             continue
         covered.add(id(g))
+        paid = e.payment_date or received_on.get(id(g))
         points.append(
             PaymentPoint(
-                pay_date=e.pay_or_ex,
+                pay_date=paid or e.ex_date,
                 ex_date=e.ex_date,
                 per_share=e.amount,
                 currency=e.currency,
                 origin="single_source" if lone else "event",
                 special=e.flagged_special,
                 ref=f"corporate_action:{e.id}",
+                pay_known=paid is not None,
             )
         )
     for m in rec.matches:
@@ -151,7 +160,13 @@ def detect_frequency(dates: Sequence[dt.date]) -> str:
 
 
 def _lag_days(points: Sequence[PaymentPoint]) -> int | None:
-    lags = [(p.pay_date - p.ex_date).days for p in points if p.ex_date and p.pay_date >= p.ex_date]
+    """Median ex-to-pay gap, from payments whose pay date is on record (an ex-date standing in
+    for a missing pay date would make it 0, and "buy before" the payment date)."""
+    lags = [
+        (p.pay_date - p.ex_date).days
+        for p in points
+        if p.pay_known and p.ex_date and p.pay_date >= p.ex_date
+    ]
     return int(median(lags)) if lags else None
 
 
@@ -252,11 +267,26 @@ def build_schedule(
     per_year = PER_YEAR[frequency]
     step = Decimal(365) / Decimal(per_year)
     lag = _lag_days(regular)
+    last_seen = last.ex_date or last.pay_date
+    if (today - last_seen).days > int(step * SUSPENDED_AFTER_CYCLES) + (lag or 0) + 30:
+        # Boeing's last dividend went ex in February 2020: repeating it every quarter since
+        # would forecast income that stopped years ago.
+        schedule.status = "unavailable" if not schedule.rows else "partial"
+        schedule.reason = (
+            f"no {frequency.replace('_', '-')} payment since {last_seen.isoformat()}: treated "
+            "as suspended, so no payment is estimated"
+        )
+        return schedule
     growth = growth_5y if assume_growth else None
     schedule.growth_used = growth
+    # Project from the last payment date; when only its ex-date is on record, from the ex-date
+    # moved on by the usual gap. With no gap on record either, the projected date is an ex-date.
+    anchor = last.pay_date if last.pay_known else last_seen
+    shift = 0 if last.pay_known else (lag or 0)
+    ex_only = not last.pay_known and lag is None
     k = 1
     while True:
-        pay = last.pay_date + dt.timedelta(days=int((step * k).to_integral_value()))
+        pay = anchor + dt.timedelta(days=int((step * k).to_integral_value()) + shift)
         k += 1
         if pay > horizon:
             break
@@ -268,8 +298,16 @@ def build_schedule(
         if growth is not None:
             years = Decimal((pay - last.pay_date).days) / Decimal(365)
             amount = amount * (Decimal(1) + growth) ** years
-        ex = pay - dt.timedelta(days=lag) if lag is not None else None
-        note = None if lag is not None else "no ex-to-pay lag on record; ex-date not estimated"
+        ex: dt.date | None
+        if ex_only:
+            ex = pay
+            note = (
+                "no payment date on record, only ex-dates: the date shown is the expected "
+                "ex-date (own the shares before it); the payment follows some weeks later"
+            )
+        else:
+            ex = pay - dt.timedelta(days=lag) if lag is not None else None
+            note = None if lag is not None else "no ex-to-pay lag on record; ex-date not estimated"
         schedule.rows.append(row("estimated", pay, ex, amount, last.currency,
                                  f"{frequency} cadence from {last.ref}", note,
                                  ex_estimated=ex is not None))  # fmt: skip

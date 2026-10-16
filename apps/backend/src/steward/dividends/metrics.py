@@ -92,8 +92,17 @@ def annual_dps(points: Sequence[PaymentPoint]) -> tuple[dict[int, Decimal], str 
     if len(currencies) > 1:
         return {}, f"payments are in several currencies ({', '.join(sorted(currencies))})"
     out: dict[int, Decimal] = defaultdict(lambda: ZERO)
+    counts: dict[int, int] = defaultdict(int)
     for p in regular:
         out[p.pay_date.year] += p.per_share
+        counts[p.pay_date.year] += 1
+    # The history usually starts mid-year: a first year with fewer payments than the years
+    # after it is part of a year, not a smaller dividend (Apple's 2016 is one payment of four).
+    years = sorted(counts)
+    if len(years) >= 3:
+        usual = sorted(counts[y] for y in years[1:-1])[len(years[1:-1]) // 2]
+        if counts[years[0]] < usual:
+            del out[years[0]]
     return dict(out), None
 
 

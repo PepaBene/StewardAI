@@ -74,6 +74,9 @@ class PaymentPoint:
     origin: str  # "event" | "receipt" | "single_source"
     special: bool = False
     ref: str = ""
+    # False when no payment date is on record (providers that give only the ex-date):
+    # `pay_date` then holds the ex-date and says nothing about the ex-to-pay gap.
+    pay_known: bool = True
 
 
 @dataclass

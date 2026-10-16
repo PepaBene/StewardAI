@@ -222,3 +222,57 @@ def test_single_source_history_counts_only_when_the_rule_allows_it_and_is_labell
     # History is not a declaration: the schedule estimates from it and declares nothing.
     s = schedule(lone, groups, min_payments=3)
     assert s.rows and "declared" not in {r.kind for r in s.rows}
+
+
+def test_a_payer_silent_for_two_cycles_is_suspended_not_forecast() -> None:
+    # Boeing's last dividend went ex in February 2020. Quarterly step 91.25 days: two missed
+    # cycles (182) plus the 30-day ex-to-pay gap plus a month's grace is 242 days; the last
+    # payment here went ex on 2025-02-13, 322 days before today.
+    s = schedule(
+        points(
+            ("2024-06-15", "0.50"),
+            ("2024-09-15", "0.50"),
+            ("2024-12-15", "0.50"),
+            ("2025-03-15", "0.50"),
+        )
+    )
+    assert s.rows == []
+    assert s.status == "unavailable"
+    assert s.reason is not None and "suspended" in s.reason and "2025-02-13" in s.reason
+
+
+def test_with_only_ex_dates_on_record_the_estimate_is_an_ex_date() -> None:
+    # Providers that give only the ex-date: the pay date holds the ex-date and is not known,
+    # so no 0-day ex-to-pay gap is learned and "buy before" is not the payment date.
+    pts = points(*QUARTERLY)
+    for p in pts:
+        p.ex_date, p.pay_known = p.pay_date, False
+    s = schedule(pts)
+    assert s.rows[0].pay_date == day("2026-01-14")
+    assert s.rows[0].ex_date == day("2026-01-14")
+    assert s.rows[0].note is not None and "expected ex-date" in s.rows[0].note
+
+
+def test_a_known_gap_moves_an_ex_date_anchor_to_its_payment() -> None:
+    # Three payments with a known 30-day gap, the last with only its ex-date (2025-10-15):
+    # the next payment is 2025-10-15 + 91 + 30 = 2026-02-13, ex 30 days before.
+    pts = points(*QUARTERLY)
+    pts[-1].pay_date, pts[-1].ex_date, pts[-1].pay_known = (
+        day("2025-10-15"),
+        day("2025-10-15"),
+        False,
+    )
+    s = schedule(pts)
+    assert s.rows[0].pay_date == day("2026-02-13")
+    assert s.rows[0].ex_date == day("2026-01-14")
+
+
+def test_a_partial_first_year_is_not_counted() -> None:
+    # One payment of four in the first year (the record starts mid-year) is not a year's
+    # dividend: Apple's 2016 made "years without a cut" 9 instead of 8.
+    yearly = [("2023-11-15", "0.10")] + [
+        (f"{y}-{m}-15", "0.25") for y in (2024, 2025) for m in ("02", "05", "08", "11")
+    ]
+    annual, _ = annual_dps(points(*yearly))
+    assert sorted(annual) == [2024, 2025]
+    assert years_without_cut(annual, TODAY) == 1

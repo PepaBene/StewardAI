@@ -159,7 +159,8 @@ function Position({ h, row, baseCcy }: { h: Holding; row: HoldingInsight | undef
         {yld !== null ? formatPercent(yld) : row?.pays_dividend === false ? "Pays no dividend" : "—"}
       </Fact>
       <Fact label="Next payment" sub={next ? `${next.kind}, ${formatPrice(toNum(next.per_share), next.currency ?? h.instrument_currency)} a share` : undefined}>
-        {next ? `${formatDate(next.date)}${toNum(next.amount) !== null ? `, ${formatMoney(toNum(next.amount), next.currency ?? baseCcy)}` : ""}` : "—"}
+        {/* The amount is converted to the account currency; only the per-share figure is in the dividend's own. */}
+        {next ? `${formatDate(next.date)}${toNum(next.amount) !== null ? `, ${formatMoney(toNum(next.amount), row?.income_currency ?? h.account_currency ?? baseCcy)}` : ""}` : "—"}
       </Fact>
       <Fact label="Income, next 12 months">{inc !== null ? formatMoney(inc, row?.income_currency ?? baseCcy, { decimals: 0 }) : "—"}</Fact>
     </dl>
