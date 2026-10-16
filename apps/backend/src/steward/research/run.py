@@ -23,6 +23,7 @@ reach says so.
 
 import asyncio
 import datetime as dt
+import hashlib
 import json
 import math
 import time
@@ -449,6 +450,34 @@ def single_source_claims(
     return {k: v[:MAX_CORROBORATE] for k, v in out.items()}
 
 
+# Positions in the version list whose whole-config id changes with every other holding's thesis
+# or profile edit; a resume compares only this holding's own entry of them.
+_PER_HOLDING = (1, 3)
+
+
+def run_inputs(ticker: str, theses_v: Any, profiles_v: Any) -> list[str | None]:
+    """A fingerprint of this holding's own thesis and profile entry (None: it has none)."""
+    thesis = (
+        next((t for t in theses_v.body.theses if t.ticker == ticker), None) if theses_v else None
+    )
+    profile = profiles_v.body.for_ticker(ticker) if profiles_v else None
+    return [
+        hashlib.sha256(m.model_dump_json().encode()).hexdigest()[:16] if m is not None else None
+        for m in (thesis, profile)
+    ]
+
+
+def same_run_inputs(first: dict[str, Any], versions: list[Any], own: list[str | None]) -> bool:
+    """Whether a resume runs under what the first attempt used. Another holding's thesis being
+    saved (a batch drafts many at once) is not a change; this holding's own entry is."""
+    shared = [i for i in range(len(versions)) if i not in _PER_HOLDING]
+    then = first.get("ids") or []
+    if len(then) != len(versions) or any(then[i] != versions[i] for i in shared):
+        return False
+    # A run checkpointed before `own` existed has only the ids; its own entry is unknown.
+    return "own" not in first or first["own"] == own
+
+
 async def run_research(ctx: JobContext, deps: ResearchDeps) -> int:
     pool = ctx.pool
     ticker = str(ctx.params.get("ticker") or "").strip()
@@ -464,13 +493,16 @@ async def run_research(ctx: JobContext, deps: ResearchDeps) -> int:
         versions = [v.id if v else None for v in (
             research_v, theses_v, strategy_v, profiles_v, sources_v, verification_v
         )]  # fmt: skip
+        own = run_inputs(ticker, theses_v, profiles_v)
 
         async def first_versions() -> dict[str, Any]:
-            return {"ids": versions}
+            return {"ids": versions, "own": own}
 
         # The cached steps below were made under the versions of the first attempt. A resume
         # under newer ones would mix two layouts, so it stops and the owner starts a new run.
-        if (await ctx.checkpoint("config_versions", first_versions))["ids"] != versions:
+        if not same_run_inputs(
+            await ctx.checkpoint("config_versions", first_versions), versions, own
+        ):
             raise JobFailed("the configuration changed since this run started; start a new run")
         for version_id in versions:
             await ctx.record_config_version(version_id)

@@ -414,3 +414,33 @@ def test_an_event_quote_is_whole_sentences() -> None:
     quote, (lo, hi) = _quote(text, at, at + 4)
     assert quote == "The Company agreed with Acme Corp to buy it."
     assert " ".join(text[lo:hi].split()) == quote
+
+
+def test_a_thesis_run_resumes_after_another_holdings_thesis_is_saved() -> None:
+    from types import SimpleNamespace
+
+    from pydantic import BaseModel
+
+    from steward.research.run import run_inputs, same_run_inputs
+
+    class T(BaseModel):
+        ticker: str
+        stance: str
+
+    def theses(*items: T) -> Any:
+        return SimpleNamespace(body=SimpleNamespace(theses=list(items)))
+
+    profiles = SimpleNamespace(body=SimpleNamespace(for_ticker=lambda t: None))
+    own = run_inputs("A", theses(T(ticker="A", stance="keep")), profiles)
+    first = {"ids": [1, 10, 2, 20, 3, 4], "own": own}
+    # Another holding's thesis saved: the theses version moved, this holding's entry did not.
+    later = run_inputs(
+        "A", theses(T(ticker="A", stance="keep"), T(ticker="B", stance="add")), profiles
+    )
+    assert same_run_inputs(first, [1, 11, 2, 21, 3, 4], later)
+    # This holding's own thesis changed, or a shared config (the research profile) did.
+    changed = run_inputs("A", theses(T(ticker="A", stance="exit")), profiles)
+    assert not same_run_inputs(first, [1, 11, 2, 20, 3, 4], changed)
+    assert not same_run_inputs(first, [9, 10, 2, 20, 3, 4], own)
+    # A run checkpointed before the fingerprint existed is judged on the shared ids.
+    assert same_run_inputs({"ids": [1, 10, 2, 20, 3, 4]}, [1, 12, 2, 22, 3, 4], own)
