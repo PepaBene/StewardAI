@@ -126,8 +126,19 @@ def _num(text: str, scale: str | None = None) -> Decimal:
     return value.quantize(Decimal(1)) if value == value.to_integral_value() else value
 
 
-def _quote(text: str, start: int, end: int, width: int = 200) -> tuple[str, tuple[int, int]]:
-    lo, hi = max(0, start - width), min(len(text), end + width)
+_SENTENCE_END = re.compile(r"[.!?;](?=\s)|\n\s*\n")
+
+
+def _quote(text: str, start: int, end: int, width: int = 600) -> tuple[str, tuple[int, int]]:
+    """The whole sentences around the match, at most `width` characters either side: a quote
+    cut mid-word or mid-sentence is one nobody (person or judge) can read the claim against."""
+    floor, ceiling = max(0, start - width), min(len(text), end + width)
+    before = [m.end() for m in _SENTENCE_END.finditer(text, floor, start)]
+    lo = before[-1] if before else floor
+    after = _SENTENCE_END.search(text, end, ceiling)
+    hi = after.end() if after else ceiling
+    while lo < start and text[lo].isspace():
+        lo += 1
     return " ".join(text[lo:hi].split()), (lo, hi)
 
 

@@ -404,3 +404,13 @@ def test_a_wikidata_competitor_says_what_the_inference_rests_on() -> None:
     (link,) = parse_competitors(body)
     assert link.basis is not None and "Inferred, not stated" in link.basis
     assert "the industry semiconductor industry and the index NASDAQ-100" in link.basis
+
+
+def test_an_event_quote_is_whole_sentences() -> None:
+    from steward.graph.deal_extract import _quote
+
+    text = "Intro. The Company agreed with Acme Corp to buy it. Then more."
+    at = text.index("Acme")
+    quote, (lo, hi) = _quote(text, at, at + 4)
+    assert quote == "The Company agreed with Acme Corp to buy it."
+    assert " ".join(text[lo:hi].split()) == quote
