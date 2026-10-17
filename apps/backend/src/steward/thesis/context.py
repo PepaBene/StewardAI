@@ -60,7 +60,29 @@ def compact(value: Any) -> Any:
     return value
 
 
+def without_placeholder_values(result: dict[str, Any]) -> dict[str, Any]:
+    """The scenario read with a default DCF's values left out.
+
+    With no set saved by the owner the read builds a DCF on default growth and discount
+    assumptions: placeholders to edit, not a forecast. Handed over as an anchor, the author kept
+    them as its scenarios (Cisco exited at USD 107 on a USD 57 "base" no one had chosen), so only
+    the fact that no owner valuation exists, and the filed inputs, reach it.
+    """
+    if result.get("assumptions_basis") != "default_placeholder":
+        return result
+    return {
+        "assumptions_basis": "default_placeholder",
+        "note": "The owner has saved no valuation. The app's default DCF is a placeholder, not a "
+        "valuation, and its values are left out: do not use them, or an earlier memo's "
+        "figures taken from them, as scenarios.",
+        "price": result.get("price"),
+        "filed_inputs": result.get("filed_inputs"),
+    }
+
+
 def tool_block(tool: str, result: dict[str, Any]) -> str:
+    if tool == "valuation_scenarios":
+        result = without_placeholder_values(result)
     if result.get("error"):
         return f"### {tool}\nnot available: {str(result['error'])[:200]}"
     text = json.dumps(compact(neutralise_tree(result)), default=str, separators=(",", ":"))

@@ -403,8 +403,9 @@ finding for the memo.
 that add to 1, with bear strictly below base and base strictly below bull (even for an exit: \
 the bear case is the lowest value, whatever the stance). Derive each from the report's \
 valuation figures and the saved valuation scenarios in app_records (a DCF or multiple value \
-per share there is an anchor to use or to say why you depart from): a multiple applied to \
-earnings (trailing or forward P/E), the analysts' consensus target and its range as a \
+per share the owner saved there is an anchor to use or to say why you depart from; a default \
+placeholder is not, nor an earlier memo's scenarios, which are judged afresh): a multiple \
+applied to earnings (trailing or forward P/E), the analysts' consensus target and its range as a \
 cross-check, a drawdown for the bear case. The base case is what the valuation supports, not \
 the current price restated; a probability-weighted value within 3% of the price is refused \
 unless valuation_method says the figures show the stock fairly valued. Name the method in \

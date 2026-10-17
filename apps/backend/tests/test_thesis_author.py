@@ -288,3 +288,19 @@ def test_context_keeps_facts_and_the_newest_figure_of_each_metric() -> None:
     assert compact(raw) == {"a": 1, "c": [{"d": 2}]}
     assert tool_block("holding", {"error": "no owner"}) == "### holding\nnot available: no owner"
     assert latest_figures(_revenue_facts()) == ["revenue (reported): 94036000000 USD in FY2025 Q3"]
+
+
+def test_context_leaves_out_a_default_dcf_but_keeps_the_owners() -> None:
+    from steward.thesis.context import tool_block
+
+    default = {
+        "assumptions_basis": "default_placeholder",
+        "range_low": {"value": "41.41"},
+        "scenarios": [{"name": "base", "value_per_share": {"value": "57.44"}}],
+        "filed_inputs": [{"label": "Free cash flow", "value": "13.9e9"}],
+    }
+    block = tool_block("valuation_scenarios", default)
+    assert "57.44" not in block and "41.41" not in block
+    assert "placeholder" in block and "Free cash flow" in block
+    saved = {**default, "assumptions_basis": "owner_saved"}
+    assert "57.44" in tool_block("valuation_scenarios", saved)
