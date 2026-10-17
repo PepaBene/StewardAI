@@ -7,6 +7,7 @@ from typing import Any
 
 from steward.chat.tools import ChatTools, _target_line
 from steward.research.sources import Registry
+from steward.verify.claims import missing_numbers
 
 
 class FakePool:
@@ -50,5 +51,20 @@ def test_the_overview_snippet_states_the_figures_an_overvaluation_answer_quotes(
         "price_vs_base": round(35.76 / 31.72 - 1, 4),
     }
     line = _target_line(row)
-    for figure in ("35.76", "31.72", "4.04", "12.7%", "above"):
+    for figure in ("35.76", "31.72", "4.04", "12.74%", "above"):
         assert figure in line
+    # The stored precision is kept, so a quoted 9.506 and 1.255 find their match.
+    sxrs = {
+        "ticker": "SXRSd_EQ",
+        "price": 9.506,
+        "currency": "EUR",
+        "thesis_scenarios": {"bear": 6.873, "base": 8.251, "bull": 11.388},
+        "price_vs_base": round(9.506 / 8.251 - 1, 4),
+    }
+    assert (
+        missing_numbers(
+            "Its price is EUR 9.506 versus a base of EUR 8.251, 15.21% above (about EUR 1.255).",
+            [_target_line(sxrs)],
+        )
+        == []
+    )

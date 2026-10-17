@@ -12,6 +12,7 @@ import datetime as dt
 import json
 import time
 from collections.abc import Sequence
+from decimal import Decimal
 from typing import Any
 
 import asyncpg
@@ -849,12 +850,18 @@ class QueryEmbedder:
 
 def _target_line(row: dict[str, Any]) -> str:
     """One holding's thesis targets against its price, as the theses overview states them."""
+
+    # Full precision: the claim check accepts "9.51" against a stored 9.506, not the reverse, and
+    # the model quotes what it is given (SXRS "EUR 9.506 against 8.251" failed on a 2-dp snippet).
+    def plain(x: float) -> str:
+        return format(Decimal(str(round(x, 4))).normalize(), "f")
+
     s, price, gap = row["thesis_scenarios"] or {}, row["price"], row["price_vs_base"]
-    targets = ", ".join(f"{k} {s[k]:.2f}" for k in ("bear", "base", "bull") if s.get(k))
+    targets = ", ".join(f"{k} {plain(s[k])}" for k in ("bear", "base", "bull") if s.get(k))
     side = "above" if gap >= 0 else "below"
     return (
-        f"{row['ticker']} price {price:.2f} {row['currency'] or ''}, thesis {targets}; price "
-        f"{abs(price - s['base']):.2f} ({abs(gap) * 100:.1f}%) {side} the base"
+        f"{row['ticker']} price {plain(price)} {row['currency'] or ''}, thesis {targets}; price "
+        f"{plain(abs(price - s['base']))} ({abs(gap) * 100:.2f}%) {side} the base"
     )
 
 
