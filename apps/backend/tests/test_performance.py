@@ -314,6 +314,25 @@ def test_cash_reconciliation_within_and_outside_tolerance():
     assert off.difference == D("-10") and not off.within_tolerance
 
 
+def test_cash_in_a_pie_is_cash_not_a_break():
+    from steward.performance.service import _cash_checks
+
+    # Real shape from 27-28 Sep 2026: a 400 pie order waiting to fill moves its cash into the
+    # pie, which Trading212 reports inside the invested value; the fill lands the next day.
+    entries = build_ledger([fill("f1", "BUY", "10", "40", "-400.53", at(2026, 1, 8))])
+    snaps = [
+        {"snapshot_date": day(2026, 1, 6), "total_value": D("1000"), "invested_value": D("0"),
+         "cash_in_pies": D("0")},
+        {"snapshot_date": day(2026, 1, 7), "total_value": D("1000"), "invested_value": D("400.59"),
+         "cash_in_pies": D("400.59")},
+        {"snapshot_date": day(2026, 1, 8), "total_value": D("1000"), "invested_value": D("400.59"),
+         "cash_in_pies": D("0.06")},
+    ]  # fmt: skip
+    checks = _cash_checks(snaps, entries, D("1"))  # type: ignore[arg-type]
+    assert [c.difference for c in checks] == [D("0"), D("0")]
+    assert all(c.within_tolerance for c in checks)
+
+
 # ---------------------------------------------------------------------------
 # M4.3 windows
 # ---------------------------------------------------------------------------

@@ -132,6 +132,22 @@ async def test_unexplained_cash_withholds_a_precise_return(
     assert body["status"] != "complete"
 
 
+async def test_cash_held_in_a_pie_still_reconciles(
+    api: httpx.AsyncClient, backend_pool: asyncpg.Pool
+) -> None:
+    # Trading212 reports a dividend a pie has not reinvested inside its invested value: the
+    # day-3 dividend of 5 sits in the pie, not in free cash.
+    await backend_pool.execute(
+        "update public.account_snapshot set invested_value = 555, cash_available = 500,"
+        " cash_in_pies = 5 where snapshot_date = $1",
+        D3,
+    )
+    body = (await api.get("/portfolio/performance")).json()
+    assert body["ledger"]["status"] == "clean", body["ledger"]
+    inception = next(w for w in body["windows"] if w["label"] == "inception")
+    assert inception["twr"]["value"] == pytest.approx(0.055)
+
+
 async def test_lots_and_holding_period(api: httpx.AsyncClient) -> None:
     body = (await api.get("/portfolio/performance/lots")).json()
     (lot,) = body["lots"]

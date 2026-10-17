@@ -76,11 +76,16 @@ def _d(value: float | Decimal | None) -> Decimal | None:
 
 async def _snapshots(pool: asyncpg.Pool) -> list[asyncpg.Record]:
     """Daily account snapshots in the latest snapshot's base currency, oldest first. The days
-    before the first Trading212 snapshot are the ones rebuilt from the ledger."""
+    before the first Trading212 snapshot are the ones rebuilt from the ledger. A rebuilt day
+    holds every ledger entry of its Prague calendar day, so it has no capture time: intervals
+    touching it place entries by calendar day, the rule the rebuild used."""
     rows: list[asyncpg.Record] = await pool.fetch(
-        "select snapshot_date, captured_at, total_base, cash_base, invested_base, account_currency,"
-        " base_currency, fx_rate, total_value, invested_value from public.account_history"
-        " order by snapshot_date"
+        "select h.snapshot_date, case when h.reconstructed then null else h.captured_at end"
+        " as captured_at, h.total_base, h.cash_base, h.invested_base,"
+        " h.account_currency, h.base_currency, h.fx_rate, h.total_value, h.invested_value,"
+        " coalesce(s.cash_in_pies, 0) as cash_in_pies from public.account_history h"
+        " left join public.account_snapshot s on not h.reconstructed"
+        " and s.snapshot_date = h.snapshot_date order by h.snapshot_date"
     )
     if not rows:
         return []
@@ -189,6 +194,16 @@ def _day_values(snapshots: list[asyncpg.Record], ledger: list[LedgerEntry]) -> l
     return out
 
 
+def _cash(snapshot: asyncpg.Record) -> Decimal:
+    """All cash on the account. Trading212 counts cash held in pies (a pie order waiting to
+    fill, a dividend a pie has not reinvested yet) inside its invested value, so it is added
+    back: otherwise that cash looks like money leaving and coming back."""
+    pies: Decimal = snapshot.get("cash_in_pies") or ZERO
+    total: Decimal = snapshot["total_value"]
+    invested: Decimal = snapshot["invested_value"]
+    return total - invested + pies
+
+
 def _cash_checks(
     snapshots: list[asyncpg.Record], ledger: list[LedgerEntry], tolerance: Decimal
 ) -> list[CashReconciliation]:
@@ -199,8 +214,8 @@ def _cash_checks(
                 ledger,
                 start_date=before["snapshot_date"],
                 end_date=after["snapshot_date"],
-                opening_cash=before["total_value"] - before["invested_value"],
-                closing_cash=after["total_value"] - after["invested_value"],
+                opening_cash=_cash(before),
+                closing_cash=_cash(after),
                 tolerance=max(tolerance, abs(after["total_value"]) * Decimal("0.0001")),
                 start_at=before.get("captured_at"),
                 end_at=after.get("captured_at"),
@@ -763,12 +778,20 @@ async def attribution_report(
     flow_by_day = {d.date: d.flow for d in day_values}
     rate_by_day = {s["snapshot_date"]: s["fx_rate"] for s in snapshots}
     start_date = window[0]["snapshot_date"]
+    # The history view, not the broker snapshots alone: the valuation days include the ones
+    # rebuilt from the ledger, and without their positions every holding bought then looks like
+    # units that changed with no fill.
     pos_rows = await pool.fetch(
-        "select p.snapshot_date, p.ticker, p.quantity, p.current_price, p.fx_rate, p.value_base,"
-        " p.instrument_currency, i.name, i.home_country from public.position_snapshot p"
+        "with quoted as (select distinct on (ticker) ticker, instrument_currency"
+        "   from public.position_snapshot order by ticker, snapshot_date desc)"
+        " select p.snapshot_date, p.ticker, p.quantity, p.current_price, p.fx_rate, p.value_base,"
+        " coalesce(q.instrument_currency, i.currency) as instrument_currency, i.name,"
+        " i.home_country from public.position_history p"
+        " left join quoted q on q.ticker = p.ticker"
         " left join public.instrument i on i.t212_ticker = p.ticker"
-        " where p.snapshot_date >= $1 and p.snapshot_date <= $2",
-        start_date, end,
+        " where p.snapshot_date >= $1 and p.snapshot_date <= $2 and p.base_currency = $3"
+        " order by p.snapshot_date",
+        start_date, end, snapshots[-1]["base_currency"],
     )  # fmt: skip
     positions = [
         PositionDay(x["snapshot_date"], x["ticker"], x["quantity"], x["current_price"],
