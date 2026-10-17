@@ -15810,6 +15810,11 @@ export interface components {
             checks_status: string | null;
             /** Reasons */
             reasons: string[];
+            /**
+             * Fund Isin
+             * @description The ISIN when the instrument is a fund: its page is /funds/{isin}, since a fund has no earnings, segments or results dates for the company page to show.
+             */
+            fund_isin?: string | null;
         };
         /** CompanyValuation */
         CompanyValuation: {

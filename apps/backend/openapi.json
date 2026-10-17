@@ -47518,6 +47518,18 @@
             },
             "type": "array",
             "title": "Reasons"
+          },
+          "fund_isin": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fund Isin",
+            "description": "The ISIN when the instrument is a fund: its page is /funds/{isin}, since a fund has no earnings, segments or results dates for the company page to show."
           }
         },
         "type": "object",

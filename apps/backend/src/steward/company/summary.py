@@ -18,6 +18,7 @@ from steward.checks.service import company_checks
 from steward.company.fair_values import LABELS, CompanyFairValues, fair_values
 from steward.company.quote import Quote, load_member, load_quote
 from steward.portfolio.read import Holding, portfolio_holdings
+from steward.portfolio.risk_tier import instrument_is_fund
 
 _SHORT = re.compile(r"^([A-Z0-9.]+?)([a-z])?_(?:[A-Z]{2}_)?EQ$")
 
@@ -72,6 +73,11 @@ class CompanySummary(BaseModel):
     axes: list[SummaryAxis]
     checks_status: str | None
     reasons: list[str]
+    fund_isin: str | None = Field(
+        default=None,
+        description="The ISIN when the instrument is a fund: its page is /funds/{isin}, since a "
+        "fund has no earnings, segments or results dates for the company page to show.",
+    )
 
 
 def summary_axes(axes: list[AxisScore]) -> list[SummaryAxis]:
@@ -123,10 +129,17 @@ async def company_summary(
         reasons.append(f"checks: {checks.reason}")
     holdings = await portfolio_holdings(pool)
     held = next((h for h in holdings.holdings if h.ticker == ticker), None)
+    kind = await pool.fetchrow(
+        "select isin, instrument_type, security_type from public.instrument where t212_ticker = $1",
+        ticker,
+    )
+    fund_isin = None
+    if kind is not None and instrument_is_fund(kind["instrument_type"], kind["security_type"]):
+        fund_isin = kind["isin"]
     return CompanySummary(
         ticker=ticker, symbol=short_symbol(ticker), name=member.name, exchange=member.exchange,
         mic=member.mic, currency=price.currency or member.currency, country=member.country,
         held=held is not None, price=price, fair_value=fair, position=position_of(held),
         axes=summary_axes(checks.axes) if checks else [],
-        checks_status=checks.status if checks else None, reasons=reasons,
+        checks_status=checks.status if checks else None, reasons=reasons, fund_isin=fund_isin,
     )  # fmt: skip

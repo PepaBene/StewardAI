@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useCallback, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 
 import { HoldingSectionPanels } from "@/app/(app)/holdings/[ticker]/holding-view";
 import { openChatPanel } from "@/components/chat/chat-panel";
@@ -230,6 +230,13 @@ export function CompanyShell({ ticker, children }: { ticker: string; children: R
   const o = overview.kind === "ok" ? overview.data : overview.kind === "error" ? overview.previous : null;
   const summary = summaryState.kind === "ok" ? summaryState.data : null;
   const name = displayName(o, ticker);
+  // A fund has no earnings, segments or results dates: its own page reads its holdings,
+  // factsheet and look-through instead of a company page full of "unknown".
+  const router = useRouter();
+  const fundIsin = summary?.fund_isin ?? null;
+  useEffect(() => {
+    if (fundIsin) router.replace(`/funds/${encodeURIComponent(fundIsin)}`);
+  }, [fundIsin, router]);
 
   const slug = slugFromPath(pathname);
   const active = sectionForSlug(slug);
