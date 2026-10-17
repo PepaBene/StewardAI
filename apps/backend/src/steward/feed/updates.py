@@ -18,6 +18,7 @@ import datetime as dt
 import hashlib
 import json
 import logging
+import re
 from collections import Counter
 from collections.abc import Awaitable, Iterable, Mapping, Sequence
 from typing import Any, Literal
@@ -89,6 +90,34 @@ TYPE_OF_AREA: dict[str, UpdateType] = {
     "macro": "other",
     "patents": "news",
 }
+
+
+# An analyst estimate that moved less than this is routine drift, as on /insights.
+MATERIAL_MOVE = 0.02
+_NUMBER = re.compile(r"^[-+]?\d[\d,]*\.?\d*(?:e[-+]?\d+)?$", re.IGNORECASE)
+
+
+def _value(text: str | None) -> float | None:
+    if text is None or not _NUMBER.match(text.strip()):
+        return None
+    return float(text.replace(",", ""))
+
+
+def relative_move(before: str | None, after: str | None) -> float | None:
+    """after / before - 1 where both are plain numbers and before is not zero."""
+    b, a = _value(before), _value(after)
+    return None if b is None or a is None or b == 0 else a / b - 1
+
+
+def readable(text: str | None) -> str | None:
+    """'4.979e+11' as '497.9 bn'; other text unchanged."""
+    v = _value(text)
+    if v is None or abs(v) < 1e6:
+        return text
+    for size, unit in ((1e12, "tn"), (1e9, "bn"), (1e6, "m")):
+        if abs(v) >= size:
+            return f"{v / size:,.1f} {unit}"
+    return text
 
 
 def update_type(source: Source, label: str | None) -> UpdateType:
@@ -264,14 +293,25 @@ async def _changes(pool: asyncpg.Pool, now: dt.datetime) -> list[Update]:
     at = dt.datetime.combine(feed.compared_with, dt.time(18), tzinfo=dt.UTC)
     out = []
     for c in feed.items[:200]:
-        what = c.what
+        move = relative_move(c.before, c.after)
+        if (
+            c.area == "estimates"
+            and c.kind != "new"
+            and (move is None or abs(move) < MATERIAL_MOVE)
+        ):
+            continue  # routine drift in a consensus figure is not something that happened
+        label = c.what.replace("_", " ")  # "earnings_per_share estimate" in words
+        what = label
         if c.before is not None or c.after is not None:
-            what = f"{c.what}: {c.before or 'none'} → {c.after or 'none'}"
+            what = f"{label}: {readable(c.before) or 'none'} → {readable(c.after) or 'none'}"
+            # Only for estimates: on a net-selling figure (-274k to -493k) a "+80%" reads backwards.
+            if c.area == "estimates" and move is not None:
+                what += f" ({move:+.1%})"
         out.append(
             Update(key=f"change:{_key(c.area, c.kind, c.subject, c.after, feed.compared_with)}",
                    type=update_type("changes", c.area), source="changes",
                    ticker=c.subject if c.area not in ("macro",) else None,
-                   headline=f"{c.subject}: {c.what}", what_changed=what, occurred_at=at,
+                   headline=f"{c.subject}: {label}", what_changed=what, occurred_at=at,
                    age_days=max(0, (now - at).days), href="/insights", read=False)
         )  # fmt: skip
     return out
@@ -296,6 +336,7 @@ async def _dividends(pool: asyncpg.Pool, since: dt.datetime, now: dt.datetime) -
         """select id, listing_id, symbol, ex_date, payment_date, cash_amount, currency, status, source, known_at
            from public.corporate_action
            where action_type = 'cash_dividend' and status <> 'rejected' and known_at >= $1
+             and (ex_date is null or ex_date >= $1::date)
              and cash_amount is not null and (symbol = any($2::text[]) or listing_id = any($3::bigint[]))
            order by known_at desc limit 200""",
         since, list(by_symbol), list(by_listing),
