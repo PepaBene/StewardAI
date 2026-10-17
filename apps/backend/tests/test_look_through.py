@@ -479,6 +479,39 @@ def test_funds_without_a_snapshot_are_their_own_bucket() -> None:
     assert "not looked through" in report.notes[1]
 
 
+def test_a_swap_based_fund_is_not_read_as_cash() -> None:
+    # A commodity swap fund publishes T-bills and the swaps, never what it tracks.
+    sxrs_isin = "IE00BDFL4P12"
+    sxrs = _snapshot(
+        sxrs_isin,
+        "ishares_json",
+        [
+            _row("TREASURY BILL", None, 1.02, asset_class="cash", sector=None),
+            _row("BCOM SWAP", None, -0.02, asset_class="derivative", sector=None),
+        ],
+    )
+    settings = LookThroughSettings(
+        funds=[
+            *LookThroughSettings().funds,
+            LookThroughFund(isin=sxrs_isin, label="SXRS", provider="ishares", portfolio_id="1"),
+        ]
+    )
+    report = compute_look_through(
+        _portfolio(
+            _pos("SXRSd_EQ", sxrs_isin, 50.0, security_type="Mutual Fund"),
+            _pos("MSFT_US_EQ", "US5949181045", 50.0),
+        ),
+        settings,
+        {sxrs_isin: sxrs},
+        {},
+        benchmark_symbols=[],
+        today=TODAY,
+    )
+    sector = {b.key: b.weight for b in report.exposures[2].buckets}
+    assert sector[NOT_LOOKED] == pytest.approx(0.5) and FUND_CASH not in sector
+    assert any("SXRS is swap-based" in n for n in report.notes)
+
+
 def test_vanguard_country_comes_from_its_fund_table_and_ftse_benchmark() -> None:
     rows = [
         _row("NVIDIA Corp", NVDA, 0.6, currency_derived=True),

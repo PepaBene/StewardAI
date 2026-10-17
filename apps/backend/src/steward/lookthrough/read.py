@@ -360,6 +360,15 @@ def is_fund_type(security_type: str | None) -> bool:
     return bool(_ETF_TYPE.search(t)) or "exchange traded" in t
 
 
+def synthetic(rows: Sequence[RowIn]) -> bool:
+    """A swap-based fund: no equity line, only collateral and the swaps it tracks through."""
+    return (
+        bool(rows)
+        and not any(r.asset_class == "equity" for r in rows)
+        and any(r.asset_class == "derivative" for r in rows)
+    )
+
+
 def _currency(code: str | None) -> str | None:
     if not code:
         return None
@@ -845,6 +854,14 @@ def compute_look_through(
         if fund_cfg is not None or is_fund_type(p.security_type):
             fund_value += p.value_base
             snap = snapshots.get(p.isin or "") if fund_cfg else None
+            if snap is not None and synthetic(snap.rows):
+                # A swap-based fund publishes its collateral (T-bills, cash), not what it
+                # tracks: counting that as the fund's cash would misstate the exposure.
+                notes.append(
+                    f"{fund_cfg.label if fund_cfg else p.ticker} is swap-based: its published "
+                    "holdings are collateral, not its exposure, so it is not looked through."
+                )
+                snap = None
             if snap is None:
                 not_looked_value += p.value_base
                 for d in DIMENSIONS:
