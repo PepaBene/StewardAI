@@ -128,6 +128,11 @@ async def test_overrides_are_an_append_only_ledger_with_a_reason(
         oid,
     )
     assert (row["original_class"], row["new_class"]) == ("open_market_sell", "tax_withholding")
+    # A resubmitted form is the decision already on file, not a second row in the history.
+    again = await insider_analysis.record_override(
+        backend_pool, ORIG, 0, "tax_withholding", "Footnote says shares withheld", "owner:1"
+    )
+    assert again == oid
     with pytest.raises(asyncpg.PostgresError):
         await backend_pool.execute(
             "update public.insider_classification_override"

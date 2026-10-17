@@ -346,6 +346,20 @@ async def record_override(
         ins.Override(accession, row_index, new_class, reason, decided_by, dt.datetime.now(dt.UTC))
     except ValueError as exc:
         raise OverrideError(str(exc)) from exc
+    # The same decision again (a resubmitted form) is the one already on file: the table is
+    # append-only, so a repeat would sit in the line's history for good.
+    latest = await pool.fetchrow(
+        "select id, new_class, reason, decided_by from public.insider_classification_override"
+        " where accession = $1 and row_index = $2 order by id desc limit 1",
+        accession,
+        row_index,
+    )
+    if latest is not None and (latest["new_class"], latest["reason"], latest["decided_by"]) == (
+        new_class,
+        reason.strip(),
+        decided_by,
+    ):
+        return int(latest["id"])
     new_id = await pool.fetchval(
         """insert into public.insider_classification_override
              (accession, row_index, original_class, new_class, reason, decided_by)
