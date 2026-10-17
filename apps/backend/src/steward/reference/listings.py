@@ -15,7 +15,9 @@ Alpha Vantage collectors always skipped. This module derives, for a holding:
 
 A link is written `confirmed` only when three independent records agree (the instrument's ISIN
 has a FIRDS record on the home MIC, OpenFIGI names a listing ticker on that exchange, and the
-FIRDS currency matches the instrument's); anything less is `suggested` and waits for the owner
+FIRDS currency matches the instrument's), or, on a home market FIRDS does not cover (Tokyo, the
+US, London), when OpenFIGI maps the ISIN to a listing on that exchange and the ISIN is of that
+market's country; anything less is `suggested` and waits for the owner
 (`confirm_listing`). An owner decision (confirm or reject) is never overwritten by a re-derive.
 """
 
@@ -45,6 +47,14 @@ MARKET_CURRENCY: dict[str, str] = {
     "XSES": "SGD", "XSTO": "SEK", "XCSE": "DKK", "XOSL": "NOK", "XWAR": "PLN", "XPRA": "CZK",
     "XBUD": "HUF", "XETR": "EUR", "XFRA": "EUR", "XPAR": "EUR", "XAMS": "EUR", "XMIL": "EUR",
     "XMAD": "EUR", "XBRU": "EUR", "XDUB": "EUR", "XHEL": "EUR", "XLIS": "EUR", "XWBO": "EUR",
+}  # fmt: skip
+# Home markets outside ESMA FIRDS, by the ISIN country their own issuers carry. FIRDS can never
+# hold their listings, so there OpenFIGI's mapping of the ISIN to a listing on the home
+# exchange, from an issuer of that country, stands in for the FIRDS record.
+NON_FIRDS_COUNTRY: dict[str, str] = {
+    "XNAS": "US", "XNYS": "US", "ARCX": "US", "BATS": "US", "XTSE": "CA", "XLON": "GB",
+    "XSWX": "CH", "XTKS": "JP", "XHKG": "HK", "XKRX": "KR", "XTAI": "TW", "XASX": "AU",
+    "XSES": "SG",
 }  # fmt: skip
 
 
@@ -132,20 +142,33 @@ async def derive_candidate(
     currency_agrees = (
         firds_ccy is not None and instrument_ccy is not None and (firds_ccy == instrument_ccy)
     )
-    if not isin_match:
+    country = NON_FIRDS_COUNTRY.get(mic)
+    # Outside FIRDS the broker's line trades in its own currency (EUR on Xetra for a Tokyo
+    # share), so there is no second currency to agree with: the ISIN country takes its place.
+    outside_firds = (
+        country is not None
+        and figi is not None
+        and bool(inst["isin"])
+        and str(inst["isin"])[:2] == country
+    )
+    if not isin_match and not outside_firds:
         gaps.append("no FIRDS record for the instrument's ISIN on the home MIC")
     if firds_ccy is not None and instrument_ccy is not None and firds_ccy != instrument_ccy:
         gaps.append(f"FIRDS currency {firds_ccy} differs from the instrument's {instrument_ccy}")
     terminated = _date(firds["terminated_at"]) if firds else None
     status = "terminated" if terminated is not None and terminated <= today else "active"
     score = round(
-        0.45 * isin_match + 0.3 * (figi is not None) + 0.15 * currency_agrees + 0.1 * bool(mic),
+        0.45 * (isin_match or outside_firds)
+        + 0.3 * (figi is not None)
+        + 0.15 * (currency_agrees or outside_firds)
+        + 0.1 * bool(mic),
         2,
     )
     evidence: dict[str, Any] = {
         "derived_from": ["instrument", "firds", "openfigi"],
         "isin": inst["isin"],
         "isin_has_firds_record_on_home_mic": isin_match,
+        "outside_firds_isin_country_matches": outside_firds,
         "openfigi_listing_ticker": listing_ticker if figi else None,
         "openfigi_figi": figi["figi"] if figi else None,
         "currency": {
@@ -173,7 +196,7 @@ async def derive_candidate(
         name=inst["name"] or ticker,
         kind=inst["security_type"] or "equity",
         issuer_lei=inst["issuer_lei"],
-        confirmable=isin_match and figi is not None and currency_agrees,
+        confirmable=(isin_match and figi is not None and currency_agrees) or outside_firds,
         gaps=gaps,
     )
 

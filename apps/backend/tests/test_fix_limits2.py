@@ -375,15 +375,26 @@ async def test_a_tokyo_home_listing_is_in_yen_not_the_brokers_euro_line() -> Non
         "security_type": None,
         "share_class_figi": None,
     }
-    answers = iter([instrument, None, {"figi": "BBG000BQWLX5", "listing_ticker": "4568"}])
 
-    class FakePool:
-        async def fetchrow(self, _sql: str, *_args: Any) -> Any:
-            return next(answers)
+    def pool(isin: str) -> Any:
+        answers = iter(
+            [{**instrument, "isin": isin}, None, {"figi": "BBG000BQWLX5", "listing_ticker": "4568"}]
+        )
 
-    c = await derive_candidate(FakePool(), "D4Sd_EQ", PriceSymbols(stooq="4568.jp", yahoo=None))  # type: ignore[arg-type]
+        class FakePool:
+            async def fetchrow(self, _sql: str, *_args: Any) -> Any:
+                return next(answers)
+
+        return FakePool()
+
+    symbols = PriceSymbols(stooq="4568.jp", yahoo=None)
+    c = await derive_candidate(pool("JP3475350009"), "D4Sd_EQ", symbols)
     assert c is not None and c.currency == "JPY"
-    assert c.evidence["currency"]["market"] == "JPY" and not c.confirmable
+    # FIRDS cannot cover Tokyo: OpenFIGI's listing for a Japanese ISIN confirms it.
+    assert c.evidence["currency"]["market"] == "JPY" and c.confirmable and c.gaps == []
+    # A foreign-domiciled ISIN on the same exchange still waits for the owner.
+    other = await derive_candidate(pool("KYG000000000"), "D4Sd_EQ", symbols)
+    assert other is not None and not other.confirmable
 
 
 def test_a_wikidata_competitor_says_what_the_inference_rests_on() -> None:
