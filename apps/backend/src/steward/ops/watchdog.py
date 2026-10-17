@@ -42,7 +42,7 @@ from steward.config.store import load_active
 from steward.config.thesis import ThesesConfig
 from steward.graph.provider_gate import reset_block
 from steward.jobs import queue
-from steward.jobs.runner import JobContext, create_job
+from steward.jobs.runner import JobContext, create_job, fail_interrupted_scheduled_runs
 from steward.lookthrough.coverage import refresh_ledger
 from steward.lookthrough.read import load_portfolio
 from steward.notify.channels import channels_from_settings
@@ -421,6 +421,12 @@ async def watchdog_handler(ctx: JobContext) -> None:
 async def _checks(
     ctx: JobContext, steps: Steps, jobs: JobsConfig, cfg: OpsSettings, now: dt.datetime
 ) -> None:
+    # The worker closes a dead run's row at start, but only once nobody holds its lock: in a
+    # deploy's overlap the old container still holds it, then dies, and the run stays
+    # "running" while catch-up skips it as already running. A run whose lock is free here has
+    # no process left; failing it lets `failed_jobs` retry it.
+    async with steps.run("interrupted_runs") as step:
+        step.detail["failed"] = await fail_interrupted_scheduled_runs(ctx.pool)
     async with steps.run("failed_jobs") as step:
         step.detail.update(await check_failed_jobs(ctx.pool, jobs, cfg, now))
     async with steps.run("quality") as step:
