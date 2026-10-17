@@ -38,7 +38,8 @@ def describe(item: Upcoming, today: dt.date) -> tuple[str, str]:
         research = "It has no research report yet."
     else:
         age = (today - item.last_research).days
-        research = f"Its research was last refreshed {age} days ago" + (
+        ago = "today" if age == 0 else "yesterday" if age == 1 else f"{age} days ago"
+        research = f"Its research was last refreshed {ago}" + (
             " - worth refreshing first." if age > STALE_DAYS else "."
         )
     return (

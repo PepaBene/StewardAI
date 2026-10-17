@@ -1951,7 +1951,7 @@ def _provider_defaults() -> dict[str, ProviderJobSettings]:
         "un_comtrade": (500, None),
         "diffbot": (None, 10_000),
         "people_data_labs": (None, 100),
-        "twelve_data": (None, None),
+        "twelve_data": (800, None),  # the Basic plan's daily credits
         "finnhub": (None, None),
         "world_bank": (None, None),
         "oecd": (None, None),

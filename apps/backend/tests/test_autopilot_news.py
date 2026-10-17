@@ -130,6 +130,20 @@ def test_escalation_is_acknowledged_by_rule_only_after_a_check_ran() -> None:
     assert news._escalation_rule(none) is None
 
 
+async def test_a_thesis_written_after_the_note_counts_as_its_follow_up() -> None:
+    # Production, 17 Oct 2026: 19 notes read "thesis impact cannot be assessed without a written
+    # thesis" and waited on the owner although a thesis had since been written for each.
+    seen: list[tuple[Any, ...]] = []
+
+    class Pool:
+        async def fetch(self, query: str, *args: Any) -> list[Any]:
+            seen.append(args)
+            return []
+
+    await news._followup(Pool(), 3, "CIEN_US_EQ")  # type: ignore[arg-type]
+    assert "thesis" in seen[0][1] and "earnings_check" in seen[0][1]
+
+
 async def test_escalation_apply_moves_only_an_open_one_and_revert_checks_the_status(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

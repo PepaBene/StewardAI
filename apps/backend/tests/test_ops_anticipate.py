@@ -24,6 +24,8 @@ def test_the_notice_says_when_it_reports_and_how_old_the_research_is() -> None:
     assert "worth refreshing first" in stale
     title3, none = anticipate.describe(item(TODAY + dt.timedelta(days=3), None), TODAY)
     assert title3 == "Apple reports in 3 days" and "no research report yet" in none
+    _, fresh = anticipate.describe(item(TODAY, TODAY - dt.timedelta(days=1)), TODAY)
+    assert "last refreshed yesterday." in fresh
 
 
 @pytest.mark.db

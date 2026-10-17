@@ -30,7 +30,10 @@ PROMPT_CAP = 6000
 # Notes the autopilot wrote, or the owner wrote when accepting its recommendation: neither is
 # the owner's own call.
 _NOT_THE_OWNER = re.compile(r"^(autopilot|owner accepted the autopilot)", re.IGNORECASE)
-DOWNSTREAM_JOBS = ("earnings_check", "thesis_verdicts")
+# Checks that weigh a holding's news against its thesis. A thesis written after the note counts:
+# it is built from the holding's news wire, and most notes ask for exactly that ("thesis impact
+# cannot be assessed without a written thesis").
+DOWNSTREAM_JOBS = ("earnings_check", "thesis_verdicts", "thesis")
 
 
 def _clip(text: Any, limit: int) -> str:
