@@ -119,6 +119,16 @@ export const SCHEDULES: Record<
     description: "Digest of the last 7 days.",
     cron: "0 18 * * 0",
   },
+  monthly_digest: {
+    label: "Monthly digest",
+    description: "Digest of the last 30 days, with where the portfolio stands against the strategy.",
+    cron: "30 7 1 * *",
+  },
+  quarterly_digest: {
+    label: "Quarterly digest",
+    description: "Digest of the last 91 days, with where the portfolio stands against the strategy.",
+    cron: "0 8 1 1,4,7,10 *",
+  },
   monthly_review: {
     label: "Monthly review",
     description:
@@ -714,6 +724,11 @@ export const DEFAULT_JOBS: JobsConfig = {
     min_severity_listed: 1,
     daily_window_hours: 24,
     weekly_window_days: 7,
+    monthly_window_days: 30,
+    quarterly_window_days: 91,
+    long_digest_min_severity_step: 1,
+    monthly_max_material_stories: 40,
+    quarterly_max_material_stories: 60,
   },
   escalation: {
     enabled: true,
@@ -1938,6 +1953,18 @@ export const SETTINGS: {
         min: 1,
         max: 31,
       },
+      { key: "monthly_window_days", label: "Monthly digest covers (days)", kind: "int", min: 7, max: 62 },
+      { key: "quarterly_window_days", label: "Quarterly digest covers (days)", kind: "int", min: 28, max: 190 },
+      {
+        key: "long_digest_min_severity_step",
+        label: "Monthly and quarterly: raise the summary severity by",
+        kind: "int",
+        min: 0,
+        max: 2,
+        hint: "A month holds many more stories; only the more severe ones get a written summary.",
+      },
+      { key: "monthly_max_material_stories", label: "Monthly digest: stories summarised at most", kind: "int", min: 5, max: 200 },
+      { key: "quarterly_max_material_stories", label: "Quarterly digest: stories summarised at most", kind: "int", min: 5, max: 300 },
     ],
   },
   escalation: {

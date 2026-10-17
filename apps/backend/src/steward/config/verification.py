@@ -11,8 +11,16 @@ from steward.config.jobs import EFFORT_HELP, Effort, ModelId, check_effort
 
 Metric = Annotated[str, Field(pattern=r"^[a-z][a-z0-9_]{0,63}$")]
 
-ClaimTarget = Literal["daily_digest", "weekly_digest", "escalation"]
-ALL_CLAIM_TARGETS: tuple[ClaimTarget, ...] = ("daily_digest", "weekly_digest", "escalation")
+ClaimTarget = Literal[
+    "daily_digest", "weekly_digest", "monthly_digest", "quarterly_digest", "escalation"
+]
+ALL_CLAIM_TARGETS: tuple[ClaimTarget, ...] = (
+    "daily_digest",
+    "weekly_digest",
+    "monthly_digest",
+    "quarterly_digest",
+    "escalation",
+)
 
 
 class CorroborationRules(ConfigModel):

@@ -24,7 +24,7 @@ import { AsOfLabel } from "@/components/freshness/as-of-label";
 import { CitationLink } from "@/components/news/citation";
 import { SeverityBadge, TierBadge } from "@/components/news/severity-badge";
 import { DigestIntradaySpark, ON_ACCENT } from "@/components/reports/digest-intraday";
-import { DigestShell } from "@/components/reports/digest-shell";
+import { DigestShell, PERIOD_LABEL } from "@/components/reports/digest-shell";
 import { usePortfolioHistory } from "@/components/reports/reports-shell";
 import { Blueprint, BlueprintCorners, PanelHeading } from "@/components/ui/blueprint";
 import { checkedTextClass, ClaimsSummaryLine, SentenceCheckMark } from "@/components/verify/sentence-check";
@@ -63,6 +63,7 @@ import {
 import { eventLabel, TIERS } from "@/lib/news/labels";
 import { shortDay } from "@/lib/news/stats";
 import { EntityName } from "@/components/entity-name";
+import { VerdictLine } from "@/components/insight/verdict-line";
 import { SourcesByDomain } from "@/components/research/sources-by-domain";
 import { TocRail, type TocItem } from "@/components/research/toc-rail";
 import { edgarFilingUrl, isNewPosition, managerChangeText, OWNERSHIP_NOTE, sortManagerChanges } from "@/lib/reference/ownership";
@@ -104,7 +105,7 @@ export function DigestView({ id }: { id: number }) {
   }
   const report = state.kind === "ok" ? state.data : state.previous!;
   return (
-    <DigestShell period={report.body.kind === "weekly" ? "weekly" : "daily"} selectedId={report.id}>
+    <DigestShell period={report.body.kind} selectedId={report.id}>
       {() => <Digest report={report} />}
     </DigestShell>
   );
@@ -514,7 +515,7 @@ function Hero({
   const spark = history ? historyUpTo(history.points, days.end, 10) : [];
   const times = alerts ? telegramTimes(alerts, body.window_start, body.window_end) : [];
   const vs = own && bench ? (own.pct - bench.pct) * 100 : null;
-  const label = body.kind === "weekly" ? "Weekly digest" : "Daily digest";
+  const label = `${PERIOD_LABEL[body.kind]} digest`;
 
   return (
     <section aria-labelledby="digest-headline" className="blueprint border-accent bg-accent px-6 py-6 text-accent-foreground">
@@ -541,7 +542,7 @@ function Hero({
               <Sparkline values={spark} width={128} height={26} label="Portfolio index, 10 days to the digest" className="h-[26px]" />
             </div>
           ) : null}
-          {body.kind !== "weekly" ? <DigestIntradaySpark until={body.window_end} /> : null}
+          {body.kind === "daily" ? <DigestIntradaySpark until={body.window_end} /> : null}
         </HeroStat>
         <HeroStat
           label="vs benchmark"
@@ -707,6 +708,67 @@ function tocItems(body: DigestBody): TocItem[] {
 }
 
 const SECTION ="blueprint space-y-2 px-6 py-5";
+
+type Deviation = NonNullable<DigestBody["strategy"]>[number];
+
+const CHANGE_TEXT: Record<Deviation["change"], string> = {
+  new: "Newly outside",
+  cleared: "Back within",
+  worse: "Further outside",
+  better: "Closer",
+  unchanged: "No change",
+  unknown: "Start not read",
+};
+
+function deviationValue(d: Deviation, v: number | null | undefined): string {
+  if (v == null) return "—";
+  return d.unit === "count" ? String(Math.round(v)) : formatPct(v, 1);
+}
+
+/** Every strategy target and rule at the end of the period, how it moved, and what it means. */
+function StrategySection({ deviations }: { deviations: Deviation[] }) {
+  const outside = deviations.filter((d) => d.status === "outside");
+  const rest = deviations.filter((d) => d.status !== "outside");
+  const row = (d: Deviation) => (
+    <li key={d.key} className="grid gap-x-4 gap-y-0.5 border-t border-border-soft py-2 text-sm sm:grid-cols-[minmax(0,14rem)_8rem_minmax(0,1fr)]">
+      <span className="font-medium">{d.label}</span>
+      <span className="num">
+        {deviationValue(d, d.end_value)}
+        <span className="block text-xs text-text-muted">
+          {d.start_value != null ? `from ${deviationValue(d, d.start_value)} · ` : ""}
+          {CHANGE_TEXT[d.change]}
+        </span>
+      </span>
+      <span className="text-text-muted">{d.implication}</span>
+    </li>
+  );
+  return (
+    <section aria-labelledby="digest-strategy" className={SECTION}>
+      <BlueprintCorners />
+      <h2 id="digest-strategy" className="flex items-center gap-1.5 text-[22px] leading-tight font-semibold">
+        <ScaleIcon aria-hidden="true" className="size-4 text-text-muted" />
+        Where you stand against your strategy
+      </h2>
+      <VerdictLine verdict={outside.length > 0 ? "caution" : "good"}>
+        {outside.length > 0
+          ? `${outside.length} of ${deviations.length} strategy targets and rules are outside at the end of the period: ${outside.map((d) => d.label).join(", ")}. A breach asks for a review under your strategy, never an automatic trade.`
+          : `All ${deviations.length} strategy targets and rules hold at the end of the period.`}
+      </VerdictLine>
+      {outside.length > 0 ? <ul>{outside.map(row)}</ul> : null}
+      {rest.length > 0 ? (
+        <details className="text-sm">
+          <summary className="cursor-pointer text-text-muted">{rest.length} within their limits</summary>
+          <ul className="mt-1">{rest.map(row)}</ul>
+        </details>
+      ) : null}
+      <p className="text-xs">
+        <Link href="/config/strategy" className={LINK}>
+          Targets and rules in Config: Strategy
+        </Link>
+      </p>
+    </section>
+  );
+}
 const LINK = "text-accent-ink underline-offset-4 hover:underline";
 
 /** Portfolio flags, thesis status changes, reviews due, macro figures, tracked managers (13F) and market holidays. */
@@ -719,6 +781,7 @@ function StatusSections({ body, facts }: { body: DigestBody; facts: Map<number, 
   const managers = sortManagerChanges(body.ownership_changes ?? []);
   return (
     <div className="flex flex-col gap-5">
+      {(body.strategy ?? []).length > 0 ? <StrategySection deviations={body.strategy ?? []} /> : null}
       {flags.length > 0 ? (
         <section aria-labelledby="digest-portfolio" className={SECTION}>
           <BlueprintCorners />

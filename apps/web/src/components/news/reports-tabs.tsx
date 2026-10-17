@@ -5,7 +5,9 @@ import { cn } from "@/lib/utils";
 const TABS = [
   { id: "daily", label: "Daily", title: "Daily digests", href: "/reports" },
   { id: "weekly", label: "Weekly", title: "Weekly digests", href: "/reports?period=weekly" },
-  { id: "reviews", label: "Monthly", title: "Monthly reviews", href: "/reviews" },
+  { id: "monthly", label: "Monthly", title: "Monthly digests: the month's news, moves and strategy", href: "/reports?period=monthly" },
+  { id: "quarterly", label: "Quarterly", title: "Quarterly digests: the quarter's news, moves and strategy", href: "/reports?period=quarterly" },
+  { id: "reviews", label: "Compliance", title: "Monthly compliance reviews: every rule checked, with proposed actions", href: "/reviews" },
   { id: "escalations", label: "Impact", title: "Impact notes (escalations)", href: "/escalations" },
   { id: "research", label: "Research", title: "Research reports", href: "/research" },
 ] as const;

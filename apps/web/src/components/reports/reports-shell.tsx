@@ -58,8 +58,16 @@ export function foldQuiet(items: readonly ShellItem[], selectedId: number | null
 
 const PAGE_TITLES: Partial<Record<ReportsTab, { title: string; description: string }>> = {
   reviews: {
-    title: "Monthly reviews",
-    description: "A look back at each month: performance, what changed, your theses and next steps.",
+    title: "Compliance reviews",
+    description: "Each month every strategy rule and thesis KPI checked, with the actions they point to.",
+  },
+  monthly: {
+    title: "Monthly digests",
+    description: "The month in one read: the stories that mattered, what moved the portfolio, macro, 13F and insider moves, thesis changes and where you stand against your strategy.",
+  },
+  quarterly: {
+    title: "Quarterly digests",
+    description: "The quarter in one read: the stories that mattered, what moved the portfolio, macro, 13F and insider moves, thesis changes and where you stand against your strategy.",
   },
 };
 const DEFAULT_TITLE = {
@@ -199,7 +207,7 @@ export function ReportsShell({
                     <details className="group">
                       <summary className="flex cursor-pointer list-none items-baseline justify-between gap-2 px-4 py-2.5 text-[13px] text-text-muted hover:bg-surface-muted">
                         <span>
-                          {entry.items.length} quiet {entry.items[0].kind === "Weekly" ? "weeks" : "days"}, nothing material
+                          {entry.items.length} quiet {({ Weekly: "weeks", Monthly: "months", Quarterly: "quarters" } as Record<string, string>)[entry.items[0].kind] ?? "days"}, nothing material
                         </span>
                         <span className="num text-xs">
                           {entry.items[entry.items.length - 1].dateLabel} – {entry.items[0].dateLabel}

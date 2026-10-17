@@ -111,7 +111,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "candidates", nargs="+", help="model or model:effort; the first is the baseline"
     )
-    parser.add_argument("--kind", choices=["daily", "weekly"], default="daily")
+    parser.add_argument(
+        "--kind", choices=["daily", "weekly", "monthly", "quarterly"], default="daily"
+    )
     parser.add_argument(
         "--days-back", type=int, default=0, help="end the window this many days ago"
     )

@@ -1140,6 +1140,34 @@ class DigestSettings(ConfigModel):
     weekly_window_days: int = Field(
         default=7, ge=1, le=31, description="The weekly digest covers this many past days."
     )
+    monthly_window_days: int = Field(
+        default=30, ge=7, le=62, description="The monthly digest covers this many past days."
+    )
+    quarterly_window_days: int = Field(
+        default=91, ge=28, le=190, description="The quarterly digest covers this many past days."
+    )
+    long_digest_min_severity_step: int = Field(
+        default=1,
+        ge=0,
+        le=2,
+        description="The monthly and quarterly digests raise the severity a story needs for a "
+        "written summary by this much (up to 3), so the writer's prompt stays bounded over a "
+        "long window.",
+    )
+    monthly_max_material_stories: int = Field(
+        default=40,
+        ge=5,
+        le=200,
+        description="The most stories the monthly digest hands the writer (highest severity "
+        "first).",
+    )
+    quarterly_max_material_stories: int = Field(
+        default=60,
+        ge=5,
+        le=300,
+        description="The most stories the quarterly digest hands the writer (highest severity "
+        "first).",
+    )
 
     @model_validator(mode="after")
     def _consistent(self) -> Self:
@@ -1154,7 +1182,28 @@ class DigestSettings(ConfigModel):
     def window(self, kind: str) -> dt.timedelta:
         if kind == "daily":
             return dt.timedelta(hours=self.daily_window_hours)
+        if kind == "monthly":
+            return dt.timedelta(days=self.monthly_window_days)
+        if kind == "quarterly":
+            return dt.timedelta(days=self.quarterly_window_days)
         return dt.timedelta(days=self.weekly_window_days)
+
+    def summarised_floor(self, kind: str) -> int:
+        """The severity a story needs for a written summary in this kind of digest: the
+        configured floor, raised for the long windows (a quarter holds far more stories than a
+        day) and never above the top severity."""
+        if kind in ("monthly", "quarterly"):
+            return min(3, self.min_severity_summarised + self.long_digest_min_severity_step)
+        return self.min_severity_summarised
+
+    def material_cap(self, kind: str) -> int | None:
+        """The most stories handed to the writer; None for the short digests, which are bounded
+        by their window."""
+        if kind == "monthly":
+            return self.monthly_max_material_stories
+        if kind == "quarterly":
+            return self.quarterly_max_material_stories
+        return None
 
 
 class ReferenceSettings(ConfigModel):
@@ -2498,6 +2547,15 @@ class JobsConfig(ConfigModel):
         default_factory=lambda: JobSchedule(cron="0 18 * * 0"),
         description="Weekly digest of the last 7 days. Default: Sundays 18:00.",
     )
+    monthly_digest: JobSchedule = Field(
+        default_factory=lambda: JobSchedule(cron="30 7 1 * *"),
+        description="Monthly digest of the last 30 days. Default: the 1st, 07:30.",
+    )
+    quarterly_digest: JobSchedule = Field(
+        default_factory=lambda: JobSchedule(cron="0 8 1 1,4,7,10 *"),
+        description="Quarterly digest of the last 91 days. Default: the 1st of Jan/Apr/Jul/Oct, "
+        "08:00.",
+    )
     monthly_review: JobSchedule = Field(
         default_factory=lambda: JobSchedule(cron="0 7 1-3 * *"),
         description="Monthly review on the first weekday of the month (a scheduled run on "
@@ -2906,6 +2964,8 @@ class JobsConfig(ConfigModel):
             "news_ingest": self.news_ingest,
             "daily_digest": self.daily_digest,
             "weekly_digest": self.weekly_digest,
+            "monthly_digest": self.monthly_digest,
+            "quarterly_digest": self.quarterly_digest,
             "monthly_review": self.monthly_review,
             "ownership_13f": self.ownership_13f,
             "insider_trades": self.insider_trades,

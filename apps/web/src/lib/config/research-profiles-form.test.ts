@@ -431,6 +431,7 @@ describe("web default profiles and templates match the backend defaults", () => 
       min_sentences: 2,
       authoring: "research_only",
       planning: "code",
+      planner_effort: "low",
       engine: "fixed",
       lenses: ["financials", "filings_events", "news_web", "portfolio_risk", "counter_case"],
       worker_model: "gpt-6-luna",

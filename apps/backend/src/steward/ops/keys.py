@@ -135,7 +135,13 @@ CATALOGUE: tuple[KeyInfo, ...] = (
         "Resend",
         "e-mail alerts and digests",
         "https://resend.com/api-keys",
-        ("daily_digest", "weekly_digest", "disclosure_alerts"),
+        (
+            "daily_digest",
+            "weekly_digest",
+            "monthly_digest",
+            "quarterly_digest",
+            "disclosure_alerts",
+        ),
         0.6,
     ),
     KeyInfo(

@@ -385,7 +385,7 @@ def _json(value: Any) -> Any:
 def _next_due(
     jobs: JobsConfig | None, report_type: str, period: str | None, created_at: dt.datetime
 ) -> dt.datetime | None:
-    if report_type != "digest" or period not in ("daily", "weekly"):
+    if report_type != "digest" or period not in ("daily", "weekly", "monthly", "quarterly"):
         return None
     return (jobs or JobsConfig()).next_run_after(f"{period}_digest", created_at)
 

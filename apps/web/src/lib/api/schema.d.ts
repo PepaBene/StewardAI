@@ -13907,7 +13907,7 @@ export interface components {
              * Critical Job Types
              * @description Job types that run normally at the monthly cap.
              */
-            critical_job_types?: ("portfolio_sync" | "earnings_check" | "thesis_verdicts" | "earnings_calendar" | "earnings_calendar_full" | "earnings_due" | "fact_reconcile" | "reference_data" | "price_history" | "intraday_prices" | "holiday_refresh" | "macro_collect" | "public_data_collect" | "source_audit" | "event_escalation" | "monitor" | "news_ingest" | "daily_digest" | "weekly_digest" | "research" | "ownership_13f" | "insider_trades" | "etf_look_through" | "monthly_review" | "chat" | "sec_xbrl" | "valuation_refresh" | "control_stakes" | "nport_holdings" | "fund_probes" | "fund_characteristics_audit" | "fund_issuer_facts" | "free_source_alerts" | "change_alerts" | "shadow_snapshot" | "shadow_report" | "raw_retention" | "research_trace_retention" | "zero_cost_gate" | "returns_refresh" | "exchange_probes" | "ir_releases" | "sec_fsds_backfill" | "pdmr_uk" | "graph_review" | "fmp_company" | "alpha_vantage_statements" | "epo_patents" | "companies_house_filings" | "edinet_filings" | "twelve_data_corporate_actions" | "ai_approvals" | "autopilot" | "autopilot_calibration" | "watchdog" | "ir_discovery" | "news_ai_search" | "news_triage" | "news_analysis" | "news_brief" | "gap_research" | "exposure_build" | "document_index" | "inbox_scan" | "inbox_agent" | "factor_returns" | "disclosure_sources" | "disclosure_ingest" | "disclosure_identifiers" | "disclosure_deals" | "disclosure_esef" | "disclosure_estimates" | "disclosure_alerts" | "thesis" | "portfolio_review" | "dividend_forecast" | "yahoo_dividends" | "consensus_snapshot" | "insight_access_probe" | "fair_value_snapshot" | "checks_refresh" | "screen_parse" | "earnings_summary")[];
+            critical_job_types?: ("portfolio_sync" | "earnings_check" | "thesis_verdicts" | "earnings_calendar" | "earnings_calendar_full" | "earnings_due" | "fact_reconcile" | "reference_data" | "price_history" | "intraday_prices" | "holiday_refresh" | "macro_collect" | "public_data_collect" | "source_audit" | "event_escalation" | "monitor" | "news_ingest" | "daily_digest" | "weekly_digest" | "monthly_digest" | "quarterly_digest" | "research" | "ownership_13f" | "insider_trades" | "etf_look_through" | "monthly_review" | "chat" | "sec_xbrl" | "valuation_refresh" | "control_stakes" | "nport_holdings" | "fund_probes" | "fund_characteristics_audit" | "fund_issuer_facts" | "free_source_alerts" | "change_alerts" | "shadow_snapshot" | "shadow_report" | "raw_retention" | "research_trace_retention" | "zero_cost_gate" | "returns_refresh" | "exchange_probes" | "ir_releases" | "sec_fsds_backfill" | "pdmr_uk" | "graph_review" | "fmp_company" | "alpha_vantage_statements" | "epo_patents" | "companies_house_filings" | "edinet_filings" | "twelve_data_corporate_actions" | "ai_approvals" | "autopilot" | "autopilot_calibration" | "watchdog" | "ir_discovery" | "news_ai_search" | "news_triage" | "news_analysis" | "news_brief" | "gap_research" | "exposure_build" | "document_index" | "inbox_scan" | "inbox_agent" | "factor_returns" | "disclosure_sources" | "disclosure_ingest" | "disclosure_identifiers" | "disclosure_deals" | "disclosure_esef" | "disclosure_estimates" | "disclosure_alerts" | "thesis" | "portfolio_review" | "dividend_forecast" | "yahoo_dividends" | "consensus_snapshot" | "insight_access_probe" | "fair_value_snapshot" | "checks_refresh" | "screen_parse" | "earnings_summary")[];
             /**
              * Per Job Cap Usd
              * @description Most AI spend of one run of a job type, in USD. A run over it fails.
@@ -15271,7 +15271,7 @@ export interface components {
              * Applies To
              * @description Reports whose sentences are checked. Alerts are composed in code from the source's own headline, so they have no model-written sentences to check.
              */
-            applies_to?: ("daily_digest" | "weekly_digest" | "escalation")[];
+            applies_to?: ("daily_digest" | "weekly_digest" | "monthly_digest" | "quarterly_digest" | "escalation")[];
         };
         /** ClaimsOut */
         ClaimsOut: {
@@ -18008,7 +18008,7 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "daily" | "weekly";
+            kind: "daily" | "weekly" | "monthly" | "quarterly";
             /**
              * Window Start
              * Format: date-time
@@ -18084,6 +18084,11 @@ export interface components {
              * @default 0
              */
             disclosure_alerts_more: number;
+            /**
+             * Strategy
+             * @description How the portfolio sits against each strategy target and rule at the end of the period and how that changed since its start: outside first, the furthest outside first. Written in code from the owner's own targets and rules.
+             */
+            strategy?: components["schemas"]["StrategyDeviation"][];
         };
         /**
          * DigestFactSource
@@ -18126,7 +18131,7 @@ export interface components {
              * @default daily
              * @enum {string}
              */
-            kind: "daily" | "weekly";
+            kind: "daily" | "weekly" | "monthly" | "quarterly";
         };
         /** DigestSection */
         DigestSection: {
@@ -18195,6 +18200,36 @@ export interface components {
              * @default 7
              */
             weekly_window_days: number;
+            /**
+             * Monthly Window Days
+             * @description The monthly digest covers this many past days.
+             * @default 30
+             */
+            monthly_window_days: number;
+            /**
+             * Quarterly Window Days
+             * @description The quarterly digest covers this many past days.
+             * @default 91
+             */
+            quarterly_window_days: number;
+            /**
+             * Long Digest Min Severity Step
+             * @description The monthly and quarterly digests raise the severity a story needs for a written summary by this much (up to 3), so the writer's prompt stays bounded over a long window.
+             * @default 1
+             */
+            long_digest_min_severity_step: number;
+            /**
+             * Monthly Max Material Stories
+             * @description The most stories the monthly digest hands the writer (highest severity first).
+             * @default 40
+             */
+            monthly_max_material_stories: number;
+            /**
+             * Quarterly Max Material Stories
+             * @description The most stories the quarterly digest hands the writer (highest severity first).
+             * @default 60
+             */
+            quarterly_max_material_stories: number;
         };
         /** DigestSource */
         DigestSource: {
@@ -26963,6 +26998,10 @@ export interface components {
             daily_digest?: components["schemas"]["JobSchedule"];
             /** @description Weekly digest of the last 7 days. Default: Sundays 18:00. */
             weekly_digest?: components["schemas"]["JobSchedule"];
+            /** @description Monthly digest of the last 30 days. Default: the 1st, 07:30. */
+            monthly_digest?: components["schemas"]["JobSchedule"];
+            /** @description Quarterly digest of the last 91 days. Default: the 1st of Jan/Apr/Jul/Oct, 08:00. */
+            quarterly_digest?: components["schemas"]["JobSchedule"];
             /** @description Monthly review on the first weekday of the month (a scheduled run on another day does nothing). Default: 07:00 on the 1st-3rd. */
             monthly_review?: components["schemas"]["JobSchedule"];
             /** @description Load new SEC Form 13F data sets (published quarterly). Default: the 5th of each month, 05:00. */
@@ -41339,6 +41378,63 @@ export interface components {
             note: string | null;
             body: components["schemas"]["StrategyConfig"];
         };
+        /** StrategyDeviation */
+        StrategyDeviation: {
+            /**
+             * Key
+             * @description The rule id, 'cash', or 'category:<dimension>:<bucket>'.
+             */
+            key: string;
+            /**
+             * Label
+             * @description The target or limit in plain words.
+             */
+            label: string;
+            /**
+             * Subject
+             * @description The position (broker ticker) or bucket the row reads; null for cash, a count or a target that is not a rule.
+             */
+            subject?: string | null;
+            /**
+             * Target
+             * @description What the strategy asks, e.g. '5% (band +/-5%)'.
+             */
+            target: string;
+            /**
+             * Unit
+             * @description 'weight': start_value and end_value are fractions of the portfolio. 'count': they are numbers of positions.
+             * @default weight
+             * @enum {string}
+             */
+            unit: "weight" | "count";
+            /**
+             * Start Value
+             * @description At the start of the period; null when it cannot be read.
+             */
+            start_value: number | null;
+            /**
+             * End Value
+             * @description At the end of the period.
+             */
+            end_value: number | null;
+            /**
+             * Status
+             * @description At the end of the period.
+             * @enum {string}
+             */
+            status: "within" | "outside" | "unknown";
+            /**
+             * Change
+             * @description From the start to the end of the period: it opened (new), closed (cleared), widened (worse), narrowed (better) or stayed (unchanged).
+             * @enum {string}
+             */
+            change: "new" | "cleared" | "worse" | "better" | "unchanged" | "unknown";
+            /**
+             * Implication
+             * @description A sentence written in code from the owner's own target or rule.
+             */
+            implication: string;
+        };
         /** StressEpisodeConfig */
         StressEpisodeConfig: {
             /**
@@ -50197,7 +50293,7 @@ export interface operations {
         parameters: {
             query?: {
                 type?: "digest" | "research" | "review" | "escalation";
-                period?: ("daily" | "weekly") | null;
+                period?: ("daily" | "weekly" | "monthly" | "quarterly") | null;
                 limit?: number;
             };
             header?: never;

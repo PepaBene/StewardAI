@@ -45,7 +45,12 @@ from steward.macro.public_collect import public_data_collect_handler
 from steward.monitor import monitor_handler
 from steward.news.ai_search import news_ai_search_handler
 from steward.news.analysis_job import news_analysis_handler, news_brief_handler
-from steward.news.digest import daily_digest_handler, weekly_digest_handler
+from steward.news.digest import (
+    daily_digest_handler,
+    monthly_digest_handler,
+    quarterly_digest_handler,
+    weekly_digest_handler,
+)
 from steward.news.escalation import event_escalation_handler
 from steward.news.pipeline import news_ingest_handler
 from steward.news.triage import news_triage_handler
@@ -110,6 +115,8 @@ JobType = Literal[
     "news_ingest",
     "daily_digest",
     "weekly_digest",
+    "monthly_digest",
+    "quarterly_digest",
     "research",
     "ownership_13f",
     "insider_trades",
@@ -194,6 +201,8 @@ JOB_HANDLERS: dict[str, JobHandler] = {
     "news_ingest": news_ingest_handler,
     "daily_digest": daily_digest_handler,
     "weekly_digest": weekly_digest_handler,
+    "monthly_digest": monthly_digest_handler,
+    "quarterly_digest": quarterly_digest_handler,
     "research": research_handler,
     "ownership_13f": ownership_13f_handler,
     "insider_trades": insider_trades_handler,

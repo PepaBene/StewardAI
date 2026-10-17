@@ -7696,7 +7696,9 @@
                 {
                   "enum": [
                     "daily",
-                    "weekly"
+                    "weekly",
+                    "monthly",
+                    "quarterly"
                   ],
                   "type": "string"
                 },
@@ -42163,6 +42165,8 @@
                 "news_ingest",
                 "daily_digest",
                 "weekly_digest",
+                "monthly_digest",
+                "quarterly_digest",
                 "research",
                 "ownership_13f",
                 "insider_trades",
@@ -42258,6 +42262,8 @@
                 "news_ingest",
                 "daily_digest",
                 "weekly_digest",
+                "monthly_digest",
+                "quarterly_digest",
                 "research",
                 "ownership_13f",
                 "insider_trades",
@@ -42366,6 +42372,8 @@
                 "news_ingest",
                 "daily_digest",
                 "weekly_digest",
+                "monthly_digest",
+                "quarterly_digest",
                 "research",
                 "ownership_13f",
                 "insider_trades",
@@ -45749,6 +45757,8 @@
               "enum": [
                 "daily_digest",
                 "weekly_digest",
+                "monthly_digest",
+                "quarterly_digest",
                 "escalation"
               ]
             },
@@ -54432,7 +54442,9 @@
             "type": "string",
             "enum": [
               "daily",
-              "weekly"
+              "weekly",
+              "monthly",
+              "quarterly"
             ],
             "title": "Kind"
           },
@@ -54575,6 +54587,14 @@
             "title": "Disclosure Alerts More",
             "description": "Alerts of the period left out of the list above.",
             "default": 0
+          },
+          "strategy": {
+            "items": {
+              "$ref": "#/components/schemas/StrategyDeviation"
+            },
+            "type": "array",
+            "title": "Strategy",
+            "description": "How the portfolio sits against each strategy target and rule at the end of the period and how that changed since its start: outside first, the furthest outside first. Written in code from the owner's own targets and rules."
           }
         },
         "type": "object",
@@ -54663,7 +54683,9 @@
             "type": "string",
             "enum": [
               "daily",
-              "weekly"
+              "weekly",
+              "monthly",
+              "quarterly"
             ],
             "title": "Kind",
             "default": "daily"
@@ -54796,6 +54818,46 @@
             "title": "Weekly Window Days",
             "description": "The weekly digest covers this many past days.",
             "default": 7
+          },
+          "monthly_window_days": {
+            "type": "integer",
+            "maximum": 62.0,
+            "minimum": 7.0,
+            "title": "Monthly Window Days",
+            "description": "The monthly digest covers this many past days.",
+            "default": 30
+          },
+          "quarterly_window_days": {
+            "type": "integer",
+            "maximum": 190.0,
+            "minimum": 28.0,
+            "title": "Quarterly Window Days",
+            "description": "The quarterly digest covers this many past days.",
+            "default": 91
+          },
+          "long_digest_min_severity_step": {
+            "type": "integer",
+            "maximum": 2.0,
+            "minimum": 0.0,
+            "title": "Long Digest Min Severity Step",
+            "description": "The monthly and quarterly digests raise the severity a story needs for a written summary by this much (up to 3), so the writer's prompt stays bounded over a long window.",
+            "default": 1
+          },
+          "monthly_max_material_stories": {
+            "type": "integer",
+            "maximum": 200.0,
+            "minimum": 5.0,
+            "title": "Monthly Max Material Stories",
+            "description": "The most stories the monthly digest hands the writer (highest severity first).",
+            "default": 40
+          },
+          "quarterly_max_material_stories": {
+            "type": "integer",
+            "maximum": 300.0,
+            "minimum": 5.0,
+            "title": "Quarterly Max Material Stories",
+            "description": "The most stories the quarterly digest hands the writer (highest severity first).",
+            "default": 60
           }
         },
         "additionalProperties": false,
@@ -80179,6 +80241,14 @@
           "weekly_digest": {
             "$ref": "#/components/schemas/JobSchedule",
             "description": "Weekly digest of the last 7 days. Default: Sundays 18:00."
+          },
+          "monthly_digest": {
+            "$ref": "#/components/schemas/JobSchedule",
+            "description": "Monthly digest of the last 30 days. Default: the 1st, 07:30."
+          },
+          "quarterly_digest": {
+            "$ref": "#/components/schemas/JobSchedule",
+            "description": "Quarterly digest of the last 91 days. Default: the 1st of Jan/Apr/Jul/Oct, 08:00."
           },
           "monthly_review": {
             "$ref": "#/components/schemas/JobSchedule",
@@ -120416,6 +120486,111 @@
           "body"
         ],
         "title": "StrategyConfigVersion"
+      },
+      "StrategyDeviation": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "The rule id, 'cash', or 'category:<dimension>:<bucket>'."
+          },
+          "label": {
+            "type": "string",
+            "title": "Label",
+            "description": "The target or limit in plain words."
+          },
+          "subject": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Subject",
+            "description": "The position (broker ticker) or bucket the row reads; null for cash, a count or a target that is not a rule."
+          },
+          "target": {
+            "type": "string",
+            "title": "Target",
+            "description": "What the strategy asks, e.g. '5% (band +/-5%)'."
+          },
+          "unit": {
+            "type": "string",
+            "enum": [
+              "weight",
+              "count"
+            ],
+            "title": "Unit",
+            "description": "'weight': start_value and end_value are fractions of the portfolio. 'count': they are numbers of positions.",
+            "default": "weight"
+          },
+          "start_value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start Value",
+            "description": "At the start of the period; null when it cannot be read."
+          },
+          "end_value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End Value",
+            "description": "At the end of the period."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "within",
+              "outside",
+              "unknown"
+            ],
+            "title": "Status",
+            "description": "At the end of the period."
+          },
+          "change": {
+            "type": "string",
+            "enum": [
+              "new",
+              "cleared",
+              "worse",
+              "better",
+              "unchanged",
+              "unknown"
+            ],
+            "title": "Change",
+            "description": "From the start to the end of the period: it opened (new), closed (cleared), widened (worse), narrowed (better) or stayed (unchanged)."
+          },
+          "implication": {
+            "type": "string",
+            "title": "Implication",
+            "description": "A sentence written in code from the owner's own target or rule."
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "label",
+          "target",
+          "start_value",
+          "end_value",
+          "status",
+          "change",
+          "implication"
+        ],
+        "title": "StrategyDeviation"
       },
       "StressEpisodeConfig": {
         "properties": {

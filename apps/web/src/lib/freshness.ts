@@ -15,7 +15,7 @@ import { formatDateTime, formatRelative, formatTime } from "@/lib/format";
 
 const HOUR = 3_600_000;
 
-export type FreshnessKind = "news" | "daily_digest" | "weekly_digest" | "escalation";
+export type FreshnessKind = "news" | "daily_digest" | "weekly_digest" | "monthly_digest" | "quarterly_digest" | "escalation";
 
 /** Age after which the data is marked stale when no schedule is known, with the reason. */
 export const STALE_AFTER: Record<FreshnessKind, { hours: number; why: string }> = {
@@ -24,6 +24,8 @@ export const STALE_AFTER: Record<FreshnessKind, { hours: number; why: string }> 
   // Written on weekdays at 07:00: older than a day and a bit is not today's digest.
   daily_digest: { hours: 26, why: "a daily digest is written every weekday morning" },
   weekly_digest: { hours: 8 * 24, why: "a weekly digest is written every Sunday" },
+  monthly_digest: { hours: 32 * 24, why: "a monthly digest is written on the 1st of each month" },
+  quarterly_digest: { hours: 93 * 24, why: "a quarterly digest is written on the 1st of January, April, July and October" },
   // An impact note describes the event as it stood when written.
   escalation: { hours: 72, why: "an impact note describes the event as it stood when it was written" },
 };
@@ -37,6 +39,8 @@ export const DUE_GRACE: Record<FreshnessKind, { minutes: number; what: string; m
   news: { minutes: 30, what: "the next news check", missing: "no newer check has finished" },
   daily_digest: { minutes: 120, what: "the next daily digest", missing: "no newer digest has been written" },
   weekly_digest: { minutes: 120, what: "the next weekly digest", missing: "no newer digest has been written" },
+  monthly_digest: { minutes: 180, what: "the next monthly digest", missing: "no newer digest has been written" },
+  quarterly_digest: { minutes: 180, what: "the next quarterly digest", missing: "no newer digest has been written" },
   escalation: null,
 };
 
@@ -116,7 +120,8 @@ export function freshness(
 }
 
 export function digestFreshnessKind(kind: string | null | undefined): FreshnessKind {
-  return kind === "weekly" ? "weekly_digest" : "daily_digest";
+  if (kind === "weekly" || kind === "monthly" || kind === "quarterly") return `${kind}_digest`;
+  return "daily_digest";
 }
 
 /**

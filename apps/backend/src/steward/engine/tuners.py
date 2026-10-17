@@ -486,7 +486,7 @@ async def tune_daily_times(pool: asyncpg.Pool, now: dt.datetime) -> dict[str, An
 MODEL_FIELDS: dict[str, tuple[str, ...]] = {
     # field -> the job types whose health shows a problem with it
     "news.classification_model": ("news_ingest",),
-    "digest.model": ("daily_digest", "weekly_digest"),
+    "digest.model": ("daily_digest", "weekly_digest", "monthly_digest", "quarterly_digest"),
     "thesis_settings.model": ("thesis",),
     "chat.model": (),  # chat is not a job: no health to watch, so no automatic put-back
 }

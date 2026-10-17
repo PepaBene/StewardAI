@@ -289,7 +289,7 @@ async def get_reports(
     pool: Pool,
     _owner: Owner,
     type: Annotated[Literal["digest", "research", "review", "escalation"], Query()] = "digest",
-    period: Annotated[Literal["daily", "weekly"] | None, Query()] = None,
+    period: Annotated[Literal["daily", "weekly", "monthly", "quarterly"] | None, Query()] = None,
     limit: Annotated[int, Query(ge=1, le=200)] = 60,
 ) -> list[ReportSummary]:
     return await list_reports(pool, type, period, limit, await _jobs_config(pool))
@@ -512,7 +512,7 @@ async def get_news_feedback(
 
 
 class DigestRequest(BaseModel):
-    kind: Literal["daily", "weekly"] = "daily"
+    kind: Literal["daily", "weekly", "monthly", "quarterly"] = "daily"
 
 
 @router.post("/jobs/digest", tags=["jobs"], status_code=status.HTTP_202_ACCEPTED)

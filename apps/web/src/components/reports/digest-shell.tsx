@@ -14,7 +14,16 @@ import { digestFreshnessKind } from "@/lib/freshness";
 import { jobHref } from "@/lib/jobs/job-detail";
 import { shortDay } from "@/lib/news/stats";
 
-export type DigestPeriod = "daily" | "weekly";
+export type DigestPeriod = "daily" | "weekly" | "monthly" | "quarterly";
+
+export const PERIOD_LABEL: Record<DigestPeriod, string> = { daily: "Daily", weekly: "Weekly", monthly: "Monthly", quarterly: "Quarterly" };
+
+const SCHEDULE: Record<DigestPeriod, string> = {
+  daily: "The daily digest is written on weekdays at 07:00.",
+  weekly: "The weekly digest is written on Sundays at 18:00.",
+  monthly: "The monthly digest is written on the 1st of each month at 07:30; write one now to see the last 30 days.",
+  quarterly: "The quarterly digest is written on the 1st of January, April, July and October at 08:00; write one now to see the last 91 days.",
+};
 
 function weekday(iso: string): string {
   return new Intl.DateTimeFormat("en-US", { weekday: "short" }).format(new Date(iso));
@@ -34,7 +43,7 @@ export function digestItems(reports: readonly ReportSummary[], period: DigestPer
   return reports.map((r) => ({
     id: r.id,
     href: `/reports/${r.id}`,
-    kind: period === "weekly" ? "Weekly" : "Daily",
+    kind: PERIOD_LABEL[period],
     dateLabel: `${weekday(r.created_at)} ${shortDay(new Date(r.created_at))}`,
     at: r.created_at,
     title: r.lead || r.headline || r.title,
@@ -117,7 +126,7 @@ export function DigestShell({
       selectedId={selected}
       emptyList={
         <EmptyState title={`No ${period} digests yet`}>
-          {period === "daily" ? "The daily digest is written on weekdays at 07:00." : "The weekly digest is written on Sundays at 18:00."}
+          {SCHEDULE[period]}
         </EmptyState>
       }
       aside={

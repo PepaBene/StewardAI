@@ -1,4 +1,5 @@
-"""Daily and weekly digests (`daily_digest`, `weekly_digest`).
+"""Daily, weekly, monthly and quarterly digests (`daily_digest`, `weekly_digest`,
+`monthly_digest`, `quarterly_digest`).
 
 The digest is assembled in code from stored stories, verdicts and facts, grouped by holding.
 Only stories at or above the configured severity get a written summary; the model writes it
@@ -41,6 +42,7 @@ from steward.llm.cache import ResultCache
 from steward.llm.client import LLM, create_llm
 from steward.llm.routing import routing_client
 from steward.llm.types import LLMError, Message, Request
+from steward.news.digest_strategy import StrategyDeviation, load_strategy_deviations
 from steward.news.link import short_name
 from steward.notify.channels import (
     MISSING_CHANNEL_HELP,
@@ -63,7 +65,21 @@ from steward.verify.claims import (
 
 logger = logging.getLogger(__name__)
 
-DigestKind = Literal["daily", "weekly"]
+DigestKind = Literal["daily", "weekly", "monthly", "quarterly"]
+
+# How each kind names its default window in a headline (the settings can change the window; the
+# headline then names the real one, see `period_text`).
+DEFAULT_PERIOD: dict[str, str] = {
+    "daily": "24 hours",
+    "weekly": "7 days",
+    "monthly": "30 days",
+    "quarterly": "91 days",
+}
+
+
+def digest_title(kind: DigestKind, day: dt.date) -> str:
+    """'Monthly digest, 2026-10-01': the report's title and the text's heading."""
+    return f"{kind.capitalize()} digest, {day.isoformat()}"
 
 
 def period_text(window: dt.timedelta) -> str:
@@ -330,6 +346,12 @@ class DigestBody(BaseModel):
     disclosure_alerts_more: int = Field(
         default=0, description="Alerts of the period left out of the list above."
     )
+    strategy: list[StrategyDeviation] = Field(
+        default_factory=list,
+        description="How the portfolio sits against each strategy target and rule at the end of "
+        "the period and how that changed since its start: outside first, the furthest outside "
+        "first. Written in code from the owner's own targets and rules.",
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -480,7 +502,11 @@ async def gather(
     profiles: HoldingProfilesConfig,
     min_material: int,
     min_listed: int = 1,
+    max_material: int | None = None,
 ) -> Material:
+    """The window's stories, verdicts and sources. `max_material` caps the stories handed to
+    the writer (the highest severity first, the order of the query): a quarter holds far more
+    material stories than a prompt should carry. The rest stay listed by headline."""
     stories = await pool.fetch(
         "select id, ticker, event_type, severity, status, confidence, headline"
         " from public.story_cluster where last_seen >= $1 and last_seen < $2"
@@ -559,7 +585,9 @@ async def gather(
                 news_item_ids=[i["id"] for i in story_items],
             )
         )
-        if story["severity"] >= min_material:
+        if story["severity"] >= min_material and (
+            max_material is None or len(material.material_story_ids) < max_material
+        ):
             material.material_story_ids.add(story["id"])
     for v in verdicts:
         text = (
@@ -724,7 +752,7 @@ def keep_cited(
 def headline_for(
     kind: DigestKind, material: Material, period: str | None = None
 ) -> tuple[str, bool]:
-    period = period or ("24 hours" if kind == "daily" else "7 days")
+    period = period or DEFAULT_PERIOD[kind]
     count = len(material.material_story_ids)
     breaches = sum(
         1 for s in material.sections.values() for v in s.verdicts if v.status == "breach"
@@ -764,7 +792,7 @@ def render_text(body: DigestBody, app_url: str | None, markdown: bool) -> str:
         mark = " [not supported by its sources]" if sentence.check == "unsupported" else ""
         return (f" ({'; '.join(refs)})" if refs else "") + mark
 
-    title = f"{body.kind.capitalize()} digest, {body.window_end.date().isoformat()}"
+    title = digest_title(body.kind, body.window_end.date())
     lines = [f"# {title}" if markdown else title, "", body.headline]
     for s in body.overview:
         lines.append(s.text + cites(s))
@@ -789,6 +817,10 @@ def render_text(body: DigestBody, app_url: str | None, markdown: bool) -> str:
             state = " (cleared)" if flag.cleared_at else ""
             kind = {"band": "out of band", "hard_limit": "hard limit", "rule": "rule breach"}
             lines.append(f"- [{kind[flag.kind]}] {flag.detail}{state}")
+    if body.strategy:
+        lines += ["", "## Strategy" if markdown else "STRATEGY"]
+        for d in body.strategy:
+            lines.append(f"- [{d.status}, {d.change}] {d.implication}")
     if body.thesis_changes:
         lines += ["", "## Thesis status changes" if markdown else "THESIS STATUS CHANGES"]
         for c in body.thesis_changes:
@@ -846,8 +878,14 @@ async def build_digest(
     window = settings.window(kind)
     start = end - window
     period = period_text(window)
+    summarised = settings.summarised_floor(kind)
+    listed = settings.min_severity_listed
+    if kind in ("monthly", "quarterly"):
+        # Over a month or a quarter the lowest severities are noise by volume: list from the
+        # configured summary floor, summarise from the raised one.
+        listed = min(max(listed, settings.min_severity_summarised), summarised)
     material = await gather(
-        pool, start, end, profiles, settings.min_severity_summarised, settings.min_severity_listed
+        pool, start, end, profiles, summarised, listed, settings.material_cap(kind)
     )
     headline, nothing = headline_for(kind, material, period)
     flags = await portfolio_flags(pool, start, end)
@@ -882,6 +920,9 @@ async def build_digest(
         sources=list(material.sources.values()),
         alerts_sent=int(alerts or 0),
         portfolio=flags,
+        # Stored and rendered, not handed to the writer: a written sentence must cite news items
+        # or facts, and the claim checker has nothing to check a code-computed weight against.
+        strategy=await load_strategy_deviations(pool, start, end),
         thesis_changes=await thesis_changes(pool, start, end),
         reviews_due=reviews_due(theses or ThesesConfig(), end.date()),
         macro=await macro_figures(pool, start),
@@ -1072,7 +1113,7 @@ async def run_digest(
             " period_end, config_version_ids, job_id)"
             " values ('digest', $1, $2, $3::jsonb, $4, $5, $6, $7, $8) returning id",
             kind,
-            f"{kind.capitalize()} digest, {now.date().isoformat()}",
+            digest_title(kind, now.date()),
             body.model_dump_json(),
             render_text(body, app_url, markdown=True),
             body.window_start,
@@ -1143,3 +1184,5 @@ def _handler(kind: DigestKind) -> JobHandler:
 
 daily_digest_handler = _handler("daily")
 weekly_digest_handler = _handler("weekly")
+monthly_digest_handler = _handler("monthly")
+quarterly_digest_handler = _handler("quarterly")

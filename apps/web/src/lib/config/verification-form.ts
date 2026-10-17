@@ -16,11 +16,13 @@ import { fractionToPercent, percentToFraction } from "./strategy-form";
  * field before anything is sent; the API's own 422 answer is shown the same way.
  */
 
-export const CLAIM_TARGETS = ["daily_digest", "weekly_digest", "escalation"] as const satisfies readonly ClaimTarget[];
+export const CLAIM_TARGETS = ["daily_digest", "weekly_digest", "monthly_digest", "quarterly_digest", "escalation"] as const satisfies readonly ClaimTarget[];
 
 export const CLAIM_TARGET_LABELS: Record<ClaimTarget, string> = {
   daily_digest: "Daily digest",
   weekly_digest: "Weekly digest",
+  monthly_digest: "Monthly digest",
+  quarterly_digest: "Quarterly digest",
   escalation: "Impact notes",
 };
 
