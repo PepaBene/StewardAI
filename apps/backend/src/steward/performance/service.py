@@ -160,6 +160,10 @@ def freshness(
     )  # fmt: skip
 
 
+# Whether the default benchmark indices include reinvested dividends ("total") or not ("price").
+INDEX_BASIS: dict[str, str] = {"^spx": "price", "^ndx": "price", "^dji": "price", "^dax": "total"}
+
+
 def _float(value: Decimal | None) -> float | None:
     return None if value is None else float(value)
 
@@ -267,18 +271,54 @@ def _rolling(
     return out
 
 
+async def _in_currency(
+    pool: asyncpg.Pool, series: list[tuple[dt.date, Decimal]], quote: str, base: str
+) -> list[tuple[dt.date, Decimal]]:
+    """The closes converted at each day's reference rate (days without a rate dropped)."""
+    if quote == base or not series:
+        return series
+    from steward.portfolio.risk import _fx_source
+
+    source = await _fx_source(pool, base)
+    fx = await load_fx_history(pool, source, {quote}, series[0][0], series[-1][0])
+    out = []
+    for day, close in series:
+        rate = fx.conversion(quote, base, day)
+        if rate is not None:
+            out.append((day, close * rate))
+    return out
+
+
 async def _benchmark_series(
-    pool: asyncpg.Pool, spec: BenchmarkSpec | None, jobs: JobsConfig, since: dt.date
+    pool: asyncpg.Pool,
+    spec: BenchmarkSpec | None,
+    jobs: JobsConfig,
+    since: dt.date,
+    base: str | None = None,
 ) -> tuple[str | None, list[tuple[dt.date, Decimal]], str | None, str, list[str]]:
-    """(label, series, currency, basis, notes) of the configured benchmark or blend."""
+    """(label, series, currency, basis, notes) of the configured benchmark or blend. With no
+    benchmark configured, the default index is converted to `base` when its quote currency is
+    known, so the comparison is like for like (the index's own move plus the currency's)."""
+    from steward.portfolio.risk import benchmark_currency
+
     notes: list[str] = []
     if spec is None:
         symbols = jobs.prices.benchmark_symbols
         if not symbols:
             return None, [], None, "unknown", ["no benchmark chosen"]
         _ref, bars = await index_series(pool, jobs.prices, symbols[0], since)
+        label = jobs.prices.index_label(symbols[0])
+        closes = [(d, Decimal(str(c))) for d, c in bars]
+        quote = benchmark_currency(symbols[0])
+        basis = INDEX_BASIS.get(symbols[0].lower(), "unknown")
+        if quote and base:
+            converted = await _in_currency(pool, closes, quote, base)
+            if len(converted) >= 2:
+                if quote != base:
+                    notes.append(f"{label} converted from {quote} to {base} at each day's rate")
+                return label, converted, base, basis, notes
         notes.append("benchmark currency and dividend basis are not recorded: set them below")
-        return jobs.prices.index_label(symbols[0]), [(d, Decimal(str(c))) for d, c in bars], None, "unknown", notes
+        return label, closes, None, "unknown", notes
     series: dict[str, list[tuple[dt.date, Decimal]]] = {}
     for component in spec.components:
         _ref, bars = await index_series(pool, jobs.prices, component.symbol, since)
@@ -399,10 +439,10 @@ async def performance_report(
     jobs_cfg = await load_active(pool, "jobs", JobsConfig)
     jobs = jobs_cfg.body if jobs_cfg else JobsConfig()
     first_day = days[0].date
-    label, bench_series, bench_ccy, bench_basis, bench_notes = await _benchmark_series(
-        pool, settings.benchmark, jobs, first_day - dt.timedelta(days=10)
-    )
     base_currency = latest["base_currency"]
+    label, bench_series, bench_ccy, bench_basis, bench_notes = await _benchmark_series(
+        pool, settings.benchmark, jobs, first_day - dt.timedelta(days=10), base_currency
+    )
     windows: list[r.WindowOut] = []
     for window_label in WINDOW_LABELS:
         start = window_start(window_label, days[-1].date)
@@ -861,6 +901,7 @@ async def attribution_report(
         settings.benchmark,
         jobs_cfg.body if jobs_cfg else JobsConfig(),
         report.start - dt.timedelta(days=10),
+        snapshots[-1]["base_currency"],
     )
     bench_return = series_return(bench_series, report.start, report.end) if label else None
     if label is not None and bench_return is not None:

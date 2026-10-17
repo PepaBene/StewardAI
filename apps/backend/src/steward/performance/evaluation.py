@@ -316,7 +316,7 @@ async def evaluation(
     jobs = jobs_cfg.body if jobs_cfg else JobsConfig()
     first = record.valuation_days[0]
     label, bench, _ccy, _basis, bench_notes = await service._benchmark_series(
-        pool, settings.benchmark, jobs, first - dt.timedelta(days=10)
+        pool, settings.benchmark, jobs, first - dt.timedelta(days=10), record.base_currency
     )
     notes = list(bench_notes)
     if label is None or not bench:

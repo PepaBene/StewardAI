@@ -314,6 +314,49 @@ def test_cash_reconciliation_within_and_outside_tolerance():
     assert off.difference == D("-10") and not off.within_tolerance
 
 
+async def test_default_benchmark_is_converted_to_the_portfolio_currency(monkeypatch):
+    from steward.config.jobs import JobsConfig
+    from steward.performance import service
+    from steward.portfolio import risk
+
+    bars = [(day(2026, 3, 2), 100.0), (day(2026, 3, 3), 100.0), (day(2026, 3, 4), 110.0)]
+    rates = {day(2026, 3, 2): D("20"), day(2026, 3, 3): D("22"), day(2026, 3, 4): D("22")}
+
+    class Fx:
+        def conversion(self, quote, base, on):
+            return rates.get(on) if (quote, base) == ("USD", "CZK") else None
+
+    async def index_series(*_args):
+        return None, bars
+
+    async def fx_history(*_args, **_kw):
+        return Fx()
+
+    async def fx_source(*_args):
+        return "cnb"
+
+    monkeypatch.setattr(service, "index_series", index_series)
+    monkeypatch.setattr(service, "load_fx_history", fx_history)
+    monkeypatch.setattr(risk, "_fx_source", fx_source)
+    jobs = JobsConfig()
+    symbol = jobs.prices.benchmark_symbols[0]
+    assert symbol == "^spx"
+    label, series, currency, basis, notes = await service._benchmark_series(
+        None, None, jobs, day(2026, 3, 1), "CZK"
+    )
+    # 100 USD at 20 -> 2000 CZK; flat in dollars but the dollar up 10 %: a CZK investor's
+    # benchmark moved; then the index itself rises 10 %.
+    assert [v for _, v in series] == [D("2000.0"), D("2200.0"), D("2420.0")]
+    assert (currency, basis) == ("CZK", "price")
+    assert notes == [f"{label} converted from USD to CZK at each day's rate"]
+    # Without a portfolio currency nothing is converted and the gap is stated.
+    _l, raw_series, none, unknown, why = await service._benchmark_series(
+        None, None, jobs, day(2026, 3, 1)
+    )
+    assert none is None and unknown == "unknown" and raw_series[0][1] == D("100.0")
+    assert "not recorded" in why[0]
+
+
 def test_cash_in_a_pie_is_cash_not_a_break():
     from steward.performance.service import _cash_checks
 
