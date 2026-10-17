@@ -69,6 +69,26 @@ async def load_active[M: BaseModel](
     )
 
 
+async def load_version[M: BaseModel](
+    conn: asyncpg.Connection | asyncpg.Pool, domain: str, version_id: int, model: type[M]
+) -> StoredConfig[M] | None:
+    """One stored version of a domain, active or not; None when it no longer exists."""
+    row = await conn.fetchrow(
+        "select id, created_at, note, body from public.config_version where domain = $1"
+        " and id = $2",
+        domain,
+        version_id,
+    )
+    if row is None:
+        return None
+    return StoredConfig(
+        id=row["id"],
+        created_at=row["created_at"],
+        note=row["note"],
+        body=model.model_validate(json.loads(row["body"])),
+    )
+
+
 class ConfigConflictError(Exception):
     """The domain's active version is not the one the caller based its change on: someone
     saved in between. Nothing was saved."""

@@ -486,6 +486,39 @@ def test_a_thesis_run_resumes_after_another_research_profile_is_edited() -> None
     )
 
 
+async def test_a_resume_after_a_config_change_reads_the_first_attempts_versions() -> None:
+    # Production, 16 Oct 2026: 9 thesis runs resumed after a restart, saw a newer strategy and
+    # failed, throwing away paid steps. They now read the versions they started with.
+    import datetime as dt
+
+    from steward.research.run import _RUN_CONFIGS, first_attempt_configs
+
+    minimal = {"strategy": {"base_currency": "CZK"}}
+    bodies = {
+        domain: model.model_validate(minimal.get(domain, {})).model_dump_json()
+        for domain, model in _RUN_CONFIGS
+    }
+
+    class Pool:
+        def __init__(self, missing: int | None = None) -> None:
+            self.asked: list[tuple[str, int]] = []
+            self.missing = missing
+
+        async def fetchrow(self, query: str, domain: str, version_id: int) -> Any:
+            self.asked.append((domain, version_id))
+            if version_id == self.missing:
+                return None
+            return {"id": version_id, "created_at": dt.datetime(2026, 10, 16), "note": None,
+                    "body": bodies[domain]}  # fmt: skip
+
+    pool = Pool()
+    got = await first_attempt_configs(pool, [94, 10, 2, None, 3, 4])
+    assert got is not None and got[0].id == 94 and got[3] is None
+    assert pool.asked[0] == ("research_profiles", 94) and ("strategy", 2) in pool.asked
+    assert await first_attempt_configs(Pool(missing=2), [94, 10, 2, 20, 3, 4]) is None
+    assert await first_attempt_configs(Pool(), [94, 10]) is None
+
+
 class _ConsensusPool:
     def __init__(self, row: dict[str, Any] | None) -> None:
         self.row = row

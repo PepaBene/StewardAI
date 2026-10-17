@@ -42,7 +42,7 @@ from steward.config.holding_profiles import HoldingProfilesConfig
 from steward.config.news_sources import NewsSourcesConfig
 from steward.config.prompts import load_prompts
 from steward.config.research import SENTENCES_BY_DEPTH, ResearchProfilesConfig
-from steward.config.store import load_active
+from steward.config.store import load_active, load_version
 from steward.config.strategy import StrategyConfig
 from steward.config.thesis import ThesesConfig
 from steward.config.verification import VerificationConfig
@@ -533,6 +533,36 @@ def same_run_inputs(first: dict[str, Any], versions: list[Any], own: list[str | 
     return before is None or before == own[:known]
 
 
+_RUN_CONFIGS: tuple[tuple[str, type[BaseModel]], ...] = (
+    ("research_profiles", ResearchProfilesConfig),
+    ("theses", ThesesConfig),
+    ("strategy", StrategyConfig),
+    ("holding_profiles", HoldingProfilesConfig),
+    ("news_sources", NewsSourcesConfig),
+    ("verification", VerificationConfig),
+)
+
+
+async def first_attempt_configs(pool: Any, ids: list[Any]) -> tuple[Any, ...] | None:
+    """The six configs at the versions a run's first attempt used (None where it had none);
+    None when one of them is gone or no longer validates."""
+    if len(ids) != len(_RUN_CONFIGS):
+        return None
+    out: list[Any] = []
+    for (domain, model), version_id in zip(_RUN_CONFIGS, ids, strict=True):
+        if version_id is None:
+            out.append(None)
+            continue
+        try:
+            stored = await load_version(pool, domain, int(version_id), model)
+        except ValueError:  # pydantic's ValidationError is a ValueError
+            return None
+        if stored is None:
+            return None
+        out.append(stored)
+    return tuple(out)
+
+
 async def run_research(ctx: JobContext, deps: ResearchDeps) -> int:
     pool = ctx.pool
     ticker = str(ctx.params.get("ticker") or "").strip()
@@ -554,11 +584,20 @@ async def run_research(ctx: JobContext, deps: ResearchDeps) -> int:
             return {"ids": versions, "own": own}
 
         # The cached steps below were made under the versions of the first attempt. A resume
-        # under newer ones would mix two layouts, so it stops and the owner starts a new run.
-        if not same_run_inputs(
-            await ctx.checkpoint("config_versions", first_versions), versions, own
-        ):
-            raise JobFailed("the configuration changed since this run started; start a new run")
+        # under newer ones would mix two layouts, so it reads those first versions again
+        # rather than failing: 9 runs on 16 Oct 2026 threw away paid steps that way.
+        first = await ctx.checkpoint("config_versions", first_versions)
+        if not same_run_inputs(first, versions, own):
+            pinned = await first_attempt_configs(pool, first.get("ids") or [])
+            if pinned is None:
+                raise JobFailed(
+                    "the configuration changed since this run started and its first versions "
+                    "can no longer be read; start a new run"
+                )
+            research_v, theses_v, strategy_v, profiles_v, sources_v, verification_v = pinned
+            versions = list(first["ids"])
+            own = run_inputs(ticker, theses_v, profiles_v, research_v, ctx.params.get("profile"))
+            step.detail["resumed_on_first_versions"] = versions
         for version_id in versions:
             await ctx.record_config_version(version_id)
         research = research_v.body if research_v else ResearchProfilesConfig()
