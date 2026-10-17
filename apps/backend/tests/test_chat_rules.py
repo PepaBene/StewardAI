@@ -125,3 +125,21 @@ def test_holding_is_matched_exactly_one_way() -> None:
     assert match_holding("when does aapl report", held) is None  # ticker must be upper case
     assert match_holding("When does SAP report?", held) == "SAP_US_EQ"
     assert match_holding("When does AAPL or SAP report?", held) is None
+
+
+@pytest.mark.parametrize(
+    ("text", "clean", "ids"),
+    [
+        ("The cash is 15,009 CZK. citeS1", "The cash is 15,009 CZK.", ["S1"]),
+        ("It is at risk [S19, S20, S6].", "It is at risk.", ["S19", "S20", "S6"]),
+        ("Revenue fell 【S3】 by a third (S4).", "Revenue fell by a third.", ["S3", "S4"]),
+        ("ASML raised its outlook citeturn0search1.", "ASML raised its outlook.", []),
+        ("Section [S1a] stays.", "Section [S1a] stays.", []),
+    ],
+)
+def test_inline_citation_markers_move_into_the_sources(
+    text: str, clean: str, ids: list[str]
+) -> None:
+    from steward.chat.assistant import split_inline_citations
+
+    assert split_inline_citations(text) == (clean, ids)

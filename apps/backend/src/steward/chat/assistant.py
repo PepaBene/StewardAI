@@ -281,6 +281,31 @@ def draft_note(draft: ChatAnswerDraft | None) -> str | None:
     return draft.insufficient_evidence
 
 
+_IDS = r"S\d+(?:\s*[,;]\s*S\d+)*"
+# Citation markers a model writes into the sentence text instead of `source_ids`: "citeS1",
+# "【S1】", "[S19, S20, S6]", "(S3)", and its own "citeturn0search1" tokens. They are moved
+# into the sentence's sources (when the registry knows them) and removed from what is shown.
+_INLINE_CITE = re.compile(
+    rf"\s*(?:\bcite\s*({_IDS})|【\s*({_IDS})\s*】|\[\s*({_IDS})\s*\]|\(\s*({_IDS})\s*\)"
+    r"|\bcite(?:turn\d+[a-z]+\d+)+)"
+)
+
+
+def split_inline_citations(text: str) -> tuple[str, list[str]]:
+    """The sentence without inline citation markers, and the ids they named."""
+    ids: list[str] = []
+
+    def take(m: re.Match[str]) -> str:
+        for group in m.groups():
+            if group:
+                ids.extend(re.findall(r"S\d+", group))
+        return ""
+
+    clean = _INLINE_CITE.sub(take, text)
+    clean = re.sub(r"\s+([.,;:!?])", r"\1", clean)
+    return re.sub(r"\s{2,}", " ", clean).strip(), ids
+
+
 def finish_answer(
     draft: ChatAnswerDraft,
     registry: Registry,
@@ -292,9 +317,11 @@ def finish_answer(
     known = registry.ids()
     out: list[ChatSentence] = []
     for s in draft.sentences:
-        if not s.text.strip():
+        text, inline = split_inline_citations(s.text)
+        if not text:
             continue
-        ids = [i for i in dict.fromkeys(s.source_ids) if i in known]
+        s = s.model_copy(update={"text": text})
+        ids = [i for i in dict.fromkeys([*s.source_ids, *inline]) if i in known]
         for url in s.urls:
             tier = tier_of(host_of(url))
             if url in titles and tier is not None and tier in tiers:
