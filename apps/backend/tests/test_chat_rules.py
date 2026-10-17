@@ -135,6 +135,11 @@ def test_holding_is_matched_exactly_one_way() -> None:
         ("Revenue fell 【S3】 by a third (S4).", "Revenue fell by a third.", ["S3", "S4"]),
         ("ASML raised its outlook citeturn0search1.", "ASML raised its outlook.", []),
         ("Section [S1a] stays.", "Section [S1a] stays.", []),
+        (
+            "Its price is **9.506 EUR**, __15.21%__ above.",
+            "Its price is 9.506 EUR, 15.21% above.",
+            [],
+        ),
     ],
 )
 def test_inline_citation_markers_move_into_the_sources(

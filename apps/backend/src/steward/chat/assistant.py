@@ -100,6 +100,8 @@ afterwards — that reads as confident when it isn't. Instead set insufficient_e
 short, plain note on what's missing (e.g. which figure or period you could not find), and \
 leave sentences empty. A partial answer is fine: write the sentences you can actually \
 source, and use insufficient_evidence only for the part you can't.
+
+Sentences are shown as plain text: no Markdown (no **bold**, headings or bullet markers).
 """
 
 
@@ -302,6 +304,8 @@ def split_inline_citations(text: str) -> tuple[str, list[str]]:
         return ""
 
     clean = _INLINE_CITE.sub(take, text)
+    # The thread shows plain text, so "**9.506 EUR**" showed its asterisks.
+    clean = re.sub(r"\*\*(.+?)\*\*|__(.+?)__", lambda m: m.group(1) or m.group(2), clean)
     clean = re.sub(r"\s+([.,;:!?])", r"\1", clean)
     return re.sub(r"\s{2,}", " ", clean).strip(), ids
 
