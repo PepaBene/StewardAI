@@ -77,7 +77,7 @@ function Area({ area, items }: { area: ChangeItem["area"]; items: ChangeItem[] }
   const ordered = readingOrder(area, items);
   const verdict = areaVerdict(
     area,
-    items.map((i) => ({ ...i, name: names.get(i.subject) ?? undefined })),
+    items.map((i) => ({ ...i, name: names.get(i.subject) ?? names.get(`${i.subject}_US_EQ`) ?? undefined })),
   );
   const shown = all ? ordered : ordered.slice(0, FIRST_ROWS);
   return (
@@ -105,7 +105,7 @@ function Area({ area, items }: { area: ChangeItem["area"]; items: ChangeItem[] }
               <th scope="row" className="py-1.5 pr-3 text-left font-normal">
                 <EntityName id={c.subject} chip={false} className="font-semibold" /><span className="text-text-muted">{KIND_LABEL[c.kind]}</span>
                 <div className="text-xs text-text-muted" title={`Relevance ${c.relevance ?? 0} of 100: ${c.relevance_reason}`}>
-                  {c.what}
+                  {c.what.replace(/_/g, " ")}
                 </div>
               </th>
               <td className="num py-1.5 text-right">{c.before ?? "No earlier record"}</td>

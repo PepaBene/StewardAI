@@ -61,7 +61,7 @@ export function estimatesVerdict(items: readonly Named[]): VerdictResult {
     };
   }
   const up = material.filter((m) => m.c > 0).length;
-  const top = material.slice(0, 3).map((m) => `${label(m.i)} ${m.i.what.replace(/^\w+ /, "")} ${pct(m.c)}`);
+  const top = material.slice(0, 3).map((m) => `${label(m.i)} ${m.i.what.replace(/^\w+ /, "").replace(/_/g, " ")} ${pct(m.c)}`);
   return {
     tone: up >= material.length - up ? "good" : "caution",
     text: `${material.length} of ${items.length} estimate changes moved ${MATERIAL_MOVE * 100}% or more (${up} up, ${material.length - up} down); the largest: ${top.join("; ")}. Rising estimates after a result are one of the strategy's measured edges (principle 7b); the rest is routine drift.`,

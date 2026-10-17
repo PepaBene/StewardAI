@@ -19,6 +19,8 @@ from typing import Any, Literal, Self
 import asyncpg
 from pydantic import BaseModel, Field, model_validator
 
+from steward.ownership.read import PRICE_OUTLIER
+
 Kind = Literal["new", "revised", "moved", "added", "removed", "dropped"]
 Area = Literal[
     "fundamentals", "estimates", "price", "fund_holdings", "graph", "macro", "ownership",
@@ -489,7 +491,6 @@ async def _macro(pool: asyncpg.Pool, since_cut: dt.datetime) -> tuple[list[Chang
 
 
 COMPLETE_QUARTER_MANAGERS = 1000
-PRICE_OUTLIER = 10  # a line whose value per share is this far from the median is a filer error
 
 # Holders and shares per holding in the two latest complete quarters, by the amendment rules of
 # `ownership.read.EFFECTIVE` (per manager and period: the latest original or RESTATEMENT, plus

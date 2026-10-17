@@ -38,6 +38,27 @@ with f as (
 )
 """
 
+PRICE_OUTLIER = 10  # a line whose value per share is this far from the median is a filer error
+
+# The effective share lines of the CUSIPs in $2, less any line whose value per share sits a
+# factor PRICE_OUTLIER from the median line of its CUSIP: one manager filing shares and value
+# swapped (3.2 bn GOOGL shares) otherwise moved the quarter's total by 60%.
+CLEAN_LINES = f"""
+, lines as (
+  select e.cik, e.accession, h.cusip, h.shares, h.value_usd,
+         h.value_usd::float8 / nullif(h.shares, 0)::float8 px
+  from effective e join public.institutional_holding h on h.accession = e.accession
+  where h.cusip = any($2::text[]) and h.shares_type = 'SH' and h.put_call is null
+), med as (
+  select cusip, percentile_cont(0.5) within group (order by px) m
+  from lines where px > 0 group by cusip
+), clean as (
+  select l.* from lines l left join med using (cusip)
+  where l.px is null or l.px <= 0 or med.m is null
+     or l.px between med.m / {PRICE_OUTLIER} and med.m * {PRICE_OUTLIER}
+)
+"""  # noqa: S608 - constant SQL, values bound as parameters
+
 
 class TopHolder(BaseModel):
     cik: str
@@ -148,12 +169,11 @@ async def _period_figures(
     pool: asyncpg.Pool, period: dt.date, cusips: list[str]
 ) -> tuple[int, Decimal, Decimal, dt.date | None, set[str]]:
     rows = await pool.fetch(
-        EFFECTIVE + " select e.cik, sum(h.shares) as shares, sum(h.value_usd) as value,"  # noqa: S608 - constant SQL, values bound as parameters
-        " max(f.filed) as filed from effective e"
-        " join public.institutional_holding h on h.accession = e.accession"
-        " join public.form13f_filing f on f.accession = e.accession"
-        " where h.cusip = any($2::text[]) and h.shares_type = 'SH' and h.put_call is null"
-        " group by e.cik",
+        EFFECTIVE  # noqa: S608 - constant SQL, values bound as parameters
+        + CLEAN_LINES
+        + " select c.cik, sum(c.shares) as shares, sum(c.value_usd) as value,"
+        " max(f.filed) as filed from clean c"
+        " join public.form13f_filing f on f.accession = c.accession group by c.cik",
         period,
         cusips,
     )
@@ -204,12 +224,11 @@ async def holding_ownership(
     if found:
         top_rows = await pool.fetch(
             EFFECTIVE  # noqa: S608 - constant SQL, values bound as parameters
-            + " select e.cik, max(f.manager_name) as manager_name, sum(h.shares) as shares,"
-            " sum(h.value_usd) as value, max(e.accession) as accession from effective e"
-            " join public.institutional_holding h on h.accession = e.accession"
-            " join public.form13f_filing f on f.accession = e.accession"
-            " where h.cusip = any($2::text[]) and h.shares_type = 'SH' and h.put_call is null"
-            " group by e.cik order by sum(h.shares) desc, e.cik limit $3",
+            + CLEAN_LINES
+            + " select c.cik, max(f.manager_name) as manager_name, sum(c.shares) as shares,"
+            " sum(c.value_usd) as value, max(c.accession) as accession from clean c"
+            " join public.form13f_filing f on f.accession = c.accession"
+            " group by c.cik order by sum(c.shares) desc, c.cik limit $3",
             found[0],
             cusips,
             top,
@@ -221,10 +240,9 @@ async def holding_ownership(
             r["cik"]: r["shares"]
             for r in await pool.fetch(
                 EFFECTIVE  # noqa: S608 - constant SQL, values bound as parameters
-                + " select e.cik, sum(h.shares) as shares from effective e"
-                " join public.institutional_holding h on h.accession = e.accession"
-                " where h.cusip = any($2::text[]) and h.shares_type = 'SH'"
-                " and h.put_call is null and e.cik = any($3::text[]) group by e.cik",
+                + CLEAN_LINES
+                + " select cik, sum(shares) as shares from clean"
+                " where cik = any($3::text[]) group by cik",
                 previous,
                 cusips,
                 [r["cik"] for r in top_rows],
