@@ -88,15 +88,27 @@ def lorenz_curve(weights: list[float]) -> LorenzCurve:
 
 
 def build_tree(leaves: list[Leaf], equity_total: float) -> list[AllocationNode]:
-    """Equity leaves as sector -> industry -> holding (one node per issuer), largest first."""
+    """Equity leaves as sector -> industry -> holding (one node per issuer), largest first.
+    An issuer has one sector and industry: a line that states none (a fund's line for another
+    share class) takes those of another line of the same issuer, so the issuer is not split
+    across the tree."""
     by_sector: dict[str, dict[str, dict[str, tuple[str, float]]]] = defaultdict(
         lambda: defaultdict(dict)
     )
+    known: dict[str, tuple[str | None, str | None]] = {}
+    for x in sorted(leaves, key=lambda x: (x.industry is None, x.sector is None, -x.weight)):
+        if x.issuer_key and (x.sector or x.industry) and x.issuer_key not in known:
+            known[x.issuer_key] = (x.sector, x.industry)
     for x in leaves:
         if x.weight <= 0 or not x.is_equity:
             continue
-        s = x.sector or SECTOR_UNKNOWN
-        i = x.industry or INDUSTRY_UNKNOWN
+        sector, industry = x.sector, x.industry
+        if x.issuer_key in known and industry is None:
+            known_sector, known_industry = known[x.issuer_key]
+            if sector is None or sector == known_sector:
+                sector, industry = known_sector, known_industry
+        s = sector or SECTOR_UNKNOWN
+        i = industry or INDUSTRY_UNKNOWN
         k = _key(x)
         label, w = by_sector[s][i].get(k, (_label(x), 0.0))
         by_sector[s][i][k] = (label, w + x.weight)

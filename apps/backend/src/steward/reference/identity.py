@@ -466,6 +466,84 @@ def plausible_issuer(entity: LegalEntity, isin: str, name: str) -> bool:
     return bool(words) and words[0] in names.split()
 
 
+async def release_venue_lei(
+    pool: asyncpg.Pool,
+    ticker: str,
+    isin: str,
+    venue_lei: str,
+    name: str,
+    result: HoldingResult,
+) -> None:
+    """Undo an issuer stored under a venue's LEI (before `plausible_issuer` existed, the share
+    was filed under the venue operator). The issuer row is given back the company's own name,
+    without an LEI, and the venue's names are dropped from its aliases; when other securities
+    really belong to that issuer, this security moves to a new issuer of its own instead."""
+    row = await pool.fetchrow(
+        "select s.id as security_id, i.id as issuer_id, i.legal_name from public.security s"
+        " join public.issuer i on i.id = s.issuer_id where s.isin = $1 and i.lei = $2",
+        isin,
+        venue_lei,
+    )
+    if row is None:
+        return
+    own_name = (
+        await pool.fetchval(
+            "select raw::jsonb->'companyfacts'->>'entityName' from public.fundamentals"
+            " where ticker = $1 and source = 'sec'",
+            ticker,
+        )
+        or name
+    )
+    venue = await pool.fetchrow(
+        "select legal_name, other_names from public.legal_entity_snapshot where lei = $1"
+        " order by known_at desc limit 1",
+        venue_lei,
+    )
+    venue_names = {name_key(row["legal_name"])}  # the issuer row carries the venue's name
+    if venue is not None:
+        others = venue["other_names"] or []
+        if isinstance(others, str):
+            others = json.loads(others)
+        venue_names = {name_key(n) for n in [venue["legal_name"], *others] if n}
+    country = home_country(result.home_mic, isin)
+    async with pool.acquire() as conn, conn.transaction():
+        shared = await conn.fetchval(
+            "select count(*) from public.security where issuer_id = $1 and id <> $2",
+            row["issuer_id"],
+            row["security_id"],
+        )
+        if shared:
+            issuer_id = await conn.fetchval(
+                "insert into public.issuer (legal_name, country) values ($1, $2) returning id",
+                own_name,
+                country,
+            )
+            await conn.execute(
+                "update public.security set issuer_id = $2 where id = $1",
+                row["security_id"],
+                issuer_id,
+            )
+        else:
+            issuer_id = row["issuer_id"]
+            await conn.execute(
+                "update public.issuer set legal_name = $2, lei = null, country = $3 where id = $1",
+                issuer_id,
+                own_name,
+                country,
+            )
+            aliases = await conn.fetch(
+                "select id, name from public.issuer_alias where issuer_id = $1", issuer_id
+            )
+            stale = [a["id"] for a in aliases if name_key(a["name"]) in venue_names]
+            if stale:
+                await conn.execute(
+                    "delete from public.issuer_alias where id = any($1::bigint[])", stale
+                )
+    result.notes.append(
+        f"{isin} was filed under the venue's LEI {venue_lei}; its issuer is {own_name} again"
+    )
+
+
 async def _gleif(
     pool: asyncpg.Pool,
     deps: ReferenceDeps,
@@ -811,6 +889,8 @@ async def resolve_holding(
         )
 
     entity = await _gleif(pool, deps, ticker, name, isin, firds_lei, settings, result, today, cik)
+    if result.rejected_lei:
+        await release_venue_lei(pool, ticker, isin, result.rejected_lei, name, result)
 
     wikidata = json.loads(inst["wikidata"]) if inst["wikidata"] else None
     wikidata_due = (

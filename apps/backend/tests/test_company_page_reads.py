@@ -268,3 +268,19 @@ def test_allocation_tree_groups_sector_industry_holding() -> None:
     assert sum(n.weight for n in out.tree) == pytest.approx(out.equity_weight)
     none = build("2026-10-01", LeafSet([], {}, 0.0, 0.0, None), [])
     assert none.tree == [] and none.reasons and none.lorenz.hhi is None
+
+
+def test_a_share_class_without_an_industry_joins_its_issuer_in_the_tree() -> None:
+    # Production: the Nasdaq 100 fund lists ALPHABET CLASS C with a sector and no industry,
+    # which put a second "Alphabet" under "Industry not stated".
+    leaves = [
+        _leaf("alphabet", 0.044, "Comm", "Internet Content"),
+        _leaf("alphabet", 0.002, "Comm", None),
+        _leaf("other", 0.01, "Comm", None),
+    ]
+    comm = build("2026-10-01", LeafSet(leaves, {}, 1.0, 0.0, "EUR"), []).tree[0]
+    assert [(i.label, [h.label for h in i.children]) for i in comm.children] == [
+        ("Internet Content", ["ALPHABET"]),
+        ("Industry not stated", ["OTHER"]),
+    ]
+    assert comm.children[0].children[0].weight == pytest.approx(0.046)

@@ -258,11 +258,15 @@ def config_groups(settings: LookThroughSettings) -> dict[str, IssuerRef]:
 
 
 async def load_issuer_register(pool: asyncpg.Pool, isins: list[str]) -> dict[str, IssuerRef]:
-    """ISIN -> issuer from the identity register (security.issuer_id), where known."""
+    """ISIN -> issuer from the identity register (security.issuer_id), where known. The label
+    is the registered English translation where GLEIF has one (第一三共株式会社 reads as
+    Daiichi Sankyo Co., Ltd.), else the legal name."""
     if not isins:
         return {}
     rows = await pool.fetch(
-        "select s.isin, i.id, i.legal_name from public.security s"
+        "select s.isin, i.id, coalesce((select a.name from public.issuer_alias a"
+        "   where a.issuer_id = i.id and a.kind = 'translated' and a.valid_to is null"
+        "   order by a.id limit 1), i.legal_name) as legal_name from public.security s"
         " join public.issuer i on i.id = s.issuer_id where s.isin = any($1::text[])",
         isins,
     )

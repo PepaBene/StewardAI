@@ -635,3 +635,37 @@ def test_home_listing_without_a_home_composite() -> None:
     resolution = openfigi.resolve(openfigi.parse_mapping({"data": rows}), "GB00BH4HKS39")
     assert resolution.home is not None and resolution.home.ticker == "VOD"
     assert openfigi.stooq_symbol(resolution.home) == "vod.uk"
+
+
+@pytestmark_db
+async def test_a_share_filed_under_a_venue_lei_gets_its_own_issuer_back(
+    backend_pool: asyncpg.Pool,
+) -> None:
+    from steward.reference.identity import HoldingResult, release_venue_lei
+
+    # Production, 5 Oct 2026: Celsius's share was filed under TP ICAP's LEI (the EU venue's).
+    venue = await backend_pool.fetchval(
+        "insert into public.issuer (legal_name, lei, country) values"
+        " ('TP ICAP (EUROPE)', '213800R54EFFINMY1P02', 'FR') returning id"
+    )
+    await backend_pool.execute(
+        "insert into public.security (issuer_id, isin, kind, name) values"
+        " ($1, 'US15118V2079', 'equity', 'Celsius')",
+        venue,
+    )
+    await backend_pool.execute(
+        "insert into public.issuer_alias (issuer_id, name, kind, known_at) values"
+        " ($1, 'TP ICAP (EUROPE)', 'legal', now()), ($1, 'Celsius Holdings Inc', 'trading', now())",
+        venue,
+    )
+    result = HoldingResult("CELH_US_EQ")
+    await release_venue_lei(
+        backend_pool, "CELH_US_EQ", "US15118V2079", "213800R54EFFINMY1P02", "Celsius", result
+    )
+    issuer = await backend_pool.fetchrow("select * from public.issuer where id = $1", venue)
+    assert (issuer["legal_name"], issuer["lei"], issuer["country"]) == ("Celsius", None, "US")
+    aliases = await backend_pool.fetch(
+        "select name from public.issuer_alias where issuer_id = $1", venue
+    )
+    assert [a["name"] for a in aliases] == ["Celsius Holdings Inc"]
+    assert "its issuer is Celsius again" in result.notes[0]
