@@ -12,6 +12,7 @@ import { formatDay } from "@/lib/charts/time";
 import { useApiResource } from "@/lib/hooks/use-api-resource";
 import { money, pct } from "@/lib/insight/income";
 import { num } from "@/lib/insight/insight";
+import { priceGapLabel } from "@/lib/portfolio/valuation";
 import { cn } from "@/lib/utils";
 
 type WatchFairValue = components["schemas"]["WatchFairValue"];
@@ -111,7 +112,7 @@ export function WatchlistFairValue() {
                                 {money(b.value, b.currency)}
                                 {up !== null ? (
                                   <span className={cn("block text-xs", up < 0 ? "text-loss" : "text-gain")}>
-                                    {up < 0 ? `price ${pct(-up, 0)} above` : `price ${pct(up, 0)} below`}
+                                    {`price ${priceGapLabel(up, (f) => pct(f, 0)) ?? "against fair value unknown"}`}
                                   </span>
                                 ) : null}
                               </>

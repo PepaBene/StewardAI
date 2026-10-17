@@ -8,6 +8,8 @@ import {
   formatPerShare,
   formatYield,
   periodLabel,
+  priceGap,
+  priceGapLabel,
   ratioText,
   relativeTo,
   VALUATION_MIN_COVERAGE,
@@ -106,5 +108,19 @@ describe("formatting", () => {
   it("compares with the benchmark", () => {
     expect(relativeTo(20, 25)).toBeCloseTo(-0.2);
     expect(relativeTo(null, 25)).toBeNull();
+  });
+});
+
+describe("price against fair value", () => {
+  // Production, 17 Oct 2026: ASML at USD 1,640 against a USD 808.65 fair value read "51% above"
+  // in the tables while the chart beside them said +103%.
+  const pct = (f: number) => `${Math.round(f * 100)}%`;
+  it("measures the price's gap on fair value, not the upside on price", () => {
+    const asml = 808.65 / 1640.41 - 1;
+    expect(priceGapLabel(asml, pct)).toBe("103% above");
+    const nu = 21.96 / 14.57 - 1;
+    expect(priceGapLabel(nu, pct)).toBe("34% below");
+    expect(priceGap(0)).toBe(0);
+    expect(priceGapLabel(-1, pct)).toBeNull();
   });
 });

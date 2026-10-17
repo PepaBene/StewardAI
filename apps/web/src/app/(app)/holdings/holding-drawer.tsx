@@ -15,6 +15,7 @@ import { formatDate, formatDateTime, formatMoney, formatPercent, formatPp, forma
 import { AXIS_LABEL, MARK_AXES, petalsFromMap } from "@/lib/insight/insight";
 import { toNum, type HoldingInsight, type HoldingNote } from "@/lib/portfolio/holding-columns";
 import { displayTicker } from "@/lib/portfolio/holdings-view";
+import { priceGapLabel } from "@/lib/portfolio/valuation";
 import { cn } from "@/lib/utils";
 
 /*
@@ -167,7 +168,7 @@ function Overview({ h, row, baseCcy, weightOf }: { h: Holding; row: HoldingInsig
               <span className="text-text-muted">{row?.fair_basis}</span>
               {upside !== null ? (
                 <span className={cn("num block text-xs", upside < 0 ? "text-loss" : "text-gain")}>
-                  {upside < 0 ? `price ${formatPercent(-upside, { decimals: 0 })} above` : `price ${formatPercent(upside, { decimals: 0 })} below`}
+                  {`price ${priceGapLabel(upside, (f) => formatPercent(f, { decimals: 0 })) ?? "against fair value unknown"}`}
                   {row?.fair_stale ? " · stale" : ""}
                 </span>
               ) : null}

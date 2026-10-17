@@ -16,6 +16,7 @@ import { useApiResource } from "@/lib/hooks/use-api-resource";
 import { useCompanyChecks } from "@/lib/insight/checks";
 import { MARK_AXES, markPetals, num, petalsFromMap } from "@/lib/insight/insight";
 import { shortTicker } from "@/lib/portfolio/ticker";
+import { priceGapLabel } from "@/lib/portfolio/valuation";
 import { cn } from "@/lib/utils";
 
 import { ChecksProvider, FairValueProvider, OverviewProvider, useFairValueReport, useShellChecks, type FairValueReport } from "./company-context";
@@ -42,7 +43,9 @@ function FairValueChip({ ticker, stored }: { ticker: string; stored: Summary["fa
         <span className="font-medium">
           Fair value {stored.currency ?? ""} {Number(stored.value).toLocaleString("en-GB", { maximumFractionDigits: 2 })}
         </span>
-        {upside !== null ? <span className="text-text-muted">, price {formatPercent(Math.abs(upside), { decimals: 0 })} {upside < 0 ? "above" : "below"}</span> : null}
+        {upside !== null && priceGapLabel(upside, (f) => formatPercent(f, { decimals: 0 })) ? (
+          <span className="text-text-muted">, price {priceGapLabel(upside, (f) => formatPercent(f, { decimals: 0 }))}</span>
+        ) : null}
         <span className="block text-text-muted">
           {stored.basis_label}
           {stored.as_of ? `, ${formatDate(stored.as_of)}` : ""}

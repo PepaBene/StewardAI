@@ -26,6 +26,7 @@ import { useApiResource } from "@/lib/hooks/use-api-resource";
 import { money, pct } from "@/lib/insight/income";
 import { num, stepValues } from "@/lib/insight/insight";
 import { groupHoldings, historyRows, type Basis, type HoldingFairValue, type PortfolioFairValue } from "@/lib/insight/valuation";
+import { priceGapLabel } from "@/lib/portfolio/valuation";
 import { cn } from "@/lib/utils";
 
 import { ConsensusCoverage } from "./consensus-coverage";
@@ -70,7 +71,7 @@ function PremiumChip({ upside }: { upside: number | null }) {
   const over = upside < 0;
   return (
     <span className={cn("num inline-block border px-1.5 text-xs", over ? "border-loss text-loss" : "border-gain text-gain")}>
-      {over ? `${pct(-upside, 0)} above` : `${pct(upside, 0)} below`}
+      {priceGapLabel(upside, (f) => pct(f, 0)) ?? "—"}
     </span>
   );
 }

@@ -114,6 +114,22 @@ export function valuationAxis(data: PortfolioValuation | null | undefined): Valu
   };
 }
 
+/**
+ * How far the price sits from fair value, as a share of fair value, from the stored upside
+ * (fair value / price - 1): price 1,640 against fair value 808 is 103 % above, not the 51 %
+ * the upside reads as. Null for an upside of -100 % or less (no positive fair value).
+ */
+export function priceGap(upside: number): number | null {
+  return upside > -1 ? 1 / (1 + upside) - 1 : null;
+}
+
+/** "103% above" or "34% below": the price against fair value, from the stored upside. */
+export function priceGapLabel(upside: number, format: (fraction: number) => string): string | null {
+  const gap = priceGap(upside);
+  if (gap === null) return null;
+  return gap > 0 ? `${format(gap)} above` : `${format(-gap)} below`;
+}
+
 /** Relative gap of the portfolio's figure to the benchmark's: 0.1 = 10 % above. */
 export function relativeTo(value: number | null | undefined, benchmark: number | null | undefined): number | null {
   if (value === null || value === undefined || benchmark === null || benchmark === undefined || benchmark === 0) return null;

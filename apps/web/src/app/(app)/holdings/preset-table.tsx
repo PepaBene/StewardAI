@@ -49,6 +49,7 @@ import {
 import { displayTicker, investedShare, securityClass, unrealisedTotal, weightScale, type HoldingPrices } from "@/lib/portfolio/holdings-view";
 import { fundsByTicker } from "@/lib/portfolio/look-through";
 import { dayMove } from "@/lib/prices/intraday";
+import { priceGapLabel } from "@/lib/portfolio/valuation";
 import { cn } from "@/lib/utils";
 
 import { LastEventLine } from "./holding-drawer";
@@ -178,7 +179,7 @@ export function cellContent(id: ColumnId, x: CellContext): ReactNode {
       if (up === null) return <Missing why={missingReason(id, row)} />;
       return (
         <span className={cn(up < 0 ? "text-loss" : "text-gain")} title={row?.fair_basis ?? undefined}>
-          {up < 0 ? `${formatPercent(-up, { decimals: 0 })} above` : `${formatPercent(up, { decimals: 0 })} below`}
+          {priceGapLabel(up, (f) => formatPercent(f, { decimals: 0 })) ?? "—"}
           {row?.fair_stale ? <span className="block text-xs text-text-muted">stale</span> : null}
         </span>
       );
