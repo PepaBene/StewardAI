@@ -38517,7 +38517,7 @@ export interface components {
             name: string | null;
             /**
              * Weight
-             * @description Share of portfolio value.
+             * @description Share of the invested value (cash left out).
              */
             weight: number | string;
             /** Score */

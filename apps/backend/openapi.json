@@ -112507,7 +112507,7 @@
               }
             ],
             "title": "Weight",
-            "description": "Share of portfolio value."
+            "description": "Share of the invested value (cash left out)."
           },
           "score": {
             "anyOf": [

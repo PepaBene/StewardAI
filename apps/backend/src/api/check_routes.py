@@ -87,7 +87,7 @@ async def get_company_checks(ticker: TickerPath, pool: Pool, owner: Owner) -> Co
 class ScoreLine(BaseModel):
     ticker: str
     name: str | None
-    weight: Decimal = Field(description="Share of portfolio value.")
+    weight: Decimal = Field(description="Share of the invested value (cash left out).")
     score: Decimal | None
     passes: int
     applicable: int

@@ -52,7 +52,7 @@ function Lines({ title, lines, tone }: { title: string; lines: PortfolioScorecar
                     {l.name ?? l.ticker}
                   </Link>
                   <span className="num shrink-0 text-text-muted">
-                    {l.passes} of {l.applicable} · {formatPercent(num(l.weight), { decimals: 1 })}
+                    {l.passes} of {l.applicable} · {formatPercent(num(l.weight), { decimals: 1 })} of invested
                   </span>
                 </div>
                 <div className="mt-0.5 h-1 bg-score-mark-track">
