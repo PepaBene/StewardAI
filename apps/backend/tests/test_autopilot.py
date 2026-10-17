@@ -102,6 +102,13 @@ class FakeLedger:
             if r.kind == kind and r.status in statuses and r.decided_at >= since
         }
 
+    async def kept_refs(self, pool: Any, kind: str) -> set[str]:
+        return {
+            r.subject_ref
+            for r in self.rows
+            if r.kind == kind and r.status == "closed" and r.decided_by == "ttl"
+        }
+
     async def close_escalation(self, pool: Any, kind: str, ref: str) -> None:
         for r in self.rows:
             if r.kind == kind and r.subject_ref == ref and r.status == "escalated":
@@ -132,6 +139,7 @@ def fake_ledger(monkeypatch: pytest.MonkeyPatch) -> FakeLedger:
         record=fake.record,
         count_since=fake.count_since,
         decided_refs=fake.decided_refs,
+        kept_refs=fake.kept_refs,
         close_escalation=fake.close_escalation,
         escalations=fake.escalations,
         set_status=fake.set_status,
@@ -505,6 +513,41 @@ async def test_ttl_expiry_closes_an_old_escalation_with_the_kinds_expiry_decisio
     statuses = [(r.status, r.decided_by) for r in fake_ledger.rows]
     assert ("closed", "model:gpt-small") in statuses or ("closed", "model:gpt-big") in statuses
     assert ("applied", "ttl") in statuses
+
+
+async def test_ttl_expiry_of_a_keep_kind_leaves_the_item_and_stops_asking(
+    fake_ledger: FakeLedger,
+) -> None:
+    store = Store(open={"a": None})
+    client = ScriptedClient(
+        {("gpt-small", "a"): ("accept", 0.5), ("gpt-big", "a"): ("accept", 0.5)}
+    )
+    kind = toy_kind(store, expire_decision=None, expire_keeps=True)
+    await run(store, client, settings())
+    policy = AutopilotKindPolicy(ttl_days=3)
+    assert await judge.expire_stale(None, kind, policy, "auto", now=NOW + dt.timedelta(days=4)) == 1
+    assert store.open["a"] is None  # nothing applied
+    assert [r for r in fake_ledger.rows if r.status == "escalated"] == []
+    calls = len(client.calls)
+    later = NOW + dt.timedelta(days=30)
+    await judge.run_kind(
+        None, client, kind, settings(), "auto", {"calls": 9}, now=later, rng=random.Random(1)  # type: ignore[arg-type]  # noqa: S311
+    )
+    assert len(client.calls) == calls  # never asked again
+
+
+async def test_a_rule_settles_an_item_already_waiting_on_the_owner(
+    fake_ledger: FakeLedger,
+) -> None:
+    store = Store(open={"sure": None})
+    await fake_ledger.record(
+        None, kind="toy", subject_ref="sure", ticker="TST", decision="defer", confidence=0.4,
+        decided_by="model:gpt-small", summary="unsure", evidence={}, status="escalated",
+    )  # fmt: skip
+    out = await run(store, ScriptedClient({}), settings())
+    assert out["applied"] == 1
+    assert store.open["sure"] == "accept"
+    assert [r.status for r in fake_ledger.rows if r.subject_ref == "sure"] == ["closed", "applied"]
 
 
 async def test_calibration_promotes_a_reversible_kind_but_never_an_irreversible_one(

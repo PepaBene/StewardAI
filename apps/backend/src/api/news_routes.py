@@ -101,10 +101,23 @@ async def get_news(
             "customer or watch topic."
         ),
     ] = False,
+    min_severity: Annotated[
+        int | None,
+        Query(
+            ge=0,
+            le=3,
+            description="Stories of at least this severity, plus those not classified yet.",
+        ),
+    ] = None,
+    event_type: Annotated[
+        list[EventType | Literal["unclassified"]] | None,
+        Query(description="Story event type; `unclassified` for stories not classified yet."),
+    ] = None,
     limit: Annotated[int, Query(ge=1, le=200)] = 50,
 ) -> NewsFeed:
     """News items, newest first, each with its story's severity and confidence. Filters
-    combine (AND); a repeated parameter matches any of its values."""
+    combine (AND); a repeated parameter matches any of its values. The first page also
+    counts the stories `direct` and `min_severity` leave out, and the stories per event type."""
     filters = FeedFilters(
         ticker=ticker,
         severities=severity or [],
@@ -113,6 +126,8 @@ async def get_news(
         story_id=story,
         before_id=before_id,
         direct=direct,
+        min_severity=min_severity,
+        event_types=list(event_type or []),
         limit=limit,
     )
     return await news_feed(pool, filters, await _jobs_config(pool))

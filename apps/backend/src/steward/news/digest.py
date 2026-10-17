@@ -16,7 +16,8 @@ import logging
 from collections import defaultdict
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Literal, Protocol
+from decimal import Decimal
+from typing import Any, Literal, Protocol
 
 import asyncpg
 import httpx
@@ -205,28 +206,85 @@ async def disclosure_alert_lines(
     pool: asyncpg.Pool, start: dt.datetime, end: dt.datetime
 ) -> list[DisclosureAlertLine]:
     """Public-disclosure alerts (insider trades, holder changes, relationship changes, deals)
-    raised in the window, newest first, as the alerts job worded them."""
+    raised in the window, newest first. Insider trades fold into one line per company (see
+    `fold_insider_trades`); the rest read as the alerts job worded them."""
+    return fold_insider_trades(await _window_alerts(pool, start, end))[:MAX_DISCLOSURE_LINES]
+
+
+async def _window_alerts(
+    pool: asyncpg.Pool, start: dt.datetime, end: dt.datetime
+) -> list[dict[str, Any]]:
     rows = await pool.fetch(
-        """select ticker, kind, headline, source_url, known_at from public.disclosure_alert
+        """select ticker, kind, headline, source_url, known_at, detail ->> 'value' as value
+             from public.disclosure_alert
             where created_at >= $1 and created_at < $2
-            order by created_at desc, id desc limit $3""",
+            order by created_at desc, id desc""",
         start,
         end,
-        MAX_DISCLOSURE_LINES,
     )
-    return [DisclosureAlertLine(**dict(r)) for r in rows]
+    return [dict(r) for r in rows]
+
+
+def _millions(value: Decimal) -> str:
+    return f"${value / 1_000_000:,.1f}M" if value >= 1_000_000 else f"${value:,.0f}"
+
+
+def fold_insider_trades(rows: list[dict[str, Any]]) -> list[DisclosureAlertLine]:
+    """One line per company for its insider trades, in the order of its newest one: "Insiders
+    filed 23 open-market sales ($48.2M) and 1 purchase ($0.2M)." A company's insiders sell
+    for tax, diversification and pre-set plans every week, so thirty single sales said less
+    than their count and total; a purchase is the rarer signal and is named first."""
+    out: list[DisclosureAlertLine] = []
+    trades: dict[str, list[dict[str, Any]]] = {}
+    for r in rows:
+        if r["kind"] != "insider_trade":
+            out.append(DisclosureAlertLine(**{k: r[k] for k in DisclosureAlertLine.model_fields}))
+            continue
+        if r["ticker"] not in trades:
+            trades[r["ticker"]] = []
+            out.append(DisclosureAlertLine(**{k: r[k] for k in DisclosureAlertLine.model_fields}))
+        trades[r["ticker"]].append(r)
+    for i, line in enumerate(out):
+        group = trades.get(line.ticker) if line.kind == "insider_trade" else None
+        if not group or len(group) == 1:
+            continue
+        buys = [r for r in group if "purchase" in r["headline"]]
+        sells = [r for r in group if "purchase" not in r["headline"]]
+
+        def part(items: list[dict[str, Any]], noun: str) -> str | None:
+            if not items:
+                return None
+            total = sum((Decimal(r["value"]) for r in items if r["value"]), Decimal(0))
+            plural = "s" if len(items) > 1 else ""
+            return f"{len(items)} open-market {noun}{plural} ({_millions(total)})"
+
+        parts = [p for p in (part(buys, "purchase"), part(sells, "sale")) if p]
+        out[i] = line.model_copy(
+            update={"headline": f"Insiders filed {' and '.join(parts)}", "source_url": None}
+        )
+    return out
 
 
 async def disclosure_alert_overflow(
     pool: asyncpg.Pool, start: dt.datetime, end: dt.datetime
 ) -> int:
-    """How many alerts of the window did not fit in the digest's list."""
-    total: int = await pool.fetchval(
-        "select count(*) from public.disclosure_alert where created_at >= $1 and created_at < $2",
-        start,
+    """How many alert lines of the window did not fit in the digest's list."""
+    lines = fold_insider_trades(await _window_alerts(pool, start, end))
+    return max(0, len(lines) - MAX_DISCLOSURE_LINES)
+
+
+async def settle_reported_alerts(pool: asyncpg.Pool, end: dt.datetime) -> int:
+    """Mark the disclosure alerts raised before a stored digest's window end as read: an alert
+    states what was filed, the digest has reported it, and nothing waits on the owner. Without
+    this every routine insider sale sat in the Inbox (546 in ten days) as if it needed a
+    decision. The alerts page still lists them with the acknowledged ones."""
+    status: str = await pool.execute(
+        "update public.disclosure_alert set acknowledged_at = now(),"
+        " acknowledged_by = 'engine:digest'"
+        " where acknowledged_at is null and created_at < $1",
         end,
     )
-    return max(0, int(total or 0) - MAX_DISCLOSURE_LINES)
+    return int(status.rsplit(" ", 1)[-1])
 
 
 class DigestBody(BaseModel):
@@ -1023,6 +1081,7 @@ async def run_digest(
             ctx.job_id,
         )
         step.detail["report_id"] = report_id
+        step.detail["alerts_settled"] = await settle_reported_alerts(pool, body.window_end)
 
     async with ctx.step("deliver") as step:
         delivery = await deliver(body, channels, notify.digest_channels, app_url)

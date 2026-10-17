@@ -228,10 +228,20 @@ def _with_keys(found: list[Opinion]) -> list[Opinion]:
 
 
 def fact_rule(cand: Candidate) -> RuleResult | None:
-    """Accept when an independent source agrees within the reconciliation tolerance and none
-    disagrees. Reconciliation already quarantines mismatches, so a quarantined fact has a
-    disagreeing source and never reaches this rule."""
+    """Correct to the filing's tagged value when it disagrees: the XBRL concept is what the
+    metric means, so a release printing another basis (net income to common holders, EPS from
+    continuing operations) or a misread line yields to it. Accepting such a figure is refused
+    before applying anyway, so without this the item waited on the owner for ever.
+
+    Otherwise accept when an independent source agrees within the reconciliation tolerance and
+    none disagrees."""
     opinions = cand.evidence.get("opinions") or []
+    if any(o["source"] == "xbrl" and o.get("key") == "xbrl" for o in opinions):
+        return RuleResult(
+            "correct_xbrl",
+            "filing_xbrl_defines_metric",
+            "the filing's tagged value defines this metric and differs from the printed one",
+        )
     if not opinions or any(not o["agrees"] for o in opinions):
         return None
     if not any(o["independent"] for o in opinions):
@@ -584,8 +594,9 @@ FACT = JudgeKind(
     outcome=fact_outcome,
     rule=fact_rule,
     # No expiry: a rejected fact cannot be accepted or corrected afterwards, so "reject after a
-    # while" would not be reversible by the owner.
+    # while" would not be reversible by the owner. A held fact is not used, so it stays held.
     expire_decision=None,
+    expire_keeps=True,
     max_tokens=1200,
     verify=fact_verify,
     recheck=fact_recheck,

@@ -183,7 +183,7 @@ export function shortDay(date: Date, timeZone?: string): string {
 export type FeedPreset = "all" | "high" | "confirmed";
 
 export const PRESETS: { id: FeedPreset; label: string; title: string }[] = [
-  { id: "all", label: "All holdings", title: "Every story, no filter" },
+  { id: "all", label: "All holdings", title: "Stories about your holdings worth a digest line, no other filter" },
   { id: "high", label: "Alert + highlight", title: "Severity 3 (alert) and 2 (highlight) only" },
   { id: "confirmed", label: "Confirmed only", title: "Verified and corroborated stories only" },
 ];
@@ -208,6 +208,7 @@ export function activePreset(filters: FeedFilters): FeedPreset | null {
     if (
       f.ticker === filters.ticker &&
       f.story === filters.story &&
+      (f.eventType ?? null) === (filters.eventType ?? null) &&
       sameSet(f.severities, filters.severities) &&
       sameSet(f.confidences, filters.confidences) &&
       sameSet(f.tiers, filters.tiers)

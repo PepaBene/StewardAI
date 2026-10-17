@@ -28,7 +28,7 @@ import {
   type NewsItemOut,
   type SourceTrustOut,
 } from "@/lib/api/client";
-import type { components } from "@/lib/api/schema";
+import type { components, paths } from "@/lib/api/schema";
 import { formatPct } from "@/lib/charts/format";
 import { CONFIDENCE } from "@/lib/evidence/confidence";
 import { formatDateTime } from "@/lib/format";
@@ -38,7 +38,7 @@ import { jobHref } from "@/lib/jobs/job-detail";
 import { latestOnly } from "@/lib/latest-request";
 import { disputedStoryHref } from "@/lib/news/disputed";
 import { decodeEntities } from "@/lib/news/entities";
-import { dayLabel, eventTypeCounts, groupByDay, storyEventType } from "@/lib/news/feed-days";
+import { dayLabel, groupByDay } from "@/lib/news/feed-days";
 import {
   byLead,
   EMPTY_FILTERS,
@@ -47,6 +47,7 @@ import {
   groupByStory,
   isFiltered,
   parseFilters,
+  showAll,
   splitLinks,
   toggle,
   type FeedFilters,
@@ -68,6 +69,10 @@ const NEWS_FEED_TYPES = ["news", "earnings", "analyst", "insider"] as const;
 type NewsStats = components["schemas"]["NewsStats"];
 type SourcesHealth = components["schemas"]["SourcesHealth"];
 type PriceMap = Map<string, ClosePoint[]>;
+// The URL carries any event-type slug; the API validates it against its enum.
+type EventTypeQuery = NonNullable<
+  NonNullable<paths["/news"]["get"]["parameters"]["query"]>["event_type"]
+>;
 
 type Load =
   | { kind: "loading" }
@@ -76,6 +81,10 @@ type Load =
       kind: "ok";
       items: NewsItemOut[];
       next: number | null;
+      /** Stories the default scope leaves out (first page's count). */
+      hidden: number;
+      /** Stories per event type under the other filters (first page's count). */
+      eventTypes: NewsFeed["event_types"];
       lastIngest: JobSummary | null;
       /** When the next scheduled news check is due: the feed is current until then. */
       nextIngestDueAt: string | null;
@@ -93,6 +102,8 @@ function query(filters: FeedFilters, beforeId: number | null) {
     ticker: filters.ticker ?? undefined,
     direct: scope.direct,
     severity: scope.severity,
+    min_severity: scope.minSeverity,
+    event_type: filters.eventType ? ([filters.eventType] as EventTypeQuery) : undefined,
     confidence: filters.confidences.length ? filters.confidences : undefined,
     tier: filters.tiers.length ? filters.tiers : undefined,
     story: filters.story ?? undefined,
@@ -144,8 +155,6 @@ export function NewsView() {
   const [queueing, setQueueing] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
   const [feedOpen, setFeedOpen] = useState(false);
-  // Event-type chip: filters the loaded stories (the feed API has no event-type filter).
-  const [eventType, setEventType] = useState<string | null>(null);
   const now = useNow();
   // Only the newest load's answers are applied (filters can change while a page loads).
   const sequence = useRef(0);
@@ -176,6 +185,8 @@ export function NewsView() {
             kind: "ok",
             items: feed.items,
             next: feed.next_before_id,
+            hidden: feed.hidden_stories,
+            eventTypes: feed.event_types ?? [],
             lastIngest: feed.last_ingest,
             nextIngestDueAt: feed.next_ingest_due_at ?? null,
             loadingMore: false,
@@ -226,9 +237,10 @@ export function NewsView() {
     }
   }
 
-  const allGroups = load.kind === "ok" ? groupByStory(load.items) : [];
-  const typeCounts = eventTypeCounts(allGroups);
-  const groups = eventType === null ? allGroups : allGroups.filter((g) => (storyEventType(g) ?? "") === eventType);
+  const groups = load.kind === "ok" ? groupByStory(load.items) : [];
+  const typeChips = load.kind === "ok" ? (load.eventTypes ?? []) : [];
+  const typeTotal = typeChips.reduce((sum, t) => sum + t.count, 0);
+  const hidden = load.kind === "ok" ? load.hidden : 0;
   // An empty feed is only "no news yet" when the sources are known to be healthy.
   const sourcesNote =
     health.kind === "error"
@@ -306,16 +318,34 @@ export function NewsView() {
 
       <Filters filters={filters} holdings={holdings} onChange={setFilters} />
 
-      {typeCounts.length > 1 ? (
+      {typeChips.length > 1 || (filters.eventType && typeChips.length > 0) ? (
         <FilterChips<string>
           label="Event type"
-          value={eventType ?? "*"}
-          onChange={(k) => setEventType(k === "*" ? null : k)}
+          value={filters.eventType ?? "*"}
+          onChange={(k) => setFilters({ ...filters, story: null, eventType: k === "*" ? null : k })}
           chips={[
-            { key: "*", label: "All types", count: allGroups.length },
-            ...typeCounts.map((t) => ({ key: t.type, label: eventLabel(t.type || null), count: t.count })),
+            { key: "*", label: "All types", count: typeTotal },
+            ...typeChips.map((t) => ({ key: t.event_type ?? "unclassified", label: eventLabel(t.event_type ?? null), count: t.count })),
           ]}
         />
+      ) : null}
+
+      {hidden > 0 ? (
+        <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-text-muted">
+          <span>
+            {hidden} more {hidden === 1 ? "story is" : "stories are"} hidden:{" "}
+            {[
+              !filters.ignored && filters.severities.length === 0 ? "ignored ones (severity 0)" : null,
+              !filters.related ? "ones that reach your holdings only through a rival, supplier or customer" : null,
+            ]
+              .filter(Boolean)
+              .join(" and ")}
+            .
+          </span>
+          <Button variant="outline" size="sm" onClick={() => setFilters(showAll(filters))}>
+            Show {hidden === 1 ? "it" : `all ${hidden}`}
+          </Button>
+        </p>
       ) : null}
 
       {load.kind === "loading" ? (

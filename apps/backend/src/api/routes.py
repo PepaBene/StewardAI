@@ -481,6 +481,13 @@ async def list_jobs(
         str | None, Query(pattern=r"^[A-Za-z0-9._-]{1,32}$", description="Runs for this holding.")
     ] = None,
     before_id: IdQuery = None,
+    unresolved: Annotated[
+        bool,
+        Query(
+            description="Leave out runs that a later run of the same job (and holding) "
+            "finished: a failure retried successfully needs nobody."
+        ),
+    ] = False,
     limit: Annotated[int, Query(ge=1, le=200)] = 50,
 ) -> JobList:
     """The job log, newest first: every scheduled, manual and event-triggered run with its
@@ -495,12 +502,16 @@ async def list_jobs(
         " and ($2::text[] is null or j.status = any($2))"
         " and ($3::text is null or j.params ->> 'ticker' = $3)"
         " and ($4::bigint is null or j.id < $4)"
+        " and (not $6 or not exists (select 1 from public.job k where k.job_type = j.job_type"
+        "  and k.status = 'succeeded' and k.id > j.id"
+        "  and k.params ->> 'ticker' is not distinct from j.params ->> 'ticker'))"
         " order by j.id desc limit $5",
         job_type or None,
         status_ or None,
         ticker,
         before_id,
         limit + 1,
+        unresolved,
     )
     more = len(rows) > limit
     items = [

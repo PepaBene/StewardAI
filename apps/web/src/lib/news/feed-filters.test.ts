@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { byLead, EMPTY_FILTERS, feedScope, filtersToSearch, groupByStory, isFiltered, parseFilters, splitLinks, toggle } from "./feed-filters";
+import { byLead, EMPTY_FILTERS, feedScope, filtersToSearch, groupByStory, isFiltered, parseFilters, showAll, splitLinks, toggle } from "./feed-filters";
 
 describe("feed filters", () => {
   it("round-trips through the URL", () => {
@@ -10,11 +10,12 @@ describe("feed filters", () => {
       confidences: ["verified" as const, "disputed" as const],
       tiers: [1],
       story: null,
+      eventType: "m_and_a",
       related: false,
       ignored: false,
     };
     const search = filtersToSearch(filters);
-    expect(search).toBe("?ticker=AAPL_US_EQ&severity=2&severity=3&confidence=verified&confidence=disputed&tier=1");
+    expect(search).toBe("?ticker=AAPL_US_EQ&severity=2&severity=3&confidence=verified&confidence=disputed&tier=1&event_type=m_and_a");
     expect(parseFilters(new URLSearchParams(search.slice(1)))).toEqual(filters);
   });
 
@@ -29,13 +30,25 @@ describe("feed filters", () => {
   });
 
   it("scopes the feed to stories about holdings by default", () => {
-    expect(feedScope(EMPTY_FILTERS)).toEqual({ direct: true, severity: [1, 2, 3] });
-    expect(feedScope({ ...EMPTY_FILTERS, related: true, ignored: true })).toEqual({ direct: false, severity: undefined });
-    expect(feedScope({ ...EMPTY_FILTERS, severities: [3] })).toEqual({ direct: true, severity: [3] });
-    expect(feedScope({ ...EMPTY_FILTERS, story: 7 })).toEqual({ direct: false, severity: undefined });
+    expect(feedScope(EMPTY_FILTERS)).toEqual({ direct: true, severity: undefined, minSeverity: 1 });
+    expect(feedScope({ ...EMPTY_FILTERS, related: true, ignored: true })).toEqual({ direct: false, severity: undefined, minSeverity: undefined });
+    expect(feedScope({ ...EMPTY_FILTERS, severities: [3] })).toEqual({ direct: true, severity: [3], minSeverity: undefined });
+    expect(feedScope({ ...EMPTY_FILTERS, story: 7 })).toEqual({ direct: false, severity: undefined, minSeverity: undefined });
     const search = filtersToSearch({ ...EMPTY_FILTERS, related: true });
     expect(search).toBe("?related=1");
     expect(parseFilters(new URLSearchParams(search.slice(1))).related).toBe(true);
+  });
+
+  it("shows everything the scope hides, keeping the other filters", () => {
+    const all = showAll({ ...EMPTY_FILTERS, ticker: "AAPL_US_EQ", story: 4 });
+    expect(all).toMatchObject({ ticker: "AAPL_US_EQ", story: null, related: true, ignored: true });
+    expect(feedScope(all)).toEqual({ direct: false, severity: undefined, minSeverity: undefined });
+  });
+
+  it("keeps the event type in the URL and counts it as a filter", () => {
+    expect(parseFilters(new URLSearchParams("event_type=unclassified")).eventType).toBe("unclassified");
+    expect(parseFilters(new URLSearchParams("event_type=Bad Type!")).eventType).toBeNull();
+    expect(isFiltered({ ...EMPTY_FILTERS, eventType: "m_and_a" })).toBe(true);
   });
 
   it("splits a story's holdings into those it is about and those it reaches", () => {

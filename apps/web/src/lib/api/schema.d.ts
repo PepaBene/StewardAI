@@ -2437,7 +2437,8 @@ export interface paths {
         /**
          * Get News
          * @description News items, newest first, each with its story's severity and confidence. Filters
-         *     combine (AND); a repeated parameter matches any of its values.
+         *     combine (AND); a repeated parameter matches any of its values. The first page also
+         *     counts the stories `direct` and `min_severity` leave out, and the stories per event type.
          */
         get: operations["get_news"];
         put?: never;
@@ -21671,6 +21672,16 @@ export interface components {
              */
             status: "captured" | "partial" | "not_captured" | "no_fills";
         };
+        /** FeedEventTypeCount */
+        FeedEventTypeCount: {
+            /**
+             * Event Type
+             * @description Null for stories not classified yet.
+             */
+            event_type: string | null;
+            /** Count */
+            count: number;
+        };
         /** FeedItem */
         FeedItem: {
             story: components["schemas"]["Story"];
@@ -29894,6 +29905,17 @@ export interface components {
              * @description Pass as before_id for the next page.
              */
             next_before_id: number | null;
+            /**
+             * Hidden Stories
+             * @description First page only: stories matching the other filters that `direct` and `min_severity` leave out.
+             * @default 0
+             */
+            hidden_stories: number;
+            /**
+             * Event Types
+             * @description First page only: stories per event type under the other filters, whatever `event_type` selects.
+             */
+            event_types?: components["schemas"]["FeedEventTypeCount"][];
             last_ingest: components["schemas"]["JobSummary"] | null;
             /**
              * Next Ingest Due At
@@ -47758,6 +47780,8 @@ export interface operations {
                 /** @description Runs for this holding. */
                 ticker?: string | null;
                 before_id?: number | null;
+                /** @description Leave out runs that a later run of the same job (and holding) finished: a failure retried successfully needs nobody. */
+                unresolved?: boolean;
                 limit?: number;
             };
             header?: never;
@@ -49868,6 +49892,10 @@ export interface operations {
                 before_id?: number | null;
                 /** @description Only items about the company itself (with a ticker) or about at least one holding itself (without), not ones reached only through a rival, supplier, customer or watch topic. */
                 direct?: boolean;
+                /** @description Stories of at least this severity, plus those not classified yet. */
+                min_severity?: number | null;
+                /** @description Story event type; `unclassified` for stories not classified yet. */
+                event_type?: (("guidance_change" | "m_and_a" | "dividend_cut" | "earnings_release" | "management_change" | "regulatory_legal" | "capital_allocation" | "credit_rating" | "central_bank" | "macro_surprise" | "insider_transaction" | "product_business" | "sector_competitor" | "index_change" | "analyst_rating" | "delisting" | "entity_status" | "credit_stress" | "trade_exposure" | "patent_status" | "other") | "unclassified")[] | null;
                 limit?: number;
             };
             header?: never;

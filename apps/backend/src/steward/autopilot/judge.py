@@ -93,6 +93,10 @@ class JudgeKind:
     rule: Callable[[Candidate], RuleResult | None] | None = None
     # What an escalation nobody settled in `ttl_days` becomes (None: it waits for the owner).
     expire_decision: str | None = None
+    # No expiry decision, but the subject's standing state is already the safe one (a held fact
+    # is not used; an insider line the classifier left as `other` counts for no signal): at
+    # `ttl_days` the escalation closes and the subject stays as it is.
+    expire_keeps: bool = False
     max_tokens: int = 1500
     # False: calibration never promotes the kind from shadow to auto; the owner sets `auto`.
     promotable: bool = True
@@ -193,17 +197,24 @@ async def run_kind(
     if room <= 0:
         out["stopped"] = "daily_cap reached"
         return out
-    skip = await ledger.decided_refs(
+    waiting = await ledger.decided_refs(
         pool, kind.name, ("escalated",), now - dt.timedelta(days=settings.rejudge_days)
     )
     # An item the owner undid is the owner's to settle: the engine never decides it again.
-    skip |= await ledger.decided_refs(pool, kind.name, ("reverted",), now - UNDONE_MEMORY)
+    skip = await ledger.decided_refs(pool, kind.name, ("reverted",), now - UNDONE_MEMORY)
+    # An item left as it stands at expiry (see `expire_stale`) is not asked about again.
+    skip |= await ledger.kept_refs(pool, kind.name)
     if mode == "shadow":
         skip |= await ledger.decided_refs(pool, kind.name, ("shadow",), now - dt.timedelta(days=90))
     # `load` returns the oldest first, so the items waiting on the owner would crowd out new ones:
     # ask for enough to get past them.
-    loaded = await kind.load(pool, min(room + len(skip), 500))
-    candidates = [c for c in loaded if c.ref not in skip][:room]
+    loaded = await kind.load(pool, min(room + len(skip | waiting), 500))
+    candidates = [c for c in loaded if c.ref not in skip | waiting][:room]
+    # A rule costs nothing, so an item already waiting on the owner is settled as soon as a rule
+    # covers it rather than after the re-judge interval.
+    if kind.rule is not None:
+        late = [c for c in loaded if c.ref in waiting - skip and kind.rule(c) is not None]
+        candidates += late[: max(room - len(candidates), 0)]
 
     first_model = policy.model or settings.model
     second_model = policy.escalate_model or settings.escalate_model
@@ -366,13 +377,26 @@ async def expire_stale(
     now: dt.datetime | None = None,
 ) -> int:  # fmt: skip
     """Close escalations older than `ttl_days` with the kind's expiry decision (auto mode
-    only; a kind with no expiry decision keeps them for the owner). Returns how many closed."""
-    if mode != "auto" or kind.expire_decision is None:
+    only). A kind with no expiry decision but whose standing state is already the safe one
+    (`expire_keeps`) leaves the subject as it stands and stops asking; any other keeps them for
+    the owner. Returns how many closed."""
+    if mode != "auto" or (kind.expire_decision is None and not kind.expire_keeps):
         return 0
     now = now or dt.datetime.now(dt.UTC)
     closed = 0
     for row in await ledger.escalations(pool):
         if row.kind != kind.name or row.decided_at > now - dt.timedelta(days=policy.ttl_days):
+            continue
+        if kind.expire_decision is None:
+            await ledger.close_escalation(pool, kind.name, row.subject_ref)
+            await ledger.record(
+                pool, kind=kind.name, subject_ref=row.subject_ref, ticker=row.ticker,
+                decision="keep", confidence=None, decided_by="ttl",
+                summary=f"Autopilot (ttl): no confident verdict within {policy.ttl_days} days;"
+                " left as it stands, which is already the safe state",
+                evidence=row.evidence, status="closed",
+            )  # fmt: skip
+            closed += 1
             continue
         cand = Candidate(row.subject_ref, row.ticker, "", row.evidence)
         note = f"Autopilot (ttl): no confident verdict within {policy.ttl_days} days"

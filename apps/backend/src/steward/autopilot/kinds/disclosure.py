@@ -1277,8 +1277,9 @@ INSIDER_OVERRIDE = JudgeKind(
     revert=insider_revert,
     outcome=insider_outcome,
     # No rule, and no expiry: the classifier's `other` already stands for a line nobody
-    # settled, so there is nothing safer to fall back to.
+    # settled, so there is nothing safer to fall back to: it stays as it is.
     expire_decision=None,
+    expire_keeps=True,
     max_tokens=800,
     verify=insider_verify,
     recheck=insider_recheck,

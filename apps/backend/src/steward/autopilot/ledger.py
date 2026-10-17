@@ -196,6 +196,16 @@ async def decided_refs(
     return {r["subject_ref"] for r in rows}
 
 
+async def kept_refs(pool: asyncpg.Pool, kind: str) -> set[str]:
+    """Subjects of `kind` the expiry left as they stand (`judge.expire_stale`)."""
+    rows = await pool.fetch(
+        "select distinct subject_ref from public.auto_decision"
+        " where kind = $1 and status = 'closed' and decided_by = 'ttl' and decision = 'keep'",
+        kind,
+    )
+    return {r["subject_ref"] for r in rows}
+
+
 async def count_since(pool: asyncpg.Pool, kind: str, since: dt.datetime) -> int:
     """Decisions (applied or shadow) of `kind` since `since`: what the daily cap counts."""
     return int(

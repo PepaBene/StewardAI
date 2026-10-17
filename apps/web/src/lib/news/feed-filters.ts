@@ -11,6 +11,8 @@ export type FeedFilters = {
   confidences: Confidence[];
   tiers: number[];
   story: number | null;
+  /** One event type (or "unclassified"), as the API names it. */
+  eventType?: string | null;
   /** Also stories reached only through a rival, supplier, customer or watch topic. */
   related?: boolean;
   /** Also stories the classifier judged not worth a digest line (severity 0). */
@@ -23,20 +25,28 @@ export const EMPTY_FILTERS: FeedFilters = {
   confidences: [],
   tiers: [],
   story: null,
+  eventType: null,
   related: false,
   ignored: false,
 };
 
 /**
  * The GET /news scope: by default only stories about a holding itself and worth at least a
- * digest line; a single story is always shown whole.
+ * digest line (or not classified yet); a single story is always shown whole.
  */
-export function feedScope(filters: FeedFilters): { direct: boolean; severity: number[] | undefined } {
-  if (filters.story) return { direct: false, severity: filters.severities.length ? filters.severities : undefined };
-  return {
-    direct: !filters.related,
-    severity: filters.severities.length ? filters.severities : filters.ignored ? undefined : [1, 2, 3],
-  };
+export function feedScope(filters: FeedFilters): {
+  direct: boolean;
+  severity: number[] | undefined;
+  minSeverity: number | undefined;
+} {
+  const severity = filters.severities.length ? filters.severities : undefined;
+  if (filters.story) return { direct: false, severity, minSeverity: undefined };
+  return { direct: !filters.related, severity, minSeverity: severity || filters.ignored ? undefined : 1 };
+}
+
+/** The stories the default scope leaves out are shown by turning both "also show" switches on. */
+export function showAll(filters: FeedFilters): FeedFilters {
+  return { ...filters, story: null, related: true, ignored: true };
 }
 
 function ints(values: string[], min: number, max: number): number[] {
@@ -47,6 +57,7 @@ function ints(values: string[], min: number, max: number): number[] {
 export function parseFilters(params: URLSearchParams): FeedFilters {
   const ticker = params.get("ticker");
   const story = Number(params.get("story"));
+  const eventType = params.get("event_type");
   return {
     ticker: ticker && /^[A-Za-z0-9._-]{1,32}$/.test(ticker) ? ticker : null,
     severities: ints(params.getAll("severity"), 0, 3),
@@ -55,6 +66,7 @@ export function parseFilters(params: URLSearchParams): FeedFilters {
     ),
     tiers: ints(params.getAll("tier"), 1, 3),
     story: Number.isInteger(story) && story > 0 ? story : null,
+    eventType: eventType && /^[a-z_]{1,40}$/.test(eventType) ? eventType : null,
     related: params.get("related") === "1",
     ignored: params.get("ignored") === "1",
   };
@@ -67,6 +79,7 @@ export function filtersToSearch(filters: FeedFilters): string {
   filters.confidences.forEach((c) => params.append("confidence", c));
   filters.tiers.forEach((t) => params.append("tier", String(t)));
   if (filters.story) params.set("story", String(filters.story));
+  if (filters.eventType) params.set("event_type", filters.eventType);
   if (filters.related) params.set("related", "1");
   if (filters.ignored) params.set("ignored", "1");
   const text = params.toString();
@@ -81,6 +94,7 @@ export function isFiltered(filters: FeedFilters): boolean {
   return (
     filters.ticker !== null ||
     filters.story !== null ||
+    Boolean(filters.eventType) ||
     filters.severities.length > 0 ||
     filters.confidences.length > 0 ||
     filters.tiers.length > 0

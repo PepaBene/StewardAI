@@ -36,7 +36,7 @@ export const KIND_LABELS: Record<InboxKind, string> = {
   disputed: "Disputed stories",
   "disclosure-alerts": "Filing alerts",
   "deal-parties": "Deal parties",
-  "ai-decisions": "AI decisions to check",
+  "ai-decisions": "AI decisions, already applied",
   "stopped-jobs": "Stopped jobs",
   accuracy: "Accuracy checks",
 };

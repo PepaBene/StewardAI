@@ -12,9 +12,9 @@ import { useApiResource } from "@/lib/hooks/use-api-resource";
 import { STOPPED_JOB_DAYS } from "@/lib/inbox-queue";
 import { jobTypeLabel } from "@/lib/jobs/job-detail";
 
-const fetchFailed = () => getBrowserApiClient().GET("/jobs", { params: { query: { status: ["failed"], limit: 100 } } });
+const fetchFailed = () => getBrowserApiClient().GET("/jobs", { params: { query: { status: ["failed"], unresolved: true, limit: 100 } } });
 
-/** Inbox › Stopped jobs: runs that failed in the last week, each with its error and its run page. */
+/** Inbox › Stopped jobs: runs that failed in the last week and have not succeeded since, each with its error and its run page. */
 export function StoppedJobsView() {
   const { state } = useApiResource(fetchFailed);
   const [cutoff] = useState(() => Date.now() - STOPPED_JOB_DAYS * 86_400_000);

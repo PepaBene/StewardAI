@@ -77,9 +77,24 @@ class NewsItemOut(BaseModel):
     story: StoryOut
 
 
+class FeedEventTypeCount(BaseModel):
+    event_type: str | None = Field(description="Null for stories not classified yet.")
+    count: int
+
+
 class NewsFeed(BaseModel):
     items: list[NewsItemOut]
     next_before_id: int | None = Field(description="Pass as before_id for the next page.")
+    hidden_stories: int = Field(
+        default=0,
+        description="First page only: stories matching the other filters that `direct` and "
+        "`min_severity` leave out.",
+    )
+    event_types: list[FeedEventTypeCount] = Field(
+        default_factory=list,
+        description="First page only: stories per event type under the other filters, "
+        "whatever `event_type` selects.",
+    )
     last_ingest: JobSummary | None
     next_ingest_due_at: dt.datetime | None = Field(
         default=None,
@@ -96,6 +111,8 @@ class FeedFilters(BaseModel):
     story_id: int | None = None
     before_id: int | None = None
     direct: bool = False
+    min_severity: int | None = None
+    event_types: list[str] = Field(default_factory=list)
     limit: int = 50
 
 
@@ -134,6 +151,11 @@ def feed_where(filters: FeedFilters) -> tuple[str, list[Any]]:
         )
     if filters.severities:
         add("c.severity = any(?::smallint[])", filters.severities)
+    if filters.min_severity is not None:
+        # A story the classifier has not reached yet has no severity: it is news, not noise.
+        add("(c.severity is null or c.severity >= ?)", filters.min_severity)
+    if filters.event_types:
+        add("coalesce(c.event_type, 'unclassified') = any(?::text[])", filters.event_types)
     if filters.confidences:
         add("c.confidence = any(?::text[])", list(filters.confidences))
     if filters.tiers:
@@ -192,6 +214,37 @@ FEED_SELECT = (
 )
 
 
+_STORIES_FROM = " from public.news_item i join public.story_cluster c on c.id = i.cluster_id"
+
+
+async def _count_stories(pool: asyncpg.Pool, filters: FeedFilters) -> int:
+    where, args = feed_where(filters)
+    row = await pool.fetchrow(
+        f"select count(distinct i.cluster_id) as n{_STORIES_FROM}{where}",
+        *args,
+    )
+    return int(row["n"]) if row else 0
+
+
+async def _first_page_facets(
+    pool: asyncpg.Pool, filters: FeedFilters
+) -> tuple[int, list[FeedEventTypeCount]]:
+    """Stories the scope (`direct`, `min_severity`) leaves out, and the stories per event type
+    under every filter but the event type, so its chips stay put once one is picked."""
+    first = filters.model_copy(update={"before_id": None})
+    hidden = 0
+    if filters.story_id is None and (first.direct or first.min_severity is not None):
+        relaxed = first.model_copy(update={"direct": False, "min_severity": None})
+        hidden = max(0, await _count_stories(pool, relaxed) - await _count_stories(pool, first))
+    where, args = feed_where(first.model_copy(update={"event_types": []}))
+    rows = await pool.fetch(
+        f"select c.event_type, count(distinct i.cluster_id) as n{_STORIES_FROM}{where}"
+        " group by c.event_type order by n desc, c.event_type nulls last",
+        *args,
+    )
+    return hidden, [FeedEventTypeCount(event_type=r["event_type"], count=r["n"]) for r in rows]
+
+
 async def news_feed(
     pool: asyncpg.Pool, filters: FeedFilters, jobs: JobsConfig | None = None
 ) -> NewsFeed:
@@ -230,9 +283,14 @@ async def news_feed(
         "select id, job_type, trigger, status, error, created_at, started_at, finished_at"
         " from public.job where job_type = 'news_ingest' order by id desc limit 1"
     )
+    hidden, event_types = (
+        await _first_page_facets(pool, filters) if filters.before_id is None else (0, [])
+    )
     return NewsFeed(
         items=items,
         next_before_id=items[-1].id if more and items else None,
+        hidden_stories=hidden,
+        event_types=event_types,
         last_ingest=JobSummary(**dict(job)) if job else None,
         next_ingest_due_at=(jobs or JobsConfig()).next_run_after("news_ingest", job["created_at"])
         if job

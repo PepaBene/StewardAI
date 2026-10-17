@@ -106,7 +106,7 @@ function useQueues(reloadKey: number): QueueLoad {
       aiDecisions: api
         .GET("/approvals/ai-summary", { params: { query: { days: 7 } } })
         .then((r) => (r.data === undefined ? undefined : parseAiDecisions(r.data))),
-      failedJobs: api.GET("/jobs", { params: { query: { status: ["failed"], limit: 100 } } }).then((r) => r.data?.jobs),
+      failedJobs: api.GET("/jobs", { params: { query: { status: ["failed"], unresolved: true, limit: 100 } } }).then((r) => r.data?.jobs),
       summary: api.GET("/autopilot/summary").then((r) => r.data),
     };
     const names = Object.keys(calls) as SourceName[];
@@ -148,8 +148,10 @@ export function QueueView() {
   // Fixed at load time so ages do not tick while the page is open.
   const [now] = useState(() => Date.now());
 
-  const rows = useMemo(() => toQueueRows(load.sources, now), [load.sources, now]);
-  const counts = useMemo(() => countByKind(rows), [rows]);
+  const allRows = useMemo(() => toQueueRows(load.sources, now), [load.sources, now]);
+  const counts = useMemo(() => countByKind(allRows), [allRows]);
+  // The AI's decisions are already applied: open to overturn, but not waiting on anyone.
+  const rows = useMemo(() => allRows.filter((r) => r.kind !== "ai-decisions"), [allRows]);
   const oldest = rows.reduce<number | null>((m, r) => (r.ageDays !== null && (m === null || r.ageDays > m) ? r.ageDays : m), null);
 
   const go = (next: Filter, extra?: string) => {

@@ -126,6 +126,10 @@ def test_rule_accepts_only_when_an_independent_source_agrees_and_none_differs() 
     )
     assert fact_rule(cand(mixed)) is None
     assert fact_rule(cand([])) is None
+    # The filing's tagged value disagreeing settles it: correct to the XBRL value.
+    differ = build_opinions(held(), recon("134800000000"), None, [])
+    ruled = fact_rule(cand(differ))
+    assert ruled is not None and ruled.decision == "correct_xbrl"
 
 
 def test_prompt_lists_options_by_key_and_is_capped() -> None:
