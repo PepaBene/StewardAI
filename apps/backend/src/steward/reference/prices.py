@@ -43,6 +43,7 @@ from steward.config.holding_profiles import HoldingProfilesConfig
 from steward.config.jobs import JobsConfig
 from steward.config.store import load_active
 from steward.fx.convert import FxRate, normalise_currency
+from steward.fx.sources import FxSourceError, fetch_cnb_year
 from steward.jobs.runner import JobContext
 from steward.news.escalation import queue_escalation
 from steward.portfolio.sync import store_rates
@@ -86,6 +87,7 @@ GAPS_KEY = "price_gaps"
 CHECKS_KEY = "price_checks"
 SOURCES_KEY = "price_sources"
 FX_BACKFILL_KEY = "fx_history_backfill"
+CNB_BACKFILL_KEY = "cnb_history_backfill"
 RECENT_DAYS = 10
 BACKFILL_KEY = "price_backfill"
 # A re-fetched close this far from the stored one means the source restated its history (a
@@ -785,6 +787,30 @@ async def plausibility(
     }
 
 
+async def cnb_history(
+    pool: asyncpg.Pool, deps: PriceDeps, start: dt.date, detail: dict[str, Any]
+) -> None:
+    """ČNB's fixings back to `start`, one yearly file per year, once (and again when `start`
+    moves earlier). The sync stores only each day's fixing, so a CZK book had ČNB rates from
+    its first sync only, and every series converted to CZK (the benchmark in the risk report)
+    was cut to those few weeks. A rate already stored is never overwritten."""
+    state = await _state(pool, CNB_BACKFILL_KEY)
+    done_from = dt.date.fromisoformat(state["from"]) if state.get("from") else None
+    if state.get("done") and done_from is not None and done_from <= start:
+        return
+    stored = 0
+    for year in range(start.year, deps.today.year + 1):
+        try:
+            rates = await fetch_cnb_year(deps.http, year)
+        except (FxSourceError, httpx.HTTPError) as exc:
+            detail["cnb_backfill_error"] = f"{year}: {str(exc)[:200]}"
+            return  # retried on the next run; nothing is marked done
+        await store_rates(pool, [r for r in rates if r.rate_date >= start], overwrite=False)
+        stored += len(rates)
+    await _save_state(pool, CNB_BACKFILL_KEY, {"done": True, "from": start, "rates": stored})
+    detail["cnb_backfill"] = {"from": start.isoformat(), "rates": stored}
+
+
 async def fx_history(
     pool: asyncpg.Pool, deps: PriceDeps, years: int, detail: dict[str, Any]
 ) -> None:
@@ -803,6 +829,7 @@ async def fx_history(
         await store_rates(pool, [_frankfurter(r) for r in rates], overwrite=False)
         await _save_state(pool, FX_BACKFILL_KEY, {"done": True, "from": start, "rates": len(rates)})
         detail["fx_backfill"] = {"from": start.isoformat(), "rates": len(rates)}
+    await cnb_history(pool, deps, start, detail)
     # Consistency: the Data Portal's latest stored rates against Frankfurter's.
     latest = await pool.fetch(
         "select rate_date, currency, published_rate from public.fx_rate where source = 'ecb'"

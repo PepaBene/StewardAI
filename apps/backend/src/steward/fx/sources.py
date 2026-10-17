@@ -24,6 +24,8 @@ CNB_DAILY_URL = (
     "https://www.cnb.cz/en/financial-markets/foreign-exchange-market/"
     "central-bank-exchange-rate-fixing/central-bank-exchange-rate-fixing/daily.txt"
 )
+# Every fixing of one calendar year (`?year=2025`), for the history the daily file cannot give.
+CNB_YEAR_URL = CNB_DAILY_URL.removesuffix("daily.txt") + "year.txt"
 ECB_EXR_URL = "https://data-api.ecb.europa.eu/service/data/EXR/D..EUR.SP00.A"
 
 # How far back to look for the latest ECB rate (covers long holiday closures).
@@ -75,6 +77,56 @@ def parse_cnb(text: str) -> list[FxRate]:
             )
         )
     return rates
+
+
+def parse_cnb_year(text: str) -> list[FxRate]:
+    """ČNB's yearly fixing file: a `Date|1 AUD|1 BRL|...|100 HUF|...` header, then one
+    `DD.MM.YYYY|rate|rate|...` row per business day. A new header line starts again mid-year
+    when the list of currencies changes."""
+    columns: list[tuple[Decimal, str]] | None = None
+    rates: list[FxRate] = []
+    for raw in text.splitlines():
+        line = raw.strip()
+        if not line or line.startswith("-"):
+            continue
+        cells = [c.strip() for c in line.split("|")]
+        if cells[0].lower() == "date":
+            try:
+                columns = [(Decimal(c.split()[0]), c.split()[1].upper()) for c in cells[1:]]
+            except (IndexError, InvalidOperation) as exc:
+                raise FxSourceError(f"ČNB yearly file has an unexpected header: {line!r}") from exc
+            continue
+        if columns is None:
+            raise FxSourceError("ČNB yearly file has rows before its header")
+        try:
+            rate_date = dt.datetime.strptime(cells[0], "%d.%m.%Y").date()
+        except ValueError as exc:
+            raise FxSourceError(f"ČNB yearly file has an unreadable date: {line!r}") from exc
+        for (amount, code), cell in zip(columns, cells[1:], strict=False):
+            try:
+                published = Decimal(cell.replace(",", "."))
+            except InvalidOperation:
+                continue  # a currency not fixed that day
+            if published <= 0 or amount <= 0 or len(code) != 3:
+                continue
+            rates.append(
+                FxRate(
+                    source="cnb",
+                    rate_date=rate_date,
+                    currency=code,
+                    rate=published / amount,
+                    published_amount=amount,
+                    published_rate=published,
+                )
+            )
+    return rates
+
+
+async def fetch_cnb_year(http: httpx.AsyncClient, year: int) -> list[FxRate]:
+    response = await http.get(CNB_YEAR_URL, params={"year": str(year)})
+    if response.status_code != 200:
+        raise FxSourceError(f"ČNB returned HTTP {response.status_code} for {year}")
+    return parse_cnb_year(response.text)
 
 
 def parse_ecb(text: str) -> list[FxRate]:

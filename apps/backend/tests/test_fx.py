@@ -109,3 +109,27 @@ async def test_fetch_cnb_asks_for_the_snapshot_date() -> None:
     assert seen[0].params["date"] == "27.09.2026"
     # A Sunday request gets the last valid fixing, dated as ČNB dates it.
     assert {r.rate_date for r in rates} == {dt.date(2026, 9, 25)}
+
+
+# The shape of ČNB's yearly file: a header per currency list, which restarts mid-year when
+# the list changes (here RUB is dropped).
+CNB_YEAR_TEXT = """Date|1 EUR|100 HUF|1 RUB|1 USD
+02.01.2026|24.335|6.123|0.215|22.050
+05.01.2026|24.300|6.110|0.214|22.100
+Date|1 EUR|100 HUF|1 USD
+06.01.2026|24.280|6.100|22.150
+"""
+
+
+def test_parse_cnb_year_reads_every_day_and_a_changed_header() -> None:
+    from steward.fx.sources import parse_cnb_year
+
+    rates = parse_cnb_year(CNB_YEAR_TEXT)
+    by = {(r.rate_date, r.currency): r for r in rates}
+    assert len(rates) == 11
+    assert by[(dt.date(2026, 1, 2), "USD")].rate == Decimal("22.050")
+    assert by[(dt.date(2026, 1, 5), "HUF")].rate == Decimal("0.0611")  # per 1 unit
+    assert by[(dt.date(2026, 1, 6), "USD")].rate == Decimal("22.150")
+    assert (dt.date(2026, 1, 6), "RUB") not in by
+    with pytest.raises(FxSourceError):
+        parse_cnb_year("02.01.2026|24.335\n")
