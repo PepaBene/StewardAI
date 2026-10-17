@@ -36,6 +36,7 @@ from steward.ops import tasks
 from steward.research.run import run_research_job
 from steward.settings import get_settings
 from steward.thesis import author
+from steward.thesis.context import app_context, latest_figures
 from steward.thesis.proposal import replace_thesis
 
 logger = logging.getLogger("steward.thesis")
@@ -139,6 +140,8 @@ async def author_from_report(
     pos = await _position(pool, ticker, mode)
     report = _body(row["body"])
     text, figures = author.report_text(report)
+    facts = await load_verified_facts(pool, ticker)
+    records = await app_context(pool, ticker, pos["name"])
     prompt = author.author_prompt(
         ticker=ticker,
         name=pos["name"],
@@ -148,6 +151,8 @@ async def author_from_report(
         report_text=text,
         valuation=figures,
         strategy_text=author.strategy_text(strategy.body, ticker),
+        latest=latest_figures(facts),
+        app_context=records,
     )
     try:
         client = routing_client(create_llm(get_settings()))
@@ -155,7 +160,7 @@ async def author_from_report(
         raise JobFailed(str(exc)) from exc
     usage = Usage(model=cfg.model)
     corrections = await overrides.lessons(pool, "theses", "theses the engine wrote")
-    facts = await load_verified_facts(pool, ticker)
+    hurdle = strategy.body.pretrade.return_hurdle
     async with ctx.step("author_thesis") as step:
         today = dt.datetime.now(dt.UTC).date()
         ask = prompt
@@ -189,13 +194,31 @@ async def author_from_report(
                     draft, ticker, pos["currency"], today, today_price=pos["price"], mode=mode
                 )
                 tight = author.tight_kpis(thesis, facts)
-                if tight and attempt + 1 < AUTHOR_ATTEMPTS:
-                    raise author.AuthorError(
+                loose = author.loose_kpis(thesis, facts)
+                mismatch = author.scenario_issues(
+                    thesis,
+                    draft.stance,
+                    pos["price"] or draft.current_price,
+                    hurdle,
+                    method=draft.valuation_method or "",
+                )
+                problems = []
+                if tight:
+                    problems.append(
                         "these KPIs are set at the latest reported level or one it already"
                         f" fails, so they break on noise: {'; '.join(tight)}. Move each limit"
                         " to where the case would be wrong"
                     )
-                step.detail["tight_kpis"] = tight
+                if loose:
+                    problems.append(
+                        "these KPIs sit so far from the latest reported figure that no"
+                        f" plausible quarter fails them: {'; '.join(loose)}. Move each limit"
+                        " to where a real weakening would break it"
+                    )
+                problems.extend(mismatch)
+                if problems and attempt + 1 < AUTHOR_ATTEMPTS:
+                    raise author.AuthorError("; ".join(problems))
+                step.detail.update(tight_kpis=tight, loose_kpis=loose, scenario_issues=mismatch)
                 break
             except author.AuthorError as exc:
                 if attempt + 1 == AUTHOR_ATTEMPTS:

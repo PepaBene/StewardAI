@@ -180,6 +180,76 @@ def tight_kpis(thesis: ThesisConfig, facts: Iterable[FactRow]) -> list[str]:
     return out
 
 
+LOOSE_POINTS = Decimal(20)  # a rate's limit this many points or more from the latest is loose
+LOOSE_SHARE = Decimal("0.6")  # a level's limit this share of the latest value from it is loose
+
+
+def loose_kpis(thesis: ThesisConfig, facts: Iterable[FactRow]) -> list[str]:
+    """KPIs whose limit sits so far from the newest verified period that no plausible quarter
+    fails them: they score 100 whatever happens and never warn the owner. A rate (unit '%')
+    is loose beyond `LOOSE_POINTS` points and three quarters of its own size; a level beyond
+    `LOOSE_SHARE` of the latest value."""
+    out: list[str] = []
+    for d in judge_thesis(thesis, facts, max_periods=1):
+        obs = d.observed_value
+        if obs is None or d.fiscal_year is None or d.fiscal_period is None or obs == 0:
+            continue
+        if d.operator not in (">", ">=", "<", "<=") or d.status == "breach":
+            continue
+        gap = abs(obs - d.threshold)
+        rate = d.threshold_unit == "%"
+        if gap > (
+            max(LOOSE_POINTS, abs(obs) * Decimal("0.75")) if rate else abs(obs) * LOOSE_SHARE
+        ):
+            out.append(
+                f"{d.kpi_id} ({d.operator} {d.threshold:g} {d.threshold_unit} against"
+                f" {obs.normalize():f} in {period_label(d.fiscal_year, d.fiscal_period)})"
+            )
+    return out
+
+
+NEAR_PRICE = 0.03  # a probability-weighted value this close to the price restates it
+KEEP_LOSS = -0.15  # a keep whose own scenarios expect a loss beyond this contradicts itself
+
+
+def scenario_issues(
+    thesis: ThesisConfig,
+    stance: str,
+    price: float | None,
+    hurdle: float,
+    *,
+    method: str = "",
+) -> list[str]:
+    """Where the draft's scenarios and its stance disagree, or the scenarios only restate the
+    price: the ranking and the switch check read these numbers, so a value set at the price
+    makes every thesis look fully priced and a keep with an expected loss says two things."""
+    target = thesis.price_target
+    if price is None or price <= 0 or target is None or target.scenarios is None:
+        return []
+    total = target.scenarios.expected_value / price - 1
+    out: list[str] = []
+    fair = "fair" in method.lower()
+    if abs(total) < NEAR_PRICE and not fair:
+        out.append(
+            f"the probability-weighted value is within {NEAR_PRICE:.0%} of the price"
+            f" ({total:+.1%}): derive base, bear and bull from the valuation figures, or say in"
+            " valuation_method that the figures show it fairly valued"
+        )
+    if stance in ("add", "buy") and total <= 0:
+        out.append(f"an {stance} whose own scenarios expect {total:+.1%} contradicts itself")
+    if stance == "keep" and total < KEEP_LOSS:
+        out.append(
+            f"a keep whose own scenarios expect {total:+.1%} contradicts itself: trim or exit,"
+            " or show why the scenarios are too low"
+        )
+    if stance == "add" and 0 < total < hurdle:
+        out.append(
+            f"an add whose own scenarios expect {total:+.1%}, under the owner's {hurdle:.0%}"
+            " return hurdle, does not meet the strategy: keep, or show the higher value"
+        )
+    return out
+
+
 def _check_kpis(kpis: list[DraftKPI]) -> list[ThesisKPI]:
     allowed = set(allowed_metrics())
     out: list[ThesisKPI] = []
@@ -276,7 +346,15 @@ valuation the report computes that the price exceeds, a breached position limit,
 strategy's own rotation rule met by the figures given. A figure the report does not have (no \
 intrinsic value computed, no guidance, a missing filing) is an open question to name and a \
 reason for lower conviction, never by itself a reason to trim or exit. When the evidence is \
-mixed or thin, the stance is keep with low conviction and the open questions listed."""
+mixed or thin, the stance is keep with low conviction and the open questions listed.
+
+Weigh the stance against the owner's return hurdle and asymmetry gate in the strategy text: an \
+add needs scenarios whose probability-weighted value clears the hurdle from today's price; a \
+holding whose scenarios cannot reach it is a keep at best. The app records (the saved \
+valuation scenarios, earlier memos and their stances, the owner's notes, the rest of the \
+portfolio and the positions over their cap, filed ownership and the consensus) are what the \
+app already knows: use them, say where your thesis departs from an earlier one and why, and \
+set the position against the rest of the book."""
 
 _BUY_INTRO = """\
 You write the investment thesis for a stock the owner does not hold and is considering buying, \
@@ -313,19 +391,24 @@ these metric names: {", ".join(allowed_metrics())}. Margins and growth rates tak
 check compares it with the reported rate times 100). A threshold is the level at which the \
 case is wrong, not the current level: a floor (>=) sits clearly below the latest figure and a \
 ceiling (<=) clearly above it, with room for an ordinary quarter (a growth floor several \
-points under today's rate, say). Derive it from the report's figures (the current level, the \
-trend, what the valuation and the bear case assume), not from a round number you like; a \
-condition the latest period already fails is not a KPI but a finding for the memo.
+points under today's rate, say), but near enough that a real weakening breaks it: a limit \
+no plausible quarter can fail (a margin floor at half today's level, a growth floor 20 points \
+under it) is refused. Set each against latest_verified_figures, the same figures the check \
+reads, and derive it from the trend and what the valuation and the bear case assume, not \
+from a round number you like; a condition the latest period already fails is not a KPI but a \
+finding for the memo.
 - exit_conditions: plain-words events that end the thesis.
 - pre_mortem: exactly three likeliest reasons the stock loses 40%.
 - scenarios: bear, base and bull value per share in the position's currency with probabilities \
 that add to 1, with bear strictly below base and base strictly below bull (even for an exit: \
 the bear case is the lowest value, whatever the stance). Derive each from the report's \
-valuation figures: a multiple applied to earnings (trailing or forward P/E), the analysts' \
-consensus target and its range as a cross-check, a drawdown for the bear case. The base case is \
-what the valuation supports, not the current price restated; set it at the price only when the \
-figures say the stock is fairly valued, and say so. Name the method in valuation_method; never \
-use a number the report does not support.
+valuation figures and the saved valuation scenarios in app_records (a DCF or multiple value \
+per share there is an anchor to use or to say why you depart from): a multiple applied to \
+earnings (trailing or forward P/E), the analysts' consensus target and its range as a \
+cross-check, a drawdown for the bear case. The base case is what the valuation supports, not \
+the current price restated; a probability-weighted value within 3% of the price is refused \
+unless valuation_method says the figures show the stock fairly valued. Name the method in \
+valuation_method; never use a number the report does not support.
 - sell_target above buy_target, both in the same currency; leave one out if the report gives no \
 basis for it.
 - conviction 1 to 5 and the main reason; review_in_months by how fast the facts change.
@@ -349,6 +432,8 @@ def author_prompt(
     report_text: str,
     valuation: list[str],
     strategy_text: str,
+    latest: list[str] | None = None,
+    app_context: str = "",
 ) -> str:
     held = (
         f"held, {weight:.1%} of the portfolio, price {price:g} {currency}"
@@ -359,8 +444,15 @@ def author_prompt(
         f"<position>\n{ticker} ({name}), {held}\n</position>",
         f"<strategy>\n{strategy_text}\n</strategy>",
         "<valuation_figures>\n" + "\n".join(valuation) + "\n</valuation_figures>",
-        f"<report>\n{report_text}\n</report>",
     ]
+    if latest:
+        parts.append(
+            "<latest_verified_figures>\n" + "\n".join(latest) + "\n</latest_verified_figures>"
+        )
+    # The cited report goes before the records, so the prompt cap trims the records first.
+    parts.append(f"<report>\n{report_text}\n</report>")
+    if app_context:
+        parts.append(f"<app_records>\n{app_context}\n</app_records>")
     return "\n\n".join(parts)[:PROMPT_CAP]
 
 
@@ -401,9 +493,34 @@ def strategy_text(strategy: Any, ticker: str) -> str:
     for t in strategy.target_positions:
         if t.ticker == ticker:
             lines.append(f"Target weight {t.target_weight:.1%} (band {t.band:.1%})")
+    if strategy.cash_target is not None:
+        c = strategy.cash_target
+        lines.append(f"Cash target {c.target_weight:.0%} (band {c.band:.0%})")
+    for c in strategy.target_categories:
+        lines.append(
+            f"Target for {c.dimension} {c.bucket}: {c.target_weight:.0%} (band {c.band:.0%})"
+        )
+    for rule in strategy.rules:
+        if rule.enabled:
+            what = rule.description or rule.type.replace("_", " ")
+            value = getattr(rule, "value", None)
+            lines.append(f"Rule {rule.id}: {what} {rule.operator} {value}")
+    r = strategy.risk
+    limits = [
+        f"{label} {value:.0%}"
+        for label, value in (
+            ("max sector weight", r.max_sector_weight),
+            ("max country weight", r.max_country_weight),
+            ("review a position after a loss of", r.position_loss_review),
+            ("max drawdown", r.max_drawdown),
+        )
+        if value is not None
+    ]
+    if limits:
+        lines.append("Risk limits: " + "; ".join(limits))
     p = strategy.pretrade
     lines.append(
-        f"Return hurdle {p.return_hurdle:.0%}; asymmetry gate {p.asymmetry_gate:g}x "
+        f"Return hurdle {p.return_hurdle:.0%} a year; asymmetry gate {p.asymmetry_gate:g}x "
         "(upside against loss)"
     )
     return "\n".join(lines)

@@ -137,6 +137,11 @@ def full_data_calls(ticker: str, name: str) -> list[PlannedCall]:
     wide = [MODE_WIDE]
     spec: list[tuple[str, dict[str, Any]]] = [
         ("agent_notes", {"ticker": ticker}),
+        ("holding_notes", {"query": name, "ticker": ticker, "limit": 5}),
+        ("thesis_memos", {"ticker": ticker}),
+        ("portfolio_overview", {}),
+        ("filing_evidence", {"ticker": ticker, "section": "institutional", "limit": 5}),
+        ("filing_evidence", {"ticker": ticker, "section": "insider", "limit": 5}),
         ("transactions", {"ticker": ticker, "days": 3650, "limit": 25}),
         ("search_documents", {"query": f"{name} strategy risks outlook", "ticker": ticker}),
         ("search_documents", {"query": f"{name} what the owner wrote about it", "ticker": ticker}),

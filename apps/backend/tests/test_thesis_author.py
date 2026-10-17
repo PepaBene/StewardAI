@@ -191,3 +191,100 @@ def test_kpis_set_at_or_past_the_latest_level_are_tight() -> None:
     tight = author.tight_kpis(thesis, facts)
     assert [t.split(" ")[0] for t in tight] == ["at-level", "failed", "cap"]
     assert "FY2025 Q3" in tight[0]
+
+
+def _revenue_facts() -> list:
+    from decimal import Decimal
+
+    from steward.earnings.verdicts import FactRow
+
+    return [  # FY2025 Q3 revenue 94.036 bn, growth 9.628% on FY2024 Q3
+        FactRow(1, "revenue", "reported", 2025, "Q3", Decimal("94036000000"), "currency", "USD"),
+        FactRow(2, "revenue", "reported", 2024, "Q3", Decimal("85777000000"), "currency", "USD"),
+    ]
+
+
+def test_kpis_no_plausible_quarter_fails_are_loose() -> None:
+    from steward.config.thesis import ThesisConfig, ThesisKPI
+
+    def kpi(i: str, metric: str, threshold: float, unit: str) -> ThesisKPI:
+        return ThesisKPI(id=i, metric=metric, operator=">=", threshold=threshold, unit=unit)
+
+    thesis = ThesisConfig(
+        ticker="AAPL_US_EQ",
+        why_owned="x",
+        kpis=[
+            kpi("far", "revenue_growth_yoy", -15, "%"),
+            kpi("fair", "revenue_growth_yoy", 5, "%"),
+            kpi("floor", "revenue", 30, "USD bn"),
+        ],
+    )
+    loose = author.loose_kpis(thesis, _revenue_facts())
+    assert [t.split(" ")[0] for t in loose] == ["far", "floor"]
+
+
+def test_scenarios_that_restate_the_price_or_contradict_the_stance_are_named() -> None:
+    thesis = author.build_thesis(draft(), "GOOGL_US_EQ", "USD", TODAY, today_price=180.0)
+    # Expected value 0.25 * 120 + 0.5 * 200 + 0.25 * 260 = 195.
+    assert author.scenario_issues(thesis, "keep", 160.0, 0.3) == []
+    near = author.scenario_issues(thesis, "keep", 195.0, 0.3)
+    assert len(near) == 1 and "within 3%" in near[0]
+    assert author.scenario_issues(thesis, "keep", 195.0, 0.3, method="fairly valued at 22x") == []
+    loss = author.scenario_issues(thesis, "keep", 260.0, 0.3)
+    assert any("a keep whose own scenarios expect -25.0%" in x for x in loss)
+    add_loss = author.scenario_issues(thesis, "add", 260.0, 0.3)
+    assert any("add whose own scenarios expect -25.0%" in x for x in add_loss)
+    add_thin = author.scenario_issues(thesis, "add", 170.0, 0.3)
+    assert any("under the owner's 30%" in x for x in add_thin)
+
+
+def test_strategy_text_carries_rules_cash_and_limits() -> None:
+    from steward.config.strategy import StrategyConfig
+
+    strategy = StrategyConfig.model_validate(
+        {
+            "base_currency": "CZK",
+            "cash_target": {"target_weight": 0.05, "band": 0.05},
+            "rules": [
+                {
+                    "id": "max-cash",
+                    "type": "cash_weight",
+                    "operator": "<=",
+                    "value": 0.2,
+                    "description": "Cash at most 20%.",
+                }
+            ],
+            "risk": {"max_drawdown": 0.2},
+        }
+    )
+    text = author.strategy_text(strategy, "X")
+    assert "Cash target 5% (band 5%)" in text
+    assert "Rule max-cash: Cash at most 20%. <= 0.2" in text
+    assert "max drawdown 20%" in text
+    assert "Return hurdle 30% a year" in text
+
+
+def test_prompt_puts_the_report_before_the_app_records() -> None:
+    prompt = author.author_prompt(
+        ticker="X",
+        name="X",
+        currency="USD",
+        price=10.0,
+        weight=0.05,
+        report_text="R",
+        valuation=[],
+        strategy_text="S",
+        latest=["revenue: 1"],
+        app_context="A",
+    )
+    order = [prompt.index(t) for t in ("<latest_verified_figures>", "<report>", "<app_records>")]
+    assert order == sorted(order)
+
+
+def test_context_keeps_facts_and_the_newest_figure_of_each_metric() -> None:
+    from steward.thesis.context import compact, latest_figures, tool_block
+
+    raw = {"a": 1, "source_id": "S1", "b": None, "c": [{"sources": [1], "d": 2}]}
+    assert compact(raw) == {"a": 1, "c": [{"d": 2}]}
+    assert tool_block("holding", {"error": "no owner"}) == "### holding\nnot available: no owner"
+    assert latest_figures(_revenue_facts()) == ["revenue (reported): 94036000000 USD in FY2025 Q3"]
