@@ -445,7 +445,10 @@ async def _checks(
     if cfg.suggest_rebalance and now.hour == cfg.suggest_hour_utc:
         async with steps.run("suggestions") as step:
             step.detail.update(await suggest_rebalance(ctx.pool))
-            step.detail["thesis_breaks"] = await suggest_thesis_breaks(ctx.pool)
+    # Every hour, not once a day: a breach the verdict job has since passed (or a rewritten
+    # thesis dropped) must not stay in "Needs you" until the next morning.
+    async with steps.run("thesis_breaks") as step:
+        step.detail.update(await suggest_thesis_breaks(ctx.pool))
     owner_id = get_settings().owner_user_id
     if cfg.fill_segment_map and owner_id and now.hour == cfg.suggest_hour_utc:
         async with steps.run("company_inputs") as step:
