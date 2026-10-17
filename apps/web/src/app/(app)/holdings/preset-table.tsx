@@ -186,7 +186,8 @@ export function cellContent(id: ColumnId, x: CellContext): ReactNode {
     }
     case "fair_value": {
       const v = toNum(row?.fair_value);
-      return v === null ? <Missing why={missingReason(id, row)} /> : formatPrice(v, h.instrument_currency);
+      // An estimate, not a quote: two decimals, so a thesis base of 18.1534 does not read as exact.
+      return v === null ? <Missing why={missingReason(id, row)} /> : formatMoney(v, h.instrument_currency);
     }
     case "fair_spark": {
       const rows = priceWithFair(x.prices?.bars ?? [], row?.fair_history ?? []);
