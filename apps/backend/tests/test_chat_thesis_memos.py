@@ -5,7 +5,7 @@ import asyncio
 import datetime as dt
 from typing import Any
 
-from steward.chat.tools import ChatTools
+from steward.chat.tools import ChatTools, _target_line
 from steward.research.sources import Registry
 
 
@@ -39,3 +39,16 @@ def test_only_the_newest_memo_per_ticker_is_current() -> None:
         ("PM", "keep", True),
         ("FB", "trim", False),
     ]
+
+
+def test_the_overview_snippet_states_the_figures_an_overvaluation_answer_quotes() -> None:
+    row = {
+        "ticker": "CUPd_EQ",
+        "price": 35.76,
+        "currency": "EUR",
+        "thesis_scenarios": {"bear": 15.7, "base": 31.72, "bull": 50.89},
+        "price_vs_base": round(35.76 / 31.72 - 1, 4),
+    }
+    line = _target_line(row)
+    for figure in ("35.76", "31.72", "4.04", "12.7%", "above"):
+        assert figure in line

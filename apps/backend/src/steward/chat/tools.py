@@ -655,7 +655,7 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
         "idea) its state (intact, watch, at_risk, unjudged), 0-100 thesis score, KPI "
         "pass/breach/unknown counts and the breached KPIs, review date, risk-adjusted rank, "
         "annualised expected return against the strategy's return hurdle, the thesis bear/base/"
-        "bull targets with the price and base_vs_price (negative: the price is above the base), "
+        "bull targets with the price and price_vs_base (positive: the price is above the base), "
         "and the latest memo's stance. Use it first for 'which theses are at risk', 'how are my "
         "theses doing', 'what looks overvalued against its thesis', 'what should I sell or add "
         "to'; it is current, while reports and memos are "
@@ -845,6 +845,17 @@ class QueryEmbedder:
     async def embed(self, texts: Sequence[str]) -> list[list[float]]:
         async with httpx.AsyncClient(timeout=30.0) as http:
             return await GeminiEmbedder(http, self._key, self.model, self.dimensions).embed(texts)
+
+
+def _target_line(row: dict[str, Any]) -> str:
+    """One holding's thesis targets against its price, as the theses overview states them."""
+    s, price, gap = row["thesis_scenarios"] or {}, row["price"], row["price_vs_base"]
+    targets = ", ".join(f"{k} {s[k]:.2f}" for k in ("bear", "base", "bull") if s.get(k))
+    side = "above" if gap >= 0 else "below"
+    return (
+        f"{row['ticker']} price {price:.2f} {row['currency'] or ''}, thesis {targets}; price "
+        f"{abs(price - s['base']):.2f} ({abs(gap) * 100:.1f}%) {side} the base"
+    )
 
 
 class ChatTools:
@@ -1043,8 +1054,8 @@ class ChatTools:
                     "price": rank.price if rank else None,
                     "currency": rank.currency if rank else None,
                     "thesis_scenarios": rank.scenarios if rank else None,
-                    "base_vs_price": (
-                        round(rank.scenarios["base"] / rank.price - 1, 4)
+                    "price_vs_base": (
+                        round(rank.price / rank.scenarios["base"] - 1, 4)
                         if rank and rank.price and rank.scenarios and rank.scenarios.get("base")
                         else None
                     ),
@@ -1062,7 +1073,14 @@ class ChatTools:
             "Every thesis as it stands now",
             app_path="/theses",
             tier=1,
-            snippet=f"{len(rows)} theses; portfolio thesis score {board.portfolio_score}",
+            # The targets and gaps the model is given, so the claim check finds a figure it
+            # quotes (Chugai "EUR 31.72 against EUR 35.76, 12.7% above" was flagged unsupported).
+            snippet="; ".join(
+                [
+                    f"{len(rows)} theses; portfolio thesis score {board.portfolio_score}",
+                    *(_target_line(r) for r in rows if r["price_vs_base"] is not None),
+                ]
+            ),
         )
         return {
             "source_id": sid,
