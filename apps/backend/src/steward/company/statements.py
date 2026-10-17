@@ -13,7 +13,7 @@ from __future__ import annotations
 import datetime as dt
 import itertools
 import json
-from collections import defaultdict
+from collections import Counter, defaultdict
 from collections.abc import Callable, Iterable, Sequence
 from decimal import Decimal
 from typing import Any, Literal
@@ -170,7 +170,41 @@ async def load_rows(
         ticker,
         cutoff,
     )
-    return [dict(r) for r in rows]
+    return without_convenience_translations([dict(r) for r in rows])
+
+
+def without_convenience_translations(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Rows less the second-currency copies a filing prints for convenience.
+
+    TSMC's 20-F states each figure in TWD and again translated into USD. Taking whichever came
+    first mixed the two: revenue growth over three years read -62.3% (USD 121bn against TWD
+    2,264bn) and ROIC 2.3%. A fact is dropped only when the same filing states the same concept,
+    period and dimensions in the currency most of that filing's money facts are in."""
+    by_filing: dict[Any, Counter[str]] = defaultdict(Counter)
+    for r in rows:
+        if r.get("currency"):
+            by_filing[r.get("accession")][str(r["currency"])] += 1
+
+    def key(r: dict[str, Any]) -> tuple[Any, ...]:
+        return (r.get("accession"), r["concept"], r["period_start"], r["period_end"],
+                json.dumps(r.get("dimensions"), sort_keys=True, default=str))  # fmt: skip
+
+    main = {a: c.most_common(1)[0][0] for a, c in by_filing.items() if len(c) > 1}
+    if not main:
+        return rows
+    in_main = {
+        key(r) for r in rows if r.get("currency") and main.get(r.get("accession")) == r["currency"]
+    }
+    return [
+        r
+        for r in rows
+        if not (
+            r.get("currency")
+            and r.get("accession") in main
+            and r["currency"] != main[r.get("accession")]
+            and key(r) in in_main
+        )
+    ]
 
 
 def to_obs(

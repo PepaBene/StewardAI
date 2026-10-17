@@ -4,7 +4,13 @@ import datetime as dt
 from decimal import Decimal
 
 from steward.company.currency import Translator, translate
-from steward.company.statements import Cell, Column, Line, StatementTable
+from steward.company.statements import (
+    Cell,
+    Column,
+    Line,
+    StatementTable,
+    without_convenience_translations,
+)
 from steward.fx.history import FxHistory
 
 D = Decimal
@@ -77,3 +83,37 @@ def test_missing_rate_empties_the_cell_and_says_why() -> None:
     cell = t[0].lines[0].cells["FY25"]
     assert cell.value is None and "no ECB USD/EUR rate" in (cell.reason or "")
     assert any("No reference rate" in n for n in notes)
+
+
+def test_a_filings_convenience_translation_is_dropped_and_its_own_currency_kept() -> None:
+    # Production, 17 Oct 2026: TSM's 3-year revenue growth read -62.3%, USD 121bn (the 20-F's
+    # convenience translation) against TWD 2,264bn three years earlier.
+    def fact(acc: str, concept: str, ccy: str, value: int) -> dict[str, object]:
+        return {
+            "accession": acc,
+            "concept": concept,
+            "period_start": dt.date(2025, 1, 1),
+            "period_end": dt.date(2025, 12, 31),
+            "dimensions": None,
+            "currency": ccy,
+            "value": Decimal(value),
+        }
+
+    rows = [
+        fact("20-F", "ifrs-full:Revenue", "TWD", 3_809_054),
+        fact("20-F", "ifrs-full:Revenue", "USD", 121_423),
+        fact("20-F", "ifrs-full:ProfitLoss", "TWD", 1_695_125),
+        fact("20-F", "ifrs-full:ProfitLoss", "USD", 54_036),
+        fact("20-F", "ifrs-full:Assets", "TWD", 7_000_000),
+        # A figure only stated in the other currency is kept: it is not a copy of anything.
+        fact("20-F", "ifrs-full:DebtSecurities", "USD", 500),
+        fact("10-K", "us-gaap:Revenues", "USD", 100),
+    ]
+    kept = without_convenience_translations(rows)
+    assert [(r["concept"], r["currency"]) for r in kept] == [
+        ("ifrs-full:Revenue", "TWD"),
+        ("ifrs-full:ProfitLoss", "TWD"),
+        ("ifrs-full:Assets", "TWD"),
+        ("ifrs-full:DebtSecurities", "USD"),
+        ("us-gaap:Revenues", "USD"),
+    ]
