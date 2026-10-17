@@ -101,6 +101,13 @@ class DividendRules(ConfigModel):
         description="Largest gap between the declared gross and the received amount (net of "
         "withholding) as a share of the declared amount that still counts as agreeing.",
     )
+    confirm_from_filings: bool = Field(
+        default=True,
+        description="Confirm a suggested dividend event automatically when the issuer's filed "
+        "per-share dividend for a nearby quarter agrees (history from before the holding has no "
+        "payment to match). Older history is confirmed only when the filings agree with at "
+        "least four of the holding's events and contradict none.",
+    )
     match_window_days: int = Field(
         default=21,
         ge=1,

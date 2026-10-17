@@ -38,7 +38,14 @@ from steward.dividends.model import (
     PaymentPoint,
     ReceivedPayment,
 )
-from steward.dividends.reconcile import EventGroup, Reconciliation, group_events, reconcile
+from steward.dividends.reconcile import (
+    EventGroup,
+    FiledDividend,
+    Reconciliation,
+    filing_confirmable,
+    group_events,
+    reconcile,
+)
 from steward.fx.convert import FxSourceName, normalise_currency
 from steward.fx.history import FxHistory, load_fx_history
 from steward.jobs.runner import JobContext
@@ -1242,6 +1249,86 @@ async def confirm_events(
     return confirmed
 
 
+FILED_DPS_CONCEPTS = [
+    "us-gaap:CommonStockDividendsPerShareDeclared",
+    "us-gaap:CommonStockDividendsPerShareCashPaid",
+    "ifrs-full:DividendsRecognisedAsDistributionsToOwnersPerShare",
+]
+
+
+async def load_filed_dividends(pool: asyncpg.Pool, tickers: Sequence[str]) -> list[FiledDividend]:
+    """Quarterly per-share dividends from the issuers' filings, the latest-known row per quarter."""
+    rows = await pool.fetch(
+        "select distinct on (ticker, concept, period_start, period_end) ticker, concept, period_start,"
+        # The XBRL unit (iso4217:TWD/shares) states the currency; the column is not always set.
+        " period_end, value, coalesce(nullif(substring(unit from '^(?:iso4217:)?([A-Z]{3})(?:/|$)'), ''),"
+        " nullif(currency, '')) currency, form, coalesce(filing_url, source_url, '') url"
+        " from public.financial_statement_fact where ticker = any($1::text[]) and concept = any($2::text[])"
+        " and value is not null and period_end - period_start between 80 and 100"
+        " and coalesce(dimensions -> 'members', '[]'::jsonb) = '[]'::jsonb"
+        " order by ticker, concept, period_start, period_end, known_at desc",
+        list(tickers), FILED_DPS_CONCEPTS,
+    )  # fmt: skip
+    return [
+        FiledDividend(
+            ticker=r["ticker"],
+            period_start=r["period_start"],
+            period_end=r["period_end"],
+            per_share=Decimal(r["value"]),
+            currency=r["currency"],
+            concept=r["concept"],
+            form=r["form"],
+            url=r["url"],
+        )
+        for r in rows
+    ]
+
+
+async def confirm_from_filings(pool: asyncpg.Pool, ctx: Context) -> dict[str, list[int]]:
+    """Confirm the suggested events the issuer's filings back (`filing_confirmable`)."""
+    filed = await load_filed_dividends(pool, sorted({e.ticker for e in ctx.events}))
+    done: dict[str, list[int]] = defaultdict(list)
+    listings = {
+        r["ticker"]: r["listing_id"]
+        for r in await pool.fetch(
+            "select ticker, listing_id from public.instrument_security_link where listing_id is not null"
+        )
+    }
+    for c in filing_confirmable(ctx.groups, filed):
+        e = c.group.event
+        f = c.filed
+        listing = listings.get(e.ticker)
+        if f is not None:
+            split = f" before a {c.split}-for-1 split" if c.split > 1 else ""
+            quote = (
+                f"The issuer's {f.form or 'filing'} states {f.per_share} {f.currency or ''} per share for"
+                f" {f.period_start.isoformat()} to {f.period_end.isoformat()} ({f.concept.split(':')[-1]}){split};"
+                f" {e.source} states {e.amount} {e.currency or ''} per share, ex-date {e.ex_date.isoformat()}"
+            )
+            source, url, value = "sec_xbrl", f.url or e.source_url, f.per_share
+            reason = f"auto-confirmed: agrees with the per-share dividend in the issuer's {f.form or 'filing'}{split}"
+        else:
+            quote = (
+                f"{e.source} states {e.amount} {e.currency or ''} per share, ex-date {e.ex_date.isoformat()};"
+                f" it predates the filed record, and the filings agree with {c.corroborated} of the"
+                f" holding's {e.source} events and contradict none"
+            )
+            source, url, value = e.source, e.source_url, e.amount
+            reason = f"auto-confirmed: older {e.source} history; the filings agree with {c.corroborated} of its events and contradict none"
+        async with pool.acquire() as con, con.transaction():
+            ev = await _evidence_for(con, listing, source=source, url=url, day=e.ex_date, value=value,
+                                     unit=e.currency or "XXX", quote=quote, vintage=f"filing_check:{e.id}",
+                                     raw={"event_id": e.id, "filing": f.url if f else None, "split": c.split})  # fmt: skip
+            status = await con.execute(
+                "update public.corporate_action set status = 'confirmed', evidence_id = $2, decided_at = now(),"
+                " decision_reason = $3 where id = $1 and status = 'suggested'",
+                e.id, ev, reason,
+            )  # fmt: skip
+        if status.endswith(" 1"):
+            done[e.ticker].append(e.id)
+    return dict(done)
+
+
 TASK_KIND = "dividend_confirm"
 
 
@@ -1263,6 +1350,11 @@ async def dividend_forecast_handler(ctx_job: JobContext) -> None:
             if auto:
                 ctx = await load_context(pool, today)
         step.detail["auto_confirmed"] = auto
+        if ctx.rules.dividends.confirm_from_filings:
+            from_filings = await confirm_from_filings(pool, ctx)
+            if from_filings:
+                ctx = await load_context(pool, today)
+            step.detail["confirmed_from_filings"] = {t: len(ids) for t, ids in from_filings.items()}
         written = 0
         method = version(METHOD)
         for t in sorted(ctx.holdings):

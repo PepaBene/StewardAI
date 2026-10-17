@@ -237,5 +237,103 @@ def auto_confirmable(rec: Reconciliation) -> list[tuple[EventGroup, Match]]:
     return out
 
 
+@dataclass(frozen=True)
+class FiledDividend:
+    """One quarter's per-share dividend as the issuer filed it (XBRL, declared or paid)."""
+
+    ticker: str
+    period_start: dt.date
+    period_end: dt.date
+    per_share: Decimal
+    currency: str | None
+    concept: str
+    form: str | None
+    url: str
+
+
+# Days an ex-date may fall before / after a filed quarter: a dividend paid in the quarter goes
+# ex shortly before it at the earliest, one declared in it goes ex up to ~2 months after.
+FILED_WINDOWS = {"CashPaid": (25, 0), "Declared": (0, 75)}
+FILED_WINDOW_OTHER = (25, 75)
+SPLIT_RATIOS = (2, 3, 4, 5, 10, 20)  # provider history is split-adjusted, older filings are not
+MIN_CORROBORATED = 4  # filed matches needed before a series' older history counts
+
+
+@dataclass(frozen=True)
+class FilingCheck:
+    group: EventGroup
+    filed: FiledDividend | None  # the filed quarter that agrees; None for older trusted history
+    split: int = 1  # the split ratio between the filed and the provider's figure
+    corroborated: int = 0  # for older history: events of the series the filings agree with
+
+
+def _near(f: FiledDividend, e: DeclaredEvent) -> bool:
+    """The filed quarter may hold this event: same stated currency, ex-date in its window."""
+    if not f.currency or f.currency != e.currency:
+        return False
+    before, after = next(
+        (w for key, w in FILED_WINDOWS.items() if f.concept.endswith(key)), FILED_WINDOW_OTHER
+    )
+    return (
+        f.period_start - dt.timedelta(days=before)
+        <= e.ex_date
+        <= f.period_end + dt.timedelta(days=after)
+    )
+
+
+def _split_agreeing(filed: Decimal, amount: Decimal) -> int | None:
+    for k in (1, *SPLIT_RATIOS):
+        target = amount * k
+        if target > 0 and abs(filed - target) / target <= AGREE_PER_SHARE:
+            return k
+    return None
+
+
+def filing_confirmable(
+    groups: Sequence[EventGroup], filed: Sequence[FiledDividend]
+) -> list[FilingCheck]:
+    """Suggested events the issuer's filings back. An event is backed when a filed quarter near
+    its ex-date states the same per-share amount (or a whole split multiple of it). Events older
+    than every filing are backed by the series: only when at least `MIN_CORROBORATED` events of
+    the holding agree with the filings and none inside the filed record contradicts them."""
+    facts: dict[str, list[FiledDividend]] = {}
+    for f in filed:
+        facts.setdefault(f.ticker, []).append(f)
+    by_ticker: dict[str, list[EventGroup]] = {}
+    for g in groups:
+        by_ticker.setdefault(g.event.ticker, []).append(g)
+    out: list[FilingCheck] = []
+    for ticker, gs in by_ticker.items():
+        rows = facts.get(ticker)
+        if not rows:
+            continue
+        first = min(f.period_start for f in rows)
+        agreed: list[FilingCheck] = []
+        older: list[EventGroup] = []
+        contradicted = 0
+        for g in gs:
+            e = g.event
+            near = [f for f in rows if _near(f, e)]
+            if not near:
+                if e.ex_date < first:
+                    older.append(g)
+                continue
+            hit = next(
+                ((f, k) for f in near if (k := _split_agreeing(f.per_share, e.amount))), None
+            )
+            if hit is None:
+                contradicted += 1
+            else:
+                agreed.append(FilingCheck(g, hit[0], hit[1]))
+        out.extend(c for c in agreed if c.group.status == "suggested")
+        if len(agreed) >= MIN_CORROBORATED and contradicted == 0:
+            out.extend(
+                FilingCheck(g, None, corroborated=len(agreed))
+                for g in older
+                if g.status == "suggested"
+            )
+    return out
+
+
 def total_received(payments: Iterable[ReceivedPayment]) -> Decimal:
     return sum((p.amount for p in payments), ZERO)
