@@ -160,3 +160,34 @@ def test_only_passing_provider_errors_are_waited_out() -> None:
     assert transient(LLMError("connection reset"))
     assert not transient(LLMError("bad request", status=400))
     assert not transient(LLMError("no key", status=401))
+
+
+def test_kpis_set_at_or_past_the_latest_level_are_tight() -> None:
+    from decimal import Decimal
+
+    from steward.config.thesis import ThesisConfig, ThesisKPI
+    from steward.earnings.verdicts import FactRow
+
+    facts = [  # FY2025 Q3 revenue growth: 94.036 / 85.777 - 1 = 9.628%
+        FactRow(1, "revenue", "reported", 2025, "Q3", Decimal("94036000000"), "currency", "USD"),
+        FactRow(2, "revenue", "reported", 2024, "Q3", Decimal("85777000000"), "currency", "USD"),
+    ]
+
+    def kpi(i: str, op: str, threshold: float) -> ThesisKPI:
+        return ThesisKPI(
+            id=i, metric="revenue_growth_yoy", operator=op, threshold=threshold, unit="%"
+        )
+
+    thesis = ThesisConfig(
+        ticker="AAPL_US_EQ",
+        why_owned="x",
+        kpis=[
+            kpi("at-level", ">=", 9.6),
+            kpi("failed", ">=", 12),
+            kpi("room", ">=", 6),
+            kpi("cap", "<=", 9.7),
+        ],
+    )
+    tight = author.tight_kpis(thesis, facts)
+    assert [t.split(" ")[0] for t in tight] == ["at-level", "failed", "cap"]
+    assert "FY2025 Q3" in tight[0]

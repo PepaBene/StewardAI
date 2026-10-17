@@ -26,6 +26,7 @@ from steward.config.jobs import JobsConfig, ThesisSettings, effort_kwargs
 from steward.config.store import ConfigConflictError, load_active, save_config
 from steward.config.strategy import StrategyConfig
 from steward.config.thesis import ThesesConfig, ThesisConfig
+from steward.earnings.verdicts import load_verified_facts
 from steward.engine import overrides
 from steward.jobs.runner import JobContext, JobFailed
 from steward.llm.client import create_llm
@@ -154,6 +155,7 @@ async def author_from_report(
         raise JobFailed(str(exc)) from exc
     usage = Usage(model=cfg.model)
     corrections = await overrides.lessons(pool, "theses", "theses the engine wrote")
+    facts = await load_verified_facts(pool, ticker)
     async with ctx.step("author_thesis") as step:
         today = dt.datetime.now(dt.UTC).date()
         ask = prompt
@@ -186,6 +188,14 @@ async def author_from_report(
                 thesis = author.build_thesis(
                     draft, ticker, pos["currency"], today, today_price=pos["price"], mode=mode
                 )
+                tight = author.tight_kpis(thesis, facts)
+                if tight and attempt + 1 < AUTHOR_ATTEMPTS:
+                    raise author.AuthorError(
+                        "these KPIs are set at the latest reported level or one it already"
+                        f" fails, so they break on noise: {'; '.join(tight)}. Move each limit"
+                        " to where the case would be wrong"
+                    )
+                step.detail["tight_kpis"] = tight
                 break
             except author.AuthorError as exc:
                 if attempt + 1 == AUTHOR_ATTEMPTS:

@@ -18,6 +18,8 @@ The model's numbers are fenced in code before anything is saved:
 
 import datetime as dt
 import re
+from collections.abc import Iterable
+from decimal import Decimal
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field, ValidationError
@@ -32,6 +34,8 @@ from steward.config.thesis import (
     ThesisVariantPerception,
 )
 from steward.earnings.metrics import ADDITIVE, BASE_METRICS, MARGINS, OPTIONAL_BASE_METRICS
+from steward.earnings.periods import period_label
+from steward.earnings.verdicts import FactRow, judge_thesis
 
 Stance = Literal["keep", "add", "trim", "exit", "buy", "pass"]
 HELD_STANCES: frozenset[str] = frozenset({"keep", "add", "trim", "exit"})
@@ -152,6 +156,28 @@ def allowed_metrics() -> list[str]:
     direct = [*BASE_METRICS, *OPTIONAL_BASE_METRICS]
     growth = [f"{m}_growth_{p}" for m in sorted(ADDITIVE) for p in ("yoy", "qoq")]
     return sorted({*direct, *MARGINS, *growth})
+
+
+HEADROOM = Decimal("0.02")  # a KPI's limit sits at least this share of the latest value from it
+
+
+def tight_kpis(thesis: ThesisConfig, facts: Iterable[FactRow]) -> list[str]:
+    """KPIs whose limit the newest verified period already fails or sits within `HEADROOM` of:
+    set at the current level, they break on rounding or an ordinary quarter, not when the case
+    is wrong."""
+    out: list[str] = []
+    for d in judge_thesis(thesis, facts, max_periods=1):
+        obs = d.observed_value
+        if obs is None or d.fiscal_year is None or d.fiscal_period is None:
+            continue
+        if d.operator not in (">", ">=", "<", "<="):
+            continue
+        if d.status == "breach" or abs(obs - d.threshold) < abs(obs) * HEADROOM:
+            out.append(
+                f"{d.kpi_id} ({d.operator} {d.threshold:g} {d.threshold_unit} against"
+                f" {obs.normalize():f} in {period_label(d.fiscal_year, d.fiscal_period)})"
+            )
+    return out
 
 
 def _check_kpis(kpis: list[DraftKPI]) -> list[ThesisKPI]:
@@ -284,8 +310,12 @@ Then fill the thesis:
 - kpis: two to {MAX_KPIS} checkable conditions that would prove or break the case. Use only \
 these metric names: {", ".join(allowed_metrics())}. Margins and growth rates take the unit \
 '%' with the threshold in percentage points: 24.2 for 24.2%, never the fraction 0.242 (the \
-check compares it with the reported rate times 100). Base each threshold on a figure in the \
-report (the current level and the trend), not on a round number you like.
+check compares it with the reported rate times 100). A threshold is the level at which the \
+case is wrong, not the current level: a floor (>=) sits clearly below the latest figure and a \
+ceiling (<=) clearly above it, with room for an ordinary quarter (a growth floor several \
+points under today's rate, say). Derive it from the report's figures (the current level, the \
+trend, what the valuation and the bear case assume), not from a round number you like; a \
+condition the latest period already fails is not a KPI but a finding for the memo.
 - exit_conditions: plain-words events that end the thesis.
 - pre_mortem: exactly three likeliest reasons the stock loses 40%.
 - scenarios: bear, base and bull value per share in the position's currency with probabilities \
