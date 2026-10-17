@@ -187,7 +187,8 @@ RATIOS: dict[str, RatioDef] = {
             "Free cash flow yield",
             "value",
             "(cash from operations - |capital expenditure|) / market cap",
-            "latest full-year period; market cap at the price date",
+            "trailing twelve months (last full year plus this year to date), else the last"
+            " full year; market cap at the price date",
             "market cap <= 0",
             "fraction",
             True,
@@ -197,7 +198,8 @@ RATIOS: dict[str, RatioDef] = {
             "Earnings yield",
             "value",
             "net income / market cap",
-            "latest full-year period; market cap at the price date",
+            "trailing twelve months (last full year plus this year to date), else the last"
+            " full year; market cap at the price date",
             "market cap <= 0",
             "fraction",
             True,

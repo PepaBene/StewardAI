@@ -16,6 +16,7 @@ from steward.discovery import build
 from steward.discovery.build import FundInputs, StockInputs
 from steward.discovery.engine import Record
 from steward.discovery.universe import UniverseMember, UniverseSnapshot, inclusion_reason
+from steward.fundamentals.shares import DEFAULT_BASIS_BY_CIK
 from steward.fundresearch.data import merge_factsheets
 from steward.peer_metrics import financial_peer_metrics
 from steward.reference.price_series import SOURCE_ORDER, yahoo_from_stooq
@@ -411,6 +412,22 @@ async def load_stock_inputs(
     )
     for r in prof:
         setattr(out[r["ticker"]], r["metric"], r["text_value"])
+    # The ADS ratio a 20-F states (the SEC XBRL job stores it), else the documented default by
+    # CIK, as `valuation.read.listing_ratio` resolves it for fair values.
+    ads = await pool.fetch(
+        """select i.t212_ticker as ticker, i.cik, s.ads_ratio_reported
+           from public.instrument i
+           left join lateral (select ads_ratio_reported from public.shares_outstanding
+                              where ticker = i.t212_ticker and ads_ratio_reported is not null
+                              order by as_of desc, fetched_at desc limit 1) s on true
+           where i.t212_ticker = any($1::text[])""",
+        tickers,
+    )
+    for r in ads:
+        default = DEFAULT_BASIS_BY_CIK.get((r["cik"] or "").zfill(10))
+        per_listed = r["ads_ratio_reported"] or (default.ads_ratio if default else None)
+        if per_listed and r["ticker"] in out:
+            out[r["ticker"]].ads_ratio = Decimal(str(per_listed))
     # Insider cluster: distinct insiders with counted open-market buys in 90 days.
     ins = await pool.fetch(
         """select f.ticker, count(distinct t.reporting_owner_cik) as buyers

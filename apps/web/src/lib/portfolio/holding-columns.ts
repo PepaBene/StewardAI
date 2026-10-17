@@ -93,7 +93,7 @@ export const COLUMNS: Record<ColumnId, ColumnDef> = {
   ps: c("ps", "P/S", "Value", "multiple", "Market value over revenue.", { metric: "price_to_sales" }),
   fcf_yield: c("fcf_yield", "FCF yield", "Value", "percent", "Free cash flow over market value.", { metric: "fcf_yield" }),
   ev_ebit: c("ev_ebit", "EV / EBIT", "Value", "multiple", "Enterprise value over operating profit.", { metric: "ev_ebit" }),
-  earnings_yield: c("earnings_yield", "Earnings yield", "Value", "percent", "Operating profit over enterprise value.", { metric: "earnings_yield" }),
+  earnings_yield: c("earnings_yield", "Earnings yield", "Value", "percent", "Trailing net income over market value.", { metric: "earnings_yield" }),
   return_1y: c("return_1y", "1y return", "Fundamentals", "percent", "Price return over the last year.", { metric: "return_1y" }),
   volatility: c("volatility", "Volatility", "Fundamentals", "percent", "Annualised volatility of daily returns, one year.", { metric: "volatility_1y" }),
   momentum: c("momentum", "Momentum 12-1", "Fundamentals", "percent", "Twelve-month return excluding the last month.", { metric: "momentum_12_1" }),

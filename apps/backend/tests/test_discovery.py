@@ -312,6 +312,50 @@ def test_stock_record_computes_valuation_in_matching_currency_and_explains_gaps(
     assert r.values["sector"].value is None and "profile" in (r.values["sector"].reason or "")
 
 
+def half_year(end: dt.date, net_income: int, cfo: int) -> dict[str, object]:
+    p = period(period_start=end - dt.timedelta(days=181), period_end=end, duration_days=181)
+    inputs = dict(p["inputs"])  # type: ignore[call-overload]
+    inputs["net_income"] = {"concept": "n", "value": D(net_income)}
+    inputs["cfo"] = {"concept": "c", "value": D(cfo)}
+    inputs["equity"] = {"concept": "e", "value": D(900)}
+    p["inputs"] = inputs
+    return p
+
+
+def test_multiples_use_a_trailing_year_when_the_newest_period_is_a_half_year() -> None:
+    # Production, 17 Oct 2026: KO's P/E was six months of earnings into a full market cap.
+    member = m("X", country="US", currency="USD", status="active", has_statements=True)
+    periods = [
+        period(),  # FY2025: net income 150, cfo 220
+        half_year(dt.date(2025, 6, 30), 70, 100),
+        half_year(dt.date(2026, 6, 30), 90, 130),
+    ]
+    data = StockInputs(
+        periods=periods, closes=closes(400, "50", "0.05"), shares=[(dt.date(2025, 12, 31), D(100))]
+    )
+    r = stock_record(member, data, TODAY)
+    cap = data.closes[-1][1] * 100
+    assert r.values["earnings_yield"].value == D(150 + 90 - 70) / cap
+    assert r.values["price_to_book"].value == cap / D(900)  # the newest balance sheet
+    # Without last year's half the trailing year cannot be built: the full year stands in.
+    r = stock_record(member, StockInputs(**{**data.__dict__, "periods": periods[::2]}), TODAY)
+    assert r.values["earnings_yield"].value == D(150) / cap
+
+
+def test_an_ads_price_is_valued_on_ads_not_on_home_market_shares() -> None:
+    # Production, 17 Oct 2026: TSM's P/E read 198x, its ADS price times 25.9bn common shares.
+    member = m("X", country="US", currency="USD", status="active", has_statements=True)
+    data = StockInputs(
+        periods=[period()],
+        closes=closes(400, "50", "0.05"),
+        shares=[(dt.date(2025, 12, 31), D(500))],
+        ads_ratio=D(5),
+    )
+    r = stock_record(member, data, TODAY)
+    assert r.values["market_cap"].value == data.closes[-1][1] * 100
+    assert "1 listed share = 5 home-market shares" in (r.values["market_cap"].source or "")
+
+
 def test_parity_metrics_from_cash_flow_dividends_and_insiders() -> None:
     member = m("X", country="US", currency="USD", status="active", has_statements=True)
     end = dt.date(2025, 12, 31)

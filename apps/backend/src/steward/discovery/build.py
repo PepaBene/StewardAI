@@ -20,7 +20,13 @@ from steward.company.ratios import is_financial_issuer
 from steward.discovery.engine import Record
 from steward.discovery.metrics import STOCK_CATALOGUE, MetricValue
 from steward.discovery.universe import UniverseMember
-from steward.peer_metrics import _is_annual, invested_capital, latest_period, prior_year
+from steward.peer_metrics import (
+    FLOW_INPUTS,
+    _is_annual,
+    invested_capital,
+    latest_period,
+    prior_year,
+)
 from steward.reference.risk import volatility as _volatility
 
 ZERO = Decimal(0)
@@ -53,6 +59,8 @@ class StockInputs:
     # restate earlier years for a split, so it shows a split no corporate action records.
     restated_shares: list[tuple[dt.date, Decimal]] = field(default_factory=list)
     statement_currency: str | None = None
+    # Home-market shares one priced share represents (TSMC's ADS = 5 common shares).
+    ads_ratio: Decimal = Decimal(1)
     # Latest cached company checks (axis -> 0-6 score or None) and failed risk checks; empty when
     # the issuer has never been checked.
     check_scores: dict[str, Decimal | None] = field(default_factory=dict)
@@ -180,6 +188,51 @@ def _roic(
     )
 
 
+def trailing_inputs(period: dict[str, Any], periods: list[dict[str, Any]]) -> dict[str, Decimal]:
+    """The period's inputs with every flow line over the twelve months to its end.
+
+    Valuation multiples need a year of earnings and cash flow. When the newest period is a
+    half-year or a quarter, a flow is the last full year plus this year to date less the same
+    span a year earlier; failing that, the last full year's figure. Balance-sheet lines stay
+    at the newest period. Production, 17 Oct 2026: KO's P/E read 48.5x because six months of
+    net income ($8.3bn, H1 2026) were divided into a full market cap; on a trailing year it
+    is about 28x."""
+    current = {k: v["value"] for k, v in period["inputs"].items()}
+    if _is_annual(period["duration_days"]):
+        return current
+    end, days = period["period_end"], period["duration_days"] or 0
+    same_basis = [p for p in periods if p["basis"] == period["basis"]]
+    annual = max(
+        (
+            p
+            for p in same_basis
+            if _is_annual(p["duration_days"]) and 0 < (end - p["period_end"]).days <= 370
+        ),
+        key=lambda p: p["period_end"],
+        default=None,
+    )
+    prior = next(
+        (
+            p
+            for p in same_basis
+            if abs((p["duration_days"] or 0) - days) <= 10
+            and 350 <= (end - p["period_end"]).days <= 380
+        ),
+        None,
+    )
+    out = {k: v for k, v in current.items() if k not in FLOW_INPUTS}
+    if annual is None:
+        return out  # no year to build on: a multiple stays unknown rather than understated
+    year = {k: v["value"] for k, v in annual["inputs"].items()}
+    before = {k: v["value"] for k, v in prior["inputs"].items()} if prior else {}
+    for key in FLOW_INPUTS:
+        if key in year and key in current and key in before:
+            out[key] = year[key] + current[key] - before[key]
+        elif key in year:
+            out[key] = year[key]
+    return out
+
+
 def stock_record(member: UniverseMember, data: StockInputs, as_of: dt.date) -> Record:
     values: dict[str, MetricValue] = {}
     identity: dict[str, str | None] = {
@@ -224,7 +277,7 @@ def stock_record(member: UniverseMember, data: StockInputs, as_of: dt.date) -> R
                 basis=period["basis"],
                 source="filed_statements",
             )
-        inputs = {k: v["value"] for k, v in period["inputs"].items()}
+        inputs = trailing_inputs(period, data.periods)
         r = _roic(period, data.periods, is_financial_issuer(data.sector, data.industry))
         values["roic"] = _ratio_mv(
             r, period_end=period["period_end"], basis=period["basis"], source="filed_statements"
@@ -254,9 +307,13 @@ def stock_record(member: UniverseMember, data: StockInputs, as_of: dt.date) -> R
         # Closes are split-adjusted to today's share basis; the filed share count is not, so it is
         # scaled by every split after its period end (see `split_factor`).
         factor, how = split_factor(shares, data.splits, data.restated_shares)
-        market_cap = price[0] * shares[1] * factor
+        # The price is per listed share and the filed count is of home-market shares: TSM's
+        # $412 ADS times 25.9bn common shares put its P/E at 198x instead of about 40x.
+        market_cap = price[0] * shares[1] * factor / data.ads_ratio
         if how:
             cap_source += f" ({how})"
+        if data.ads_ratio != 1:
+            cap_source += f" (1 listed share = {data.ads_ratio:g} home-market shares)"
     values["market_cap"] = _mv(
         market_cap,
         reason=cap_reason,
