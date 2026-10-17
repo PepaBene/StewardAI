@@ -1,9 +1,11 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 
 import { ResourceGate } from "@/components/company/primitives";
+import { EntityName } from "@/components/entity-name";
 import { KpiStrip } from "@/components/insight/kpi-tile";
+import { VerdictLine } from "@/components/insight/verdict-line";
 import { Field, Problem, problemText, SELECT, TEXTAREA } from "@/components/risk/common";
 import { Blueprint, PanelHeading } from "@/components/ui/blueprint";
 import { Button } from "@/components/ui/button";
@@ -26,6 +28,7 @@ import {
 } from "@/lib/journal/journal";
 import { journalSummary } from "@/lib/journal/summary";
 import { cn } from "@/lib/utils";
+import { isAutoLogged, journalVerdict, priceText, sinceText, type Quote } from "@/lib/verdicts/journal";
 
 // The most the server returns in one request; a full page means older entries exist.
 const JOURNAL_LIMIT = 500;
@@ -40,6 +43,7 @@ export function JournalView() {
   const [exhausted, setExhausted] = useState(false);
   const [olderProblem, setOlderProblem] = useState<string | null>(null);
   const [loadingOlder, setLoadingOlder] = useState(false);
+  const quotes = useQuotes();
 
   async function loadOlder(firstPageSize: number) {
     if (loadingOlder) return;
@@ -76,9 +80,16 @@ export function JournalView() {
     formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
+  const verdict = state.kind === "ok" ? journalVerdict([...state.data, ...older], quotes) : null;
+
   return (
     <div className="flex flex-col gap-5">
       {state.kind === "ok" ? <JournalStrip entries={[...state.data, ...older]} /> : null}
+      {verdict ? (
+        <VerdictLine verdict={verdict.tone} className="max-w-4xl">
+          {verdict.text}
+        </VerdictLine>
+      ) : null}
       <div ref={formRef}>
         <EntryFormPanel form={form} setForm={setForm} onSaved={saved} />
       </div>
@@ -93,10 +104,23 @@ export function JournalView() {
             filter={filter}
             setFilter={setFilter}
             onReview={review}
+            quotes={quotes}
           />
         )}
       </ResourceGate>
     </div>
+  );
+}
+
+const fetchHoldings = () => getBrowserApiClient().GET("/portfolio/holdings");
+
+/** Today's broker price of each holding, to say how a decision has fared since. */
+function useQuotes(): ReadonlyMap<string, Quote> {
+  const { state } = useApiResource(fetchHoldings);
+  return useMemo(
+    () =>
+      new Map(state.kind === "ok" ? state.data.holdings.map((h) => [h.ticker, { price: h.current_price, currency: h.instrument_currency }] as const) : []),
+    [state],
   );
 }
 
@@ -247,6 +271,7 @@ function Ledger({
   filter,
   setFilter,
   onReview,
+  quotes,
 }: {
   entries: JournalEntry[];
   hasMore: boolean;
@@ -256,6 +281,7 @@ function Ledger({
   filter: string;
   setFilter: (v: string) => void;
   onReview: (e: JournalEntry) => void;
+  quotes: ReadonlyMap<string, Quote>;
 }) {
   const shown = entries.filter((e) => filter.trim() === "" || (e.ticker ?? "portfolio").toLowerCase().includes(filter.trim().toLowerCase()));
   const reviewedIds = new Set(entries.map((e) => e.parent_id).filter((id): id is number => id !== null));
@@ -289,7 +315,13 @@ function Ledger({
       ) : (
         <ol className="mt-3 divide-y divide-border-soft border-y border-border-soft">
           {shown.map((entry) => (
-            <Row key={entry.id} entry={entry} reviewed={reviewedIds.has(entry.id)} onReview={() => onReview(entry)} />
+            <Row
+              key={entry.id}
+              entry={entry}
+              reviewed={reviewedIds.has(entry.id)}
+              onReview={() => onReview(entry)}
+              quote={entry.ticker ? quotes.get(entry.ticker) : undefined}
+            />
           ))}
         </ol>
       )}
@@ -297,9 +329,11 @@ function Ledger({
   );
 }
 
-function Row({ entry, reviewed, onReview }: { entry: JournalEntry; reviewed: boolean; onReview: () => void }) {
+function Row({ entry, reviewed, onReview, quote }: { entry: JournalEntry; reviewed: boolean; onReview: () => void; quote: Quote | undefined }) {
   const days = reviewed || entry.decision === "review" ? null : daysUntil(entry.review_date, new Date());
   const due = reviewLabel(days);
+  const since = sinceText(entry, quote);
+  const price = priceText(entry.price_at_decision, entry.price_currency);
   return (
     <li className="grid gap-x-4 gap-y-1 py-3 sm:grid-cols-[7rem_1fr]">
       <div className="flex items-baseline gap-2 sm:flex-col sm:gap-0.5">
@@ -308,19 +342,22 @@ function Row({ entry, reviewed, onReview }: { entry: JournalEntry; reviewed: boo
       </div>
       <div className="min-w-0 space-y-1.5">
         <p className="text-sm">
-          <span className="font-semibold">{entry.ticker ?? "Portfolio"}</span>
+          {entry.ticker ? <EntityName id={entry.ticker} className="font-semibold" /> : <span className="font-semibold">Portfolio</span>}
           {entry.parent_id ? <span className="text-text-muted"> · reviews entry {entry.parent_id}</span> : null}
           {entry.conviction ? <span className="text-text-muted"> · conviction {entry.conviction} of 5</span> : null}
           {entry.main_reason ? <span className="text-text-muted"> · {reasonLabel(entry.main_reason).toLowerCase()}</span> : null}
-          {entry.price_at_decision ? (
-            <span className="num text-text-muted">
-              {" "}
-              · at {entry.price_at_decision}
-              {entry.price_currency ? ` ${entry.price_currency}` : ""}
-            </span>
-          ) : null}
+          {price ? <span className="num text-text-muted"> · at {price}</span> : null}
         </p>
-        <p className="max-w-prose text-sm whitespace-pre-line">{entry.hypothesis}</p>
+        {isAutoLogged(entry) ? (
+          <p className="max-w-prose text-sm text-text-muted">No reason written yet: logged from the broker sync.</p>
+        ) : (
+          <p className="max-w-prose text-sm whitespace-pre-line">{entry.hypothesis}</p>
+        )}
+        {since ? (
+          <VerdictLine verdict={since.tone} className="text-xs">
+            {since.text}
+          </VerdictLine>
+        ) : null}
         {due ? <p className={cn("text-xs", days !== null && days < 0 ? "font-semibold text-warning-signal" : "text-text-muted")}>{due}</p> : null}
         <details className="text-sm">
           <summary className="cursor-pointer text-text-muted">What it rested on</summary>

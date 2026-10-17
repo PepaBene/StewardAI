@@ -1,12 +1,19 @@
 "use client";
 
+import { useState } from "react";
+
 import { ResourceGate } from "@/components/company/primitives";
 import { EntityName } from "@/components/entity-name";
+import { VerdictLine } from "@/components/insight/verdict-line";
 import { Blueprint, PanelHeading } from "@/components/ui/blueprint";
+import { Button } from "@/components/ui/button";
 import { getBrowserApiClient } from "@/lib/api/client";
+import { useEntityNames } from "@/lib/entities/use-entity-names";
 import { formatDate, formatPercent } from "@/lib/format";
 import { useApiResource } from "@/lib/hooks/use-api-resource";
 import { AREA_LABEL, groupByArea, KIND_LABEL, type ChangeFeed, type ChangeItem } from "@/lib/insights/insights";
+import { cn } from "@/lib/utils";
+import { areaVerdict, managers, MATERIAL_MOVE, readingOrder, relativeChange } from "@/lib/verdicts/changes";
 
 import { Notes } from "../xray/shared";
 
@@ -62,11 +69,24 @@ function Feed({ feed }: { feed: ChangeFeed }) {
   );
 }
 
+const FIRST_ROWS = 12;
+
 function Area({ area, items }: { area: ChangeItem["area"]; items: ChangeItem[] }) {
-  const shown = items.slice(0, 40);
+  const names = useEntityNames();
+  const [all, setAll] = useState(false);
+  const ordered = readingOrder(area, items);
+  const verdict = areaVerdict(
+    area,
+    items.map((i) => ({ ...i, name: names.get(i.subject) ?? undefined })),
+  );
+  const shown = all ? ordered : ordered.slice(0, FIRST_ROWS);
   return (
     <Blueprint className="p-4">
       <PanelHeading level={3} title={AREA_LABEL[area]} action={<span className="num text-xs text-text-muted">{items.length} change{items.length === 1 ? "" : "s"}</span>} />
+      <VerdictLine verdict={verdict.tone} className="mt-2 max-w-4xl">
+        {verdict.text}
+      </VerdictLine>
+      <div className="overflow-x-auto">
       <table className="mt-3 w-full text-sm">
         <caption className="sr-only">{AREA_LABEL[area]}: changes with before and after values and the records behind them</caption>
         <thead>
@@ -74,6 +94,7 @@ function Area({ area, items }: { area: ChangeItem["area"]; items: ChangeItem[] }
             <th scope="col" className="py-1 font-medium">Change</th>
             <th scope="col" className="py-1 text-right font-medium">Before</th>
             <th scope="col" className="py-1 text-right font-medium">After</th>
+            <th scope="col" className="py-1 text-right font-medium">Change</th>
             <th scope="col" className="py-1 text-right font-medium">Portfolio</th>
             <th scope="col" className="py-1 font-medium">Records</th>
           </tr>
@@ -83,13 +104,13 @@ function Area({ area, items }: { area: ChangeItem["area"]; items: ChangeItem[] }
             <tr key={`${c.subject}-${c.what}-${i}`} className="border-t border-border-soft align-top">
               <th scope="row" className="py-1.5 pr-3 text-left font-normal">
                 <EntityName id={c.subject} chip={false} className="font-semibold" /><span className="text-text-muted">{KIND_LABEL[c.kind]}</span>
-                <div className="text-xs text-text-muted">{c.what}</div>
-                <div className="text-xs text-text-muted" title={c.relevance_reason}>
-                  Relevance {c.relevance ?? 0} of 100
+                <div className="text-xs text-text-muted" title={`Relevance ${c.relevance ?? 0} of 100: ${c.relevance_reason}`}>
+                  {c.what}
                 </div>
               </th>
               <td className="num py-1.5 text-right">{c.before ?? "No earlier record"}</td>
               <td className="num py-1.5 text-right">{c.after ?? "Gone"}</td>
+              <ChangeCell item={c} />
               <td className="num py-1.5 text-right">{c.weight === null || c.weight === undefined ? "Not held" : formatPercent(c.weight, { decimals: 1 })}</td>
               <td className="py-1.5 pl-3 text-xs text-text-muted">
                 {[c.before_ref, c.after_ref].map((r, j) =>
@@ -113,7 +134,28 @@ function Area({ area, items }: { area: ChangeItem["area"]; items: ChangeItem[] }
           ))}
         </tbody>
       </table>
-      {items.length > shown.length ? <p className="mt-2 text-xs text-text-muted">Showing the {shown.length} with the largest portfolio weight of {items.length}.</p> : null}
+      </div>
+      {items.length > FIRST_ROWS ? (
+        <Button type="button" variant="outline" size="sm" className="mt-3" onClick={() => setAll(!all)}>
+          {all ? `Show the first ${FIRST_ROWS}` : `Show all ${items.length}`}
+        </Button>
+      ) : null}
     </Blueprint>
+  );
+}
+
+/** The relative move where both sides are numbers; manager counts for 13F rows. */
+function ChangeCell({ item }: { item: ChangeItem }) {
+  const holders = item.area === "ownership" ? [managers(item.before), managers(item.after)] : null;
+  const change = holders ? (holders[0] && holders[1] ? holders[1] / holders[0] - 1 : null) : item.area === "insiders" ? null : relativeChange(item);
+  if (change == null || !Number.isFinite(change)) return <td className="py-1.5 text-right text-text-faint">–</td>;
+  const material = Math.abs(change) >= MATERIAL_MOVE;
+  return (
+    <td
+      className={cn("num py-1.5 text-right", material ? (change > 0 ? "text-gain" : "text-loss") : "text-text-muted")}
+      title={holders ? "Change in the number of 13F managers holding it" : undefined}
+    >
+      {formatPercent(change, { signed: true, decimals: 1 })}
+    </td>
   );
 }

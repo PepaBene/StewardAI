@@ -431,7 +431,10 @@ async def _graph(
         " order by r.updated_at desc limit 300",
         since_cut,
     )
-    return [graph_item(r, since_cut, weights) for r in rows], len(rows)
+    # A link re-collected with the same status bumps `updated_at` but changes nothing the owner
+    # sees ("confirmed" to "confirmed" filled the feed with 215 non-changes), so it is left out.
+    items = [graph_item(r, since_cut, weights) for r in rows]
+    return [i for i in items if i.kind == "new" or i.before != i.after], len(rows)
 
 
 def graph_item(
@@ -486,6 +489,45 @@ async def _macro(pool: asyncpg.Pool, since_cut: dt.datetime) -> tuple[list[Chang
 
 
 COMPLETE_QUARTER_MANAGERS = 1000
+PRICE_OUTLIER = 10  # a line whose value per share is this far from the median is a filer error
+
+# Holders and shares per holding in the two latest complete quarters, by the amendment rules of
+# `ownership.read.EFFECTIVE` (per manager and period: the latest original or RESTATEMENT, plus
+# NEW HOLDINGS filed after it), so a restated report is not counted next to its original.
+# A line whose value per share sits a factor PRICE_OUTLIER from the median line of that stock
+# and quarter is left out: one manager filing shares and value swapped (3.2 bn GOOGL shares)
+# otherwise moved the quarter's total by 60%.
+OWNERSHIP_SQL = """
+with p as (
+  select period from public.form13f_filing group by period
+  having count(distinct cik) > $2 order by period desc limit 2
+), f as (
+  select * from public.form13f_filing where period in (select period from p)
+), base as (
+  select distinct on (cik, period) accession, cik, period, filed from f
+  where submission_type = '13F-HR' or coalesce(amendment_type, '') <> 'NEW HOLDINGS'
+  order by cik, period, filed desc, accession desc
+), adds as (
+  select a.accession, a.cik, a.period from f a
+  left join base b on b.cik = a.cik and b.period = a.period
+  where a.submission_type = '13F-HR/A' and a.amendment_type = 'NEW HOLDINGS'
+    and (b.accession is null or (a.filed, a.accession) > (b.filed, b.accession))
+), effective as (
+  select accession, cik, period from base union select accession, cik, period from adds
+), lines as (
+  select e.period, e.cik, h.ticker, h.shares::float8 shares,
+         h.value_usd::float8 / nullif(h.shares, 0)::float8 px
+  from effective e join public.institutional_holding h on h.accession = e.accession
+  where h.ticker = any($1::text[]) and h.put_call is null
+), med as (
+  select period, ticker, percentile_cont(0.5) within group (order by px) m
+  from lines where px > 0 group by 1, 2
+)
+select l.period, l.ticker, count(distinct l.cik) managers, sum(l.shares)::float8 shares
+from lines l join med using (period, ticker)
+where l.px between med.m / $3 and med.m * $3
+group by 1, 2
+"""
 INSIDER_WINDOW_DAYS = 90
 INSIDER_MOVE_SHARES = 1
 
@@ -514,17 +556,7 @@ def ownership_item(
 async def _ownership(
     pool: asyncpg.Pool, tickers: list[str], weights: dict[str, float]
 ) -> tuple[list[ChangeItem], int, str | None]:
-    rows = await pool.fetch(
-        "with p as (select period from public.form13f_filing group by period"
-        "  having count(distinct cik) > $2 order by period desc limit 2)"
-        " select f.period, h.ticker, count(distinct f.cik) managers, sum(h.shares)::float8 shares"
-        " from public.institutional_holding h"
-        " join public.form13f_filing f on f.accession = h.accession"
-        " where f.period in (select period from p) and h.ticker = any($1::text[])"
-        " and h.put_call is null group by 1, 2",
-        tickers,
-        COMPLETE_QUARTER_MANAGERS,
-    )
+    rows = await pool.fetch(OWNERSHIP_SQL, tickers, COMPLETE_QUARTER_MANAGERS, PRICE_OUTLIER)
     periods = sorted({r["period"] for r in rows})
     by: dict[str, dict[dt.date, tuple[dt.date, int, float]]] = {}
     for r in rows:
@@ -539,9 +571,9 @@ async def _ownership(
     return (
         out,
         len(by),
-        "Compares the two latest quarters; filings arrive up to 45 days late. Share totals add "
-        "up every filed line, so amendments and managers' sub-accounts may repeat; the manager "
-        "count is the steadier figure.",
+        "Compares the two latest quarters; filings arrive up to 45 days late. A restated report "
+        "replaces its original, and a line whose value per share is far from every other "
+        "manager's (shares and value swapped by the filer) is left out.",
     )
 
 
@@ -553,7 +585,10 @@ def insider_item(
         return None
     return ChangeItem(
         area="insiders", kind="moved", subject=ticker,
-        what=f"Net open-market insider shares, {INSIDER_WINDOW_DAYS} days",
+        what=(
+            f"Net open-market insider shares: the {INSIDER_WINDOW_DAYS} days before,"
+            f" then the last {INSIDER_WINDOW_DAYS}"
+        ),
         before=f"{prior:+,.0f}", after=f"{recent:+,.0f}", before_ref=None,
         after_ref=Ref(table="insider_transaction", id=ticker, known_at=None),
         weight=weight_of(ticker, weights),
