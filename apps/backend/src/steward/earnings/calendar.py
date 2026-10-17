@@ -44,6 +44,7 @@ from steward.llm.client import LLM, create_llm
 from steward.llm.routing import RoutingClient, routing_client
 from steward.llm.types import LLMError, Message, Request
 from steward.settings import get_settings
+from steward.sources.edgar import EdgarClient, EdgarError
 from steward.sources.finnhub import FinnhubError, next_earnings_date
 
 logger = logging.getLogger(__name__)
@@ -446,11 +447,49 @@ async def _find_date(
     return None, ""
 
 
+async def dates_from_filings(
+    pool: asyncpg.Pool, edgar: EdgarClient, today: dt.date, lookback_days: int
+) -> list[str]:
+    """Holdings with no current report date that furnished results in the last
+    `lookback_days` (8-K Item 2.02, or a 6-K results release): the filing date becomes the
+    report date, so the usual checks after a report run. Finnhub's free tier and IR pages that
+    refuse the fetcher leave some foreign filers (ASML, TSMC) without a date, and their reports
+    otherwise pass unchecked."""
+    since = today - dt.timedelta(days=lookback_days)
+    rows = await pool.fetch(
+        "select t212_ticker, cik, next_report_date from public.instrument"
+        " where cik is not null and (next_report_date is null or next_report_date < $1)"
+        " and t212_ticker in (select ticker from public.position_snapshot where quantity > 0"
+        "  and snapshot_date = (select max(snapshot_date) from public.position_snapshot))",
+        since,
+    )
+    found: list[str] = []
+    for r in rows:
+        try:
+            hit = await edgar.find_earnings_release(r["cik"], since, window_days=lookback_days)
+        except (EdgarError, httpx.HTTPError) as exc:
+            logger.warning("results filing lookup failed for %s: %s", r["t212_ticker"], exc)
+            continue
+        if hit is None:
+            continue
+        filing, url = hit
+        await set_report_date(pool, r["t212_ticker"], filing.filing_date, url, today, lookback_days)
+        found.append(f"{r['t212_ticker']} ({filing.form} {filing.filing_date.isoformat()})")
+    return found
+
+
 async def earnings_due_handler(ctx: JobContext) -> None:
     async with ctx.step("load_config") as step:
         config = await load_config(ctx)
         offsets = sorted(set(config.jobs.earnings_check.check_days_after_report))
         step.detail["offsets"] = offsets
+    agent = get_settings().sec_user_agent
+    if offsets and agent and "@" in agent:
+        async with ctx.step("dates_from_filings") as step:
+            async with httpx.AsyncClient(timeout=30.0) as http:
+                step.detail["found"] = await dates_from_filings(
+                    ctx.pool, EdgarClient(http, agent), local_today(), max(offsets)
+                )
     async with ctx.step("queue_checks") as step:
         step.detail["queued"] = await queue_due_checks(ctx.pool, offsets, local_today())
 
