@@ -255,6 +255,12 @@ def assess(
         audit_state = "thin"
     else:
         audit_state = "none"
+    ledger_complete = audit_ledger.summarize(audit_rows).complete
+    # Name the gate-wide checks too, or a refused feature reads as if everything passed.
+    if not zero_cost_passed:
+        reason += "; the zero-cost audit of the data sources has open findings"
+    if not ledger_complete:
+        reason += "; the source-check ledger has not met its sample targets"
     return FeatureReadiness(
         id=feature.id,
         title=feature.title,
@@ -268,10 +274,7 @@ def assess(
         # The ledger as a whole must also be complete (its sample targets and region spread met):
         # a few self-entered matched facts on two subjects do not release a feature on their own.
         can_activate=(
-            status == "ready"
-            and audit_state == "passed"
-            and zero_cost_passed
-            and audit_ledger.summarize(audit_rows).complete
+            status == "ready" and audit_state == "passed" and zero_cost_passed and ledger_complete
         ),
     )
 
