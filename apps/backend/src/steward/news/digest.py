@@ -33,7 +33,7 @@ from steward.config.store import load_active
 from steward.config.thesis import ThesesConfig
 from steward.config.verification import ClaimVerifierSettings, VerificationConfig
 from steward.earnings.read import EvidenceRelation, FactCheck, evidence_relation
-from steward.earnings.verdicts import NEWEST_PERIOD_FIRST, is_current
+from steward.earnings.verdicts import NEWEST_PERIOD_FIRST, in_active_thesis, is_current
 from steward.engine import overrides
 from steward.jobs.runner import JobContext, JobHandler
 from steward.llm.cache import ResultCache
@@ -547,7 +547,7 @@ async def thesis_changes(
         f"   and p.kpi_id = v.kpi_id and p.created_at < $1 order by {NEWEST_PERIOD_FIRST}"
         "   limit 1) as before"
         " from public.verdict v where v.created_at >= $1 and v.created_at < $2"
-        f" order by v.ticker, v.kpi_id, {NEWEST_PERIOD_FIRST}",
+        f" and {in_active_thesis('v')} order by v.ticker, v.kpi_id, {NEWEST_PERIOD_FIRST}",
         start,
         end,
     )

@@ -23,7 +23,7 @@ from steward.config.store import load_active
 from steward.config.strategy import StrategyConfig
 from steward.config.thesis import ThesesConfig
 from steward.data_context import evidence
-from steward.earnings.verdicts import NEWEST_PERIOD_FIRST
+from steward.earnings.verdicts import NEWEST_PERIOD_FIRST, in_active_thesis
 from steward.news.read_analysis import like_pattern
 from steward.portfolio.transactions import TransactionFilters, list_transactions
 from steward.research.sources import Registry
@@ -959,7 +959,8 @@ async def thesis_and_reports(pool: asyncpg.Pool, registry: Registry, ticker: str
     verdict_rows = await pool.fetch(
         "select distinct on (kpi_id) id, kpi_id, metric, status, observed_value, operator,"  # noqa: S608
         " threshold, threshold_unit, period, rationale, created_at from public.verdict"
-        f" where ticker = $1 order by kpi_id, {NEWEST_PERIOD_FIRST}",
+        f" where ticker = $1 and {in_active_thesis('verdict')}"
+        f" order by kpi_id, {NEWEST_PERIOD_FIRST}",
         ticker,
     )
     verdicts = []

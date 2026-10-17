@@ -28,7 +28,7 @@ from steward.config.jobs import JobsConfig, ThesisSettings, effort_kwargs
 from steward.config.store import load_active
 from steward.config.strategy import StrategyConfig
 from steward.config.thesis import ThesesConfig
-from steward.earnings.verdicts import NEWEST_PERIOD_FIRST
+from steward.earnings.verdicts import NEWEST_PERIOD_FIRST, in_active_thesis
 from steward.jobs import queue
 from steward.jobs.runner import JobContext, create_job
 from steward.llm.client import create_llm
@@ -142,7 +142,7 @@ async def _holdings_pass(
     breached: dict[str, list[str]] = {}
     for r in await pool.fetch(
         "select distinct on (ticker, kpi_id) ticker, kpi_id, status from public.verdict"  # noqa: S608
-        f" order by ticker, kpi_id, {NEWEST_PERIOD_FIRST}"
+        f" where {in_active_thesis('verdict')} order by ticker, kpi_id, {NEWEST_PERIOD_FIRST}"
     ):
         if r["status"] == "breach":
             breached.setdefault(r["ticker"], []).append(r["kpi_id"])

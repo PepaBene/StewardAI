@@ -28,7 +28,7 @@ from steward.budget_guard import BudgetExceeded
 from steward.config.jobs import AutopilotSettings, effort_kwargs
 from steward.config.store import load_active
 from steward.config.thesis import ThesesConfig
-from steward.earnings.verdicts import NEWEST_PERIOD_FIRST
+from steward.earnings.verdicts import NEWEST_PERIOD_FIRST, in_active_thesis
 from steward.llm.routing import RoutingClient
 from steward.ops import tasks
 
@@ -296,7 +296,7 @@ async def thesis_evidence(pool: asyncpg.Pool, ticker: str, now: dt.datetime) -> 
     verdicts = await pool.fetch(
         "select distinct on (kpi_id) kpi_id, status, observed_value, operator, threshold,"  # noqa: S608
         " threshold_unit, period from public.verdict where ticker = $1"
-        f" order by kpi_id, {NEWEST_PERIOD_FIRST}",
+        f" and {in_active_thesis('verdict')} order by kpi_id, {NEWEST_PERIOD_FIRST}",
         ticker,
     )
     lines = [f"- {s['last_seen']:%d %b}: {s['headline']}" for s in stories]
