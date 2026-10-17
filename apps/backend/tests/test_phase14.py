@@ -52,12 +52,15 @@ def test_at_least_one_checked_sourced_sentence_keeps_the_answer_cited() -> None:
     assert answer_shape(sentences) == "cited"
 
 
-def test_the_models_own_admission_of_insufficient_evidence_is_authoritative() -> None:
-    # Even a sentence that happens to check out doesn't override the model's own call.
+def test_a_partial_answer_keeps_its_sourced_sentences_beside_the_models_note() -> None:
+    # The prompt asks for the sourced part plus a note on the rest: the note alone does not
+    # discard sentences that checked out.
     sentences = [s("Revenue was 94,036.", source_ids=["S1"])]
     reason = "I could not find a Q3 figure for this ticker."
-    assert answer_shape(sentences, reason) == "low_evidence"
+    assert answer_shape(sentences, reason) == "cited"
     assert answer_shape([], "Nothing on record for this holding.") == "low_evidence"
+    unchecked = [s("Revenue was 94,036.", source_ids=["S1"], unsupported="not in S1")]
+    assert answer_shape(unchecked, reason) == "low_evidence"
 
 
 def test_no_admission_falls_back_to_the_checked_draft() -> None:

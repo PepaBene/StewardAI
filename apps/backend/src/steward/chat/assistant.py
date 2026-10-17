@@ -341,13 +341,12 @@ def answer_shape(
     chat panel then shows the raw sources found instead of the prose, rather than a
     fluent-sounding answer marked unsupported sentence by sentence after the fact.
 
-    `insufficient_evidence` is the model's own admission (ChatAnswerDraft.insufficient_
-    evidence) that it doesn't have enough to state a claim — authoritative on its own, even
-    if a stray sentence happens to check out, since the model said the answer as a whole
-    shouldn't be trusted as one. Without it, the same conclusion is reached the other way:
-    every sentence in the checked draft turned out to be without a source or unsupported."""
-    if insufficient_evidence:
-        return "low_evidence"
+    `insufficient_evidence` is the model's own note on what it could not find. The prompt asks
+    for a partial answer when only part of the question can be sourced, so the note covers the
+    whole answer only when no sentence holds up: a question in three parts whose third had no
+    data otherwise discarded the two sourced, correct parts (the five largest positions and the
+    cap check) for a list of raw sources. The note is shown beside a partial answer."""
+    del insufficient_evidence  # the shown note; the checked sentences decide the shape
     if not sentences:
         return "low_evidence"
     if all(s.no_source or s.unsupported for s in sentences):
@@ -375,8 +374,10 @@ def needs_escalation(result: AssistantResult) -> bool:
     or an answer with no source or link on any sentence. Judged before the citation checks, so
     the signal is the model's, not the verifier's."""
     draft = result.draft
-    if draft is None or draft.insufficient_evidence:
+    if draft is None:
         return True
+    # A partial answer (sourced sentences plus a note on the part with no data) is not asked
+    # again: a stronger model reads the same records.
     return not any(s.source_ids or s.urls for s in draft.sentences)
 
 
