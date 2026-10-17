@@ -66,6 +66,9 @@ FIRDS_SEGMENTS: dict[str, tuple[str, ...]] = {
 BROKER_VENUE: dict[str, str] = {"d": "XETR", "l": "XLON", "a": "XAMS", "p": "XPAR"}
 FUND_TYPES = frozenset({"mutual fund", "etf", "etp", "unit trust", "open-end fund"})
 MULTI_CURRENCY_VENUES = frozenset({"XLON"})
+# Offshore domiciles whose companies list elsewhere (Nu Holdings: Cayman ISIN, NYSE only): the
+# ISIN country names no exchange, so the market the shares list on is their home.
+OFFSHORE_DOMICILES = frozenset({"KY", "BM", "VG", "GG", "JE", "IM", "BS", "PA", "MH", "LR", "CW"})
 
 
 def broker_root(ticker: str) -> tuple[str, str | None]:
@@ -195,7 +198,11 @@ async def derive_candidate(
         country is not None
         and figi is not None
         and bool(inst["isin"])
-        and str(inst["isin"])[:2] == country
+        and (
+            str(inst["isin"])[:2] == country
+            # An offshore issuer's broker line is the listing itself when the tickers agree.
+            or (str(inst["isin"])[:2] in OFFSHORE_DOMICILES and figi["listing_ticker"] == root)
+        )
     )
     if not isin_match and not outside_firds and not fund_line:
         gaps.append("no FIRDS record for the instrument's ISIN on the home MIC")

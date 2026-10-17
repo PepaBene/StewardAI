@@ -44,6 +44,7 @@ from steward.jobs.runner import JobContext
 from steward.news.link import short_name
 from steward.reference.events import LifecycleEvent, entity_events, listing_events, raise_events
 from steward.reference.lifecycle import name_key, sync_firds_names, sync_gleif_issuer
+from steward.reference.listings import OFFSHORE_DOMICILES
 from steward.settings import get_settings
 from steward.sources import esma, openfigi
 from steward.sources.edgar import EXCHANGE_MIC, EdgarClient, EdgarError
@@ -429,7 +430,7 @@ async def _home_market(
     resolution: openfigi.Resolution | None,
     result: HoldingResult,
 ) -> str | None:
-    if isin.startswith("US") and cik and deps.edgar is not None:
+    if (isin.startswith("US") or isin[:2] in OFFSHORE_DOMICILES) and cik and deps.edgar is not None:
         try:
             exchanges = await deps.edgar.exchanges(cik)
         except (EdgarError, httpx.HTTPError) as exc:

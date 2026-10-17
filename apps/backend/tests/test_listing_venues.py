@@ -90,3 +90,23 @@ async def test_a_london_home_listing_is_not_ended_by_the_brexit_firds_record() -
     assert c is not None
     assert (c.mic, c.currency, c.status, c.valid_to) == ("XLON", "GBP", "active", None)
     assert c.confirmable
+
+
+async def test_an_offshore_issuer_is_confirmed_on_the_market_it_lists_on() -> None:
+    # Nu Holdings: a Cayman ISIN, listed only on the NYSE.
+    inst = instrument(
+        t212_ticker="NU_US_EQ",
+        isin="KYG6683N1034",
+        name="Nu Holdings",
+        currency="USD",
+        home_mic="XNYS",
+        security_type="Common Stock",
+    )
+    c = await derive_candidate(
+        fake_pool(inst, {"figi": "BBG003", "listing_ticker": "NU"}), "NU_US_EQ", SYMBOLS
+    )
+    assert c is not None and (c.mic, c.currency) == ("XNYS", "USD") and c.confirmable
+    other = await derive_candidate(
+        fake_pool(inst, {"figi": "BBG003", "listing_ticker": "NUX"}), "NU_US_EQ", SYMBOLS
+    )
+    assert other is not None and not other.confirmable
