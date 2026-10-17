@@ -13,8 +13,10 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { AlertMessage } from "@/components/alert-message";
-import { BarChart, SparkArea } from "@/components/charts";
+import { SparkArea } from "@/components/charts";
+import { EntityName } from "@/components/entity-name";
 import { KpiStrip } from "@/components/insight/kpi-tile";
+import { VerdictLine } from "@/components/insight/verdict-line";
 import { JobStatusBadge } from "@/components/jobs/job-status-badge";
 import { PageHeader } from "@/components/page-header";
 import { Blueprint } from "@/components/ui/blueprint";
@@ -25,7 +27,6 @@ import {
   boardSummary,
   groupByState,
   scoreChange,
-  shortTicker,
   stateCounts,
   THESIS_STATE,
   type ThesisState,
@@ -36,6 +37,7 @@ import { useJobStatus } from "@/lib/hooks/use-job-status";
 import { useNow } from "@/lib/hooks/use-now";
 import { jobHref } from "@/lib/jobs/job-detail";
 import { cn } from "@/lib/utils";
+import { boardVerdict, weakest } from "@/lib/verdicts/theses";
 
 import { GuidedStart } from "./guided-start";
 import { RankingSection } from "./ranking-section";
@@ -43,8 +45,6 @@ import { ThesisCard } from "./thesis-card";
 
 const fetchBoard = () => getBrowserApiClient().GET("/theses/board");
 
-/** Holdings under this score step back to the lighter bar in "Score by holding". */
-const SCORE_THRESHOLD = 60;
 const LINK = "text-accent-ink underline-offset-4 hover:underline";
 
 export function ThesisBoardView() {
@@ -171,6 +171,7 @@ function Board({ board }: { board: ThesisBoard }) {
 
   const summary = boardSummary(board.rows);
   const groups = groupByState(board.rows);
+  const verdict = boardVerdict(board.rows);
 
   const card = (row: ThesisBoard["rows"][number]) => (
     <ThesisCard
@@ -209,24 +210,17 @@ function Board({ board }: { board: ThesisBoard }) {
         ) : null}
       </div>
 
-      <div className="grid items-start gap-5 lg:grid-cols-[2fr_1fr_1fr]">
-        <Column state="intact" count={groups.intact.length} wide>
-          {groups.intact.map(card)}
-        </Column>
-        <Column state="watch" count={groups.watch.length}>
-          {groups.watch.map(card)}
-        </Column>
-        <Column state="at_risk" count={groups.at_risk.length}>
-          {groups.at_risk.map(card)}
-        </Column>
-      </div>
-      {groups.unjudged.length > 0 ? (
-        <Column state="unjudged" count={groups.unjudged.length} wide>
-          {groups.unjudged.map(card)}
-        </Column>
-      ) : null}
+      <VerdictLine verdict={verdict.tone} className="max-w-4xl">
+        {verdict.text}
+      </VerdictLine>
 
       <StatRow board={board} />
+
+      {ORDER.map((state) => (
+        <Column key={state} state={state} count={groups[state].length}>
+          {groups[state].map(card)}
+        </Column>
+      ))}
 
       <p id="score-method" className="flex max-w-4xl items-start gap-1.5 text-xs text-text-muted">
         <InfoIcon aria-hidden="true" className="mt-0.5 size-3.5 shrink-0" />
@@ -239,6 +233,9 @@ function Board({ board }: { board: ThesisBoard }) {
     </>
   );
 }
+
+/** Breaking theses first: what needs a look comes before what is fine. */
+const ORDER: ThesisState[] = ["at_risk", "watch", "intact", "unjudged"];
 
 const DOT: Record<ThesisState, string> = {
   intact: "bg-gain",
@@ -278,68 +275,64 @@ function AnswerStrip({ board, overdue }: { board: ThesisBoard; overdue: number }
   );
 }
 
-function Column({
-  state,
-  count,
-  wide = false,
-  children,
-}: {
-  state: ThesisState;
-  count: number;
-  wide?: boolean;
-  children: React.ReactNode;
-}) {
+function Column({ state, count, children }: { state: ThesisState; count: number; children: React.ReactNode }) {
   const id = `column-${state}`;
   return (
     <section aria-labelledby={id} className="flex min-w-0 flex-col gap-3">
-      <div className="flex items-center gap-2.5 pb-1">
+      <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 pb-1">
         <span aria-hidden="true" className={cn("size-2.5 rounded-full", DOT[state])} />
         <h2 id={id} className="panel-title">
           {THESIS_STATE[state].label}
         </h2>
         <span className="num rounded-full bg-surface-muted px-2 py-px text-xs text-text-muted">{count}</span>
-        <span className="ml-auto text-xs text-text-muted">{THESIS_STATE[state].note}</span>
+        <span className="text-xs text-text-muted">{THESIS_STATE[state].note}</span>
       </div>
       {count === 0 ? (
-        <p className="rounded-card bg-surface-muted px-4 py-6 text-center text-xs text-text-faint">None</p>
+        <p className="-mt-2 text-xs text-text-faint">No thesis is {THESIS_STATE[state].label.toLowerCase()}.</p>
       ) : (
-        <div className={cn("grid items-start gap-3.5", wide && "sm:grid-cols-2", wide && state === "unjudged" && "lg:grid-cols-4")}>
-          {children}
-        </div>
+        <div className="grid items-start gap-3.5 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">{children}</div>
       )}
     </section>
   );
 }
 
-/** Below the board: the score per holding and the verdicts recorded over 30 days. */
+/** Above the cards: where the theses are weakest, and the verdicts recorded over 30 days. */
 function StatRow({ board }: { board: ThesisBoard }) {
-  const scored = board.rows
-    .filter((r) => r.score !== null)
-    .sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
+  const weak = weakest(board.rows);
   const perDay = board.verdicts_30d.per_day.map((d) => d.count);
-  const methodHint = "How the score is computed: see the note under the board.";
 
   return (
     <div className="grid items-start gap-5 md:grid-cols-[1.6fr_1fr]">
       <Blueprint className="flex flex-col gap-2 px-5 py-[18px]">
-        <h2 className="panel-title" title={methodHint}>
-          Score by holding
-        </h2>
-        {scored.length === 0 ? (
-          <p className="text-xs text-text-faint">No holding has a judged KPI yet.</p>
+        <h2 className="panel-title">Where the theses are weakest</h2>
+        {weak.length === 0 ? (
+          <p className="text-sm text-text-muted">
+            Every scored thesis is at 100: each of its KPIs passes the latest reported figure. A score this uniform usually means the KPI limits sit far from today&apos;s figures; tighten
+            them in{" "}
+            <Link href="/config/theses" className={LINK}>
+              Edit theses
+            </Link>{" "}
+            so a weakening business shows here before the price does.
+          </p>
         ) : (
-          <BarChart
-            data={scored.map((r) => ({
-              label: shortTicker(r.ticker),
-              value: r.score,
-              highlight: (r.score ?? 0) >= SCORE_THRESHOLD,
-            }))}
-            threshold={{ value: SCORE_THRESHOLD, label: `Threshold ${SCORE_THRESHOLD}` }}
-            height={130}
-            maxBarWidth={40}
-            formatValue={(v) => String(Math.round(v))}
-            label="Thesis score by holding, 0 to 100"
-          />
+          <ul className="flex flex-col gap-2">
+            {weak.map(({ row, reason }) => (
+              <li key={row.ticker} className="grid grid-cols-[minmax(0,10rem)_3rem_minmax(0,1fr)] items-center gap-3 text-sm">
+                <Link href={`/companies/${encodeURIComponent(row.ticker)}`} className="truncate hover:text-accent-ink hover:underline">
+                  <EntityName id={row.ticker} name={row.name} chip={false} />
+                </Link>
+                <span className="num text-right font-semibold">{Math.round(row.score ?? 0)}</span>
+                <span className="flex min-w-0 items-center gap-2">
+                  <span aria-hidden="true" className="h-1.5 w-16 shrink-0 overflow-hidden rounded-full bg-surface-muted">
+                    <span className={cn("block h-full rounded-full", DOT[row.state])} style={{ width: `${Math.max(4, row.score ?? 0)}%` }} />
+                  </span>
+                  <span className="truncate text-xs text-text-muted" title={reason}>
+                    {reason}
+                  </span>
+                </span>
+              </li>
+            ))}
+          </ul>
         )}
       </Blueprint>
 
@@ -348,9 +341,12 @@ function StatRow({ board }: { board: ThesisBoard }) {
         <p className="font-heading text-[32px] leading-none font-semibold">
           <span className="num">{board.verdicts_30d.count}</span>{" "}
           <span className="font-sans text-sm font-normal text-text-muted">
-            from <span className="num">{board.verdicts_30d.fact_count}</span> fact
+            from <span className="num">{board.verdicts_30d.fact_count}</span> reported figure
             {board.verdicts_30d.fact_count === 1 ? "" : "s"}
           </span>
+        </p>
+        <p className="text-xs text-text-muted">
+          A verdict is one KPI checked against one reported figure. A new one is recorded only when the outcome, the figure or the thesis changed, so a quiet month means nothing moved.
         </p>
         <div className="mt-auto pt-2">
           {perDay.some((v) => v > 0) ? (

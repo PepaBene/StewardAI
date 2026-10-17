@@ -3,6 +3,8 @@
 import { LoaderCircleIcon } from "lucide-react";
 import { useState } from "react";
 
+import { EntityName } from "@/components/entity-name";
+import { VerdictLine } from "@/components/insight/verdict-line";
 import { Problem, problemText } from "@/components/risk/common";
 import { Blueprint, PanelHeading } from "@/components/ui/blueprint";
 import { Button } from "@/components/ui/button";
@@ -21,8 +23,17 @@ import {
   type SwitchLine,
   type SwitchResponse,
 } from "@/lib/risk/ranking";
+import { RANKING_COLUMNS, rankingVerdict } from "@/lib/verdicts/theses";
 
 const fetchRanking = () => getBrowserApiClient().GET("/theses/expected-returns");
+
+const COLUMNS: [string, string][] = [
+  ["Expected return", RANKING_COLUMNS.expected],
+  ["A year", RANKING_COLUMNS.year],
+  ["Volatility", RANKING_COLUMNS.volatility],
+  ["Score", RANKING_COLUMNS.score],
+  ["Against the book", RANKING_COLUMNS.book],
+];
 
 /** Every thesis, held or on the bench, ranked by risk-adjusted expected return, with the switches it suggests. */
 export function RankingSection() {
@@ -31,7 +42,11 @@ export function RankingSection() {
 
   return (
     <Blueprint className="p-4">
-      <PanelHeading level={2} kicker="Decision loop" title="Ideas ranked by risk-adjusted return" />
+      <PanelHeading level={2} kicker="Decision loop" title="Which theses pay for their risk" />
+      <p className="mt-1 max-w-prose text-sm text-text-muted">
+        Every thesis, held or on the bench, ranked by the return its own bear, base and bull values imply from today&apos;s price, per unit of price swing. The board above says whether
+        the business delivers; this says whether the price still leaves room to earn.
+      </p>
       {state.kind === "loading" ? (
         <p className="mt-3 flex items-center gap-2 text-sm text-text-muted" role="status">
           <LoaderCircleIcon aria-hidden="true" className="size-4 animate-spin" />
@@ -46,9 +61,18 @@ export function RankingSection() {
 
 function Ranking({ ranking }: { ranking: RankingResponse }) {
   const held = ranking.rows.filter((r) => r.held).length;
+  const verdict = rankingVerdict(ranking.rows, ranking.return_hurdle);
   return (
-    <div className="mt-2 flex flex-col gap-4">
-      <p className="max-w-prose text-sm text-text-muted">{ranking.formula}</p>
+    <div className="mt-3 flex flex-col gap-4">
+      {verdict ? (
+        <VerdictLine verdict={verdict.tone} className="max-w-4xl">
+          {verdict.text}
+        </VerdictLine>
+      ) : null}
+      <details className="max-w-prose text-sm text-text-muted">
+        <summary className="cursor-pointer text-text">How the ranking is computed</summary>
+        <p className="mt-1">{ranking.formula}</p>
+      </details>
       <p className="num text-sm text-text-muted">
         Cash rate {ranking.cash_rate == null ? "not stored" : formatPercent(ranking.cash_rate)}
         {ranking.cash_rate_label ? ` (${ranking.cash_rate_label})` : ""} · portfolio Sharpe ratio {scoreText(ranking.portfolio_sharpe)} · {held} held, {ranking.bench_count} on the bench
@@ -60,6 +84,19 @@ function Ranking({ ranking }: { ranking: RankingResponse }) {
         </p>
       ))}
       {ranking.rows.length > 0 ? <RankingTable rows={ranking.rows} /> : null}
+      <dl className="grid max-w-4xl gap-x-4 gap-y-1 text-xs text-text-muted sm:grid-cols-[auto_1fr]">
+        {COLUMNS.map(([term, text]) => (
+          <div key={term} className="contents">
+            <dt className="font-medium text-text">{term}</dt>
+            <dd>{text}</dd>
+          </div>
+        ))}
+        <dt className="font-medium text-text">Highlighted</dt>
+        <dd>
+          Clears your {ranking.return_hurdle == null ? "return" : formatPercent(ranking.return_hurdle, { decimals: 0 })} hurdle and the asymmetry gate. Click a name for its scenarios
+          and inputs.
+        </dd>
+      </dl>
       <Switches />
     </div>
   );
@@ -74,11 +111,11 @@ function RankingTable({ rows }: { rows: RankingRow[] }) {
           <tr className="border-b border-border text-left">
             <th scope="col" className="py-1.5 pr-3 font-medium">#</th>
             <th scope="col" className="py-1.5 pr-3 font-medium">Stock</th>
-            <th scope="col" className="num py-1.5 pr-3 text-right font-medium">Expected return</th>
-            <th scope="col" className="num py-1.5 pr-3 text-right font-medium">A year</th>
-            <th scope="col" className="num py-1.5 pr-3 text-right font-medium">Volatility</th>
-            <th scope="col" className="num py-1.5 pr-3 text-right font-medium">Score</th>
-            <th scope="col" className="py-1.5 font-medium">Against the book</th>
+            <th scope="col" title={RANKING_COLUMNS.expected} className="num py-1.5 pr-3 text-right font-medium">Expected return</th>
+            <th scope="col" title={RANKING_COLUMNS.year} className="num py-1.5 pr-3 text-right font-medium">A year</th>
+            <th scope="col" title={RANKING_COLUMNS.volatility} className="num py-1.5 pr-3 text-right font-medium">Volatility</th>
+            <th scope="col" title={RANKING_COLUMNS.score} className="num py-1.5 pr-3 text-right font-medium">Score</th>
+            <th scope="col" title={RANKING_COLUMNS.book} className="py-1.5 font-medium">Against the book</th>
           </tr>
         </thead>
         {rows.map((r) => (
@@ -94,7 +131,7 @@ function RankingRowView({ row }: { row: RankingRow }) {
   const gap = missingText(row);
   return (
     <tbody className="border-b border-border-soft last:border-b-0">
-      <tr>
+      <tr className={row.returns?.meets_hurdle ? "bg-gain-subtle" : undefined}>
         <td className="num py-1.5 pr-3">{row.rank ?? "—"}</td>
         <th scope="row" className="py-1.5 pr-3 text-left font-semibold">
           <button
@@ -103,7 +140,7 @@ function RankingRowView({ row }: { row: RankingRow }) {
             aria-expanded={open}
             onClick={() => setOpen(!open)}
           >
-            {row.ticker}
+            <EntityName id={row.ticker} name={row.name} />
           </button>
           <span className="ml-1.5 text-xs font-normal text-text-muted">{row.held ? "held" : "bench"}</span>
         </th>

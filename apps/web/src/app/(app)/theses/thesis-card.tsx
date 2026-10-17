@@ -26,6 +26,7 @@ import { reviewQueueHref } from "@/lib/evidence/review";
 import { formatDate, formatPercent, formatRelative } from "@/lib/format";
 import { useNow } from "@/lib/hooks/use-now";
 import { cn } from "@/lib/utils";
+import { scoreExplain } from "@/lib/verdicts/theses";
 
 import { PositionRisk } from "./position-risk";
 import { VerdictPanel } from "./verdict-panel";
@@ -83,12 +84,15 @@ export function ThesisCard({
               {name}
             </p>
           </div>
-          <Ring
-            value={row.score}
-            size={52}
-            tone={STATE_TONE[row.state]}
-            ariaLabel={`Thesis score, ${THESIS_STATE[row.state].label}`}
-          />
+          <div className="flex shrink-0 flex-col items-center gap-0.5" title={`Thesis score out of 100: ${scoreExplain(row)}`}>
+            <Ring
+              value={row.score}
+              size={52}
+              tone={STATE_TONE[row.state]}
+              ariaLabel={`Thesis score, ${THESIS_STATE[row.state].label}. ${scoreExplain(row)}`}
+            />
+            <span className="text-[11px] text-text-muted">Thesis score</span>
+          </div>
         </div>
 
         {row.kpis.length === 0 ? (
