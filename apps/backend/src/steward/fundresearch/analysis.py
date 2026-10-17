@@ -107,6 +107,18 @@ def build_profile(data: FundData) -> FundProfile:
     sheet_date = f.get("as_of")
     fields: list[ProfileField] = []
 
+    def sheet(key: str) -> tuple[str, dt.date | None]:
+        """Source and date of one factsheet field; it may come from an older version."""
+        donor = (f.get("filled_from") or {}).get(key)
+        if donor is None:
+            return sheet_src, sheet_date
+        label = (
+            "owner-entered factsheet"
+            if donor.get("source") == "manual"
+            else f"{donor.get('source')} factsheet"
+        )
+        return label, donor.get("as_of")
+
     def add(
         key: str,
         label: str,
@@ -149,8 +161,8 @@ def build_profile(data: FundData) -> FundProfile:
         "share_class",
         "Share class",
         f.get("share_class"),
-        source=sheet_src,
-        as_of=sheet_date,
+        source=sheet("share_class")[0],
+        as_of=sheet("share_class")[1],
         reason="the issuer snapshot names no share class",
     )
     dom_value, dom_url, dom_date = owner("domicile")
@@ -170,7 +182,13 @@ def build_profile(data: FundData) -> FundProfile:
         source=sheet_src,
         as_of=sheet_date,
     )
-    add("benchmark", "Benchmark", f.get("benchmark_name"), source=sheet_src, as_of=sheet_date)
+    add(
+        "benchmark",
+        "Benchmark",
+        f.get("benchmark_name"),
+        source=sheet("benchmark_name")[0],
+        as_of=sheet("benchmark_name")[1],
+    )
     rep, rep_url, rep_date = owner("replication_method")
     add(
         "replication",
@@ -185,8 +203,8 @@ def build_profile(data: FundData) -> FundProfile:
         "distribution",
         "Distribution policy",
         f.get("distribution_policy"),
-        source=sheet_src,
-        as_of=sheet_date,
+        source=sheet("distribution_policy")[0],
+        as_of=sheet("distribution_policy")[1],
     )
     inc, inc_url, inc_date = owner("inception_date")
     add(
@@ -205,16 +223,16 @@ def build_profile(data: FundData) -> FundProfile:
         f.get("total_assets"),
         unit="money",
         currency=f.get("total_assets_currency"),
-        source=sheet_src,
-        as_of=f.get("total_assets_as_of") or sheet_date,
+        source=sheet("total_assets")[0],
+        as_of=f.get("total_assets_as_of") or sheet("total_assets")[1],
     )
     add(
         "expense_ratio",
         "Ongoing charge",
         f.get("expense_ratio"),
         unit="fraction",
-        source=sheet_src,
-        as_of=sheet_date,
+        source=sheet("expense_ratio")[0],
+        as_of=sheet("expense_ratio")[1],
     )
     add("factsheet_date", "Factsheet date", sheet_date, unit="date", source=sheet_src)
     add(

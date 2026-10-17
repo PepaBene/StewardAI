@@ -139,6 +139,44 @@ def _row(record: asyncpg.Record | None) -> dict[str, Any] | None:
     return out
 
 
+# Fields an issuer factsheet states, each with the columns that travel with it. A later version
+# that lacks one (a holdings scrape names no share class or charge) leaves it to the newest
+# version that has it, so a factsheet entered by hand is not hidden by the next weekly scrape.
+SHEET_FIELDS: dict[str, tuple[str, ...]] = {
+    "share_class": (),
+    "expense_ratio": (),
+    "benchmark_name": (),
+    "distribution_policy": (),
+    "nav_basis": (),
+    "total_assets": ("total_assets_currency", "total_assets_as_of"),
+}
+
+
+def merge_factsheets(rows: list[dict[str, Any]]) -> dict[str, Any] | None:
+    """The newest version, with each field it lacks taken from the newest older version that has
+    it; `filled_from` names where each such field came from (source and date)."""
+    if not rows:
+        return None
+    out = dict(rows[0])
+    filled: dict[str, dict[str, Any]] = {}
+    for key, companions in SHEET_FIELDS.items():
+        if out.get(key) not in (None, ""):
+            continue
+        donor = next((r for r in rows[1:] if r.get(key) not in (None, "")), None)
+        if donor is None:
+            continue
+        for col in (key, *companions):
+            out[col] = donor.get(col)
+        filled[key] = {"source": donor.get("source"), "as_of": donor.get("as_of")}
+    if not out.get("charges"):
+        donor = next((r for r in rows[1:] if r.get("charges")), None)
+        if donor is not None:
+            out["charges"] = donor["charges"]
+            filled["charges"] = {"source": donor.get("source"), "as_of": donor.get("as_of")}
+    out["filled_from"] = filled
+    return out
+
+
 def _cutoff(as_of: dt.date | None) -> dt.datetime | None:
     if as_of is None:
         return None
@@ -159,14 +197,15 @@ async def load_fund(
         cutoff,
         as_of or dt.date.max,
     )
-    sheet = await pool.fetchrow(
+    sheets = await pool.fetch(
         """select * from public.fund_factsheet where fund_isin=$1
              and ($2::timestamptz is null or (as_of <= $3 and fetched_at < $2))
-           order by as_of desc, fetched_at desc, id desc limit 1""",
+           order by as_of desc, fetched_at desc, id desc limit 24""",
         isin,
         cutoff,
         as_of or dt.date.max,
     )
+    sheet = merge_factsheets([r for s in sheets if (r := _row(s)) is not None])
     listings = await pool.fetch(
         """select i.t212_ticker, i.name, i.exchange, i.currency, i.price_symbol
            from public.instrument i where i.isin=$1 order by i.t212_ticker""",
@@ -199,7 +238,7 @@ async def load_fund(
     nav = await load_nav(pool, owner_id, isin, as_of)
     return FundData(
         isin=isin,
-        factsheet=_row(sheet),
+        factsheet=sheet,
         meta=dict(meta) if meta else None,
         snapshot=snapshot,
         listings=[
@@ -373,18 +412,26 @@ async def list_funds(pool: asyncpg.Pool) -> list[CatalogRow]:
              select distinct on (fund_isin) fund_isin, fund_name, provider, fund_currency, as_of
              from public.etf_snapshot order by fund_isin, as_of desc, fetched_at desc, id desc),
            sheets as (
-             select distinct on (fund_isin) fund_isin, fund_name, provider, fund_currency,
-                    expense_ratio, total_assets, total_assets_currency
+             select distinct on (fund_isin) fund_isin, fund_name, provider, fund_currency
              from public.fund_factsheet order by fund_isin, as_of desc, fetched_at desc, id desc),
+           -- as merge_factsheets: a version without the charge or assets leaves them to an older one
+           charges as (
+             select distinct on (fund_isin) fund_isin, expense_ratio from public.fund_factsheet
+             where expense_ratio is not null order by fund_isin, as_of desc, fetched_at desc, id desc),
+           assets as (
+             select distinct on (fund_isin) fund_isin, total_assets, total_assets_currency
+             from public.fund_factsheet where total_assets is not null
+             order by fund_isin, as_of desc, fetched_at desc, id desc),
            ids as (select fund_isin from snaps union select fund_isin from sheets)
            select ids.fund_isin,
                   coalesce(sh.fund_name, sn.fund_name) as name,
                   coalesce(sh.provider, sn.provider) as provider,
                   coalesce(sh.fund_currency, sn.fund_currency) as currency,
-                  sn.as_of as holdings_as_of, sh.expense_ratio, sh.total_assets, sh.total_assets_currency,
+                  sn.as_of as holdings_as_of, ch.expense_ratio, a.total_assets, a.total_assets_currency,
                   sn.fund_isin is not null as has_holdings,
                   coalesce((select array_agg(i.t212_ticker order by i.t212_ticker) from public.instrument i where i.isin = ids.fund_isin), '{}') as tickers
            from ids left join snaps sn using (fund_isin) left join sheets sh using (fund_isin)
+                left join charges ch using (fund_isin) left join assets a using (fund_isin)
            order by name nulls last, ids.fund_isin""",
     )
     return [

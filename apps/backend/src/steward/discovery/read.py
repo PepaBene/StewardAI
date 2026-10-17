@@ -16,6 +16,7 @@ from steward.discovery import build
 from steward.discovery.build import FundInputs, StockInputs
 from steward.discovery.engine import Record
 from steward.discovery.universe import UniverseMember, UniverseSnapshot, inclusion_reason
+from steward.fundresearch.data import merge_factsheets
 from steward.peer_metrics import financial_peer_metrics
 from steward.reference.price_series import SOURCE_ORDER, yahoo_from_stooq
 
@@ -517,12 +518,17 @@ async def fund_inputs(pool: asyncpg.Pool, as_of: dt.date) -> list[FundInputs]:
         as_of,
     )
     sheets = await pool.fetch(
-        """select distinct on (fund_isin) * from public.fund_factsheet
+        """select * from public.fund_factsheet
            where as_of <= $1 and fetched_at < (($1::date + 1)::timestamp at time zone 'UTC')
            order by fund_isin, as_of desc, fetched_at desc, id desc""",
         as_of,
     )
-    sheet_by = {r["fund_isin"]: dict(r) for r in sheets}
+    versions: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for r in sheets:
+        versions[r["fund_isin"]].append(dict(r))
+    sheet_by = {
+        isin: merged for isin, rows in versions.items() if (merged := merge_factsheets(rows))
+    }
     ids = [r["id"] for r in heads]
     holdings: dict[int, list[dict[str, Any]]] = defaultdict(list)
     if ids:

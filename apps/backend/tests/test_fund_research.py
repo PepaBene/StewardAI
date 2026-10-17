@@ -7,7 +7,7 @@ import pytest
 
 from steward.analytics.returns import Dividend
 from steward.fundresearch import analysis, compare, performance
-from steward.fundresearch.data import Fact, FundData, FundListing
+from steward.fundresearch.data import Fact, FundData, FundListing, merge_factsheets
 from steward.funds.aggregate import IssuerRef
 from steward.lookthrough.read import RowIn, SnapshotIn
 
@@ -685,3 +685,47 @@ def test_nav_premium_scales_pence_listing_closes_to_the_major_unit():
     view = performance.build_nav_for_listing(pts, [(dt.date(2026, 9, 29), D("1020"))], "GBX")
     assert view.points[0].premium == D("0.02")  # GBX 1020 = GBP 10.20, not 102x the NAV
     assert view.points[0].listing_close == D("10.20")
+
+
+def test_a_hand_entered_factsheet_is_not_hidden_by_a_later_empty_scrape():
+    # Production, 17 Oct 2026: the weekly iShares scrape (holdings only) was dated after the
+    # factsheet the owner entered, so the fund page showed the charge and benchmark as missing.
+    scrape = {
+        "source": "ishares_json",
+        "provider": "ishares",
+        "as_of": dt.date(2026, 10, 15),
+        "fund_name": "iShares Diversified Commodity",
+        "share_class": None,
+        "expense_ratio": None,
+        "benchmark_name": None,
+        "total_assets": None,
+        "charges": {},
+    }
+    owner = {
+        "source": "manual",
+        "provider": None,
+        "as_of": dt.date(2026, 9, 30),
+        "share_class": "USD (Acc)",
+        "expense_ratio": D("0.0019"),
+        "benchmark_name": "Bloomberg Commodity Index TR",
+        "total_assets": D("2430430000"),
+        "total_assets_currency": "USD",
+        "total_assets_as_of": None,
+        "charges": {},
+    }
+    merged = merge_factsheets([scrape, owner])
+    assert merged is not None and merged["fund_name"] == "iShares Diversified Commodity"
+    assert merged["expense_ratio"] == D("0.0019") and merged["total_assets_currency"] == "USD"
+    assert set(merged["filled_from"]) == {
+        "share_class",
+        "expense_ratio",
+        "benchmark_name",
+        "total_assets",
+    }
+    by_key = {f.key: f for f in analysis.build_profile(fund(sheet=merged)).fields}
+    assert by_key["expense_ratio"].value == "0.0019"
+    assert by_key["expense_ratio"].source == "owner-entered factsheet"
+    assert by_key["expense_ratio"].as_of == dt.date(2026, 9, 30)
+    assert by_key["total_assets"].as_of == dt.date(2026, 9, 30)
+    assert by_key["issuer"].source == "ishares factsheet (ishares_json)"
+    assert merge_factsheets([]) is None
