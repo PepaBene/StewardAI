@@ -26,6 +26,7 @@ import asyncpg
 import httpx
 
 from steward import __version__
+from steward.company.peer_coverage import peer_key, peer_symbol, uncovered_peers
 from steward.config.holding_profiles import HoldingProfile, HoldingProfilesConfig
 from steward.config.jobs import JobsConfig, XbrlSettings
 from steward.config.store import load_active
@@ -314,7 +315,11 @@ async def collect_ticker(
     profile: HoldingProfile,
     settings: XbrlSettings,
     detail: dict[str, Any],
+    *,
+    peer: bool = False,
 ) -> None:
+    """One company's latest filings. A `peer` (confirmed, not held) is read only when it files
+    a 10-K: a 20-F's statements are in the home currency against a US dollar price."""
     pool = ctx.pool
     instrument = await pool.fetchrow(
         "select t212_ticker, cik, security_type from public.instrument where t212_ticker = $1",
@@ -394,6 +399,9 @@ async def collect_ticker(
         if has_statements:
             full_amendments.add(amendment.accession)
     annual, quarter = latest_periodic(filings, full_amendments)
+    if peer and (annual is None or not annual.form.startswith("10-K")):
+        detail["skipped"] = "a peer without a 10-K: not covered"
+        return
     targets = [f for f in (annual, quarter if settings.quarterly else None) if f is not None]
     if annual is not None and is_amendment(annual.form):
         original = amended_filing(filings, annual)
@@ -476,18 +484,31 @@ async def run_sec_xbrl(ctx: JobContext, edgar: EdgarClient | None) -> None:
         config = profiles.body if profiles else HoldingProfilesConfig()
         only = ctx.params.get("ticker")
         tickers = [only] if isinstance(only, str) and only else await holding_tickers(pool)
+        # Confirmed peers not held: their statements make the peer comparison (see
+        # steward.company.peer_coverage).
+        peers = [] if only else [peer_key(s) for s in await uncovered_peers(pool)]
         step.detail["tickers"] = tickers
+        step.detail["peers"] = peers
         if not settings.enabled:
             step.detail["skipped"] = "disabled in the Jobs config (xbrl.enabled)"
             return
     if edgar is None:
         raise JobFailed("SEC_USER_AGENT is not set: the SEC requires a contact User-Agent")
     failed: list[str] = []
-    for ticker in tickers:
+    held = set(tickers)
+    for ticker in [*tickers, *peers]:
         async with ctx.step(f"xbrl:{ticker}") as step:
             profile = config.for_ticker(ticker) or HoldingProfile(ticker=ticker)
             try:
-                await collect_ticker(ctx, edgar, ticker, profile, settings, step.detail)
+                await collect_ticker(
+                    ctx,
+                    edgar,
+                    ticker,
+                    profile,
+                    settings,
+                    step.detail,
+                    peer=ticker not in held and peer_symbol(ticker) is not None,
+                )
             except (
                 EdgarError,
                 XbrlError,
@@ -501,6 +522,7 @@ async def run_sec_xbrl(ctx: JobContext, edgar: EdgarClient | None) -> None:
     async with ctx.step("summary") as step:
         step.detail.update(
             holdings=len(tickers),
+            peers=len(peers),
             failed=failed,
             checked_at=dt.datetime.now(dt.UTC).isoformat(),
         )

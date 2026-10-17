@@ -38,6 +38,7 @@ import asyncpg
 import httpx
 
 from steward import __version__
+from steward.company.peer_coverage import price_symbol, uncovered_peers
 from steward.config.event_rules import EventRulesConfig
 from steward.config.holding_profiles import HoldingProfilesConfig
 from steward.config.jobs import JobsConfig
@@ -1000,6 +1001,12 @@ async def run_price_history(ctx: JobContext, deps: PriceDeps) -> None:
             (None, p.symbol, PriceSymbols(stooq=p.symbol, yahoo=p.yahoo()))
             for p in settings.proxy_series
             if p.symbol not in indices
+        ]
+        # Confirmed peers not held: a close for their multiples in the peer comparison.
+        peers = await uncovered_peers(pool)
+        step.detail["peers"] = peers
+        wanted += [
+            (None, price_symbol(s), PriceSymbols(stooq=price_symbol(s), yahoo=s)) for s in peers
         ]
         for ticker, key, symbols in wanted:
             used, gap = await collect_series(

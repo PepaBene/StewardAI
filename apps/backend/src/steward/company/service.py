@@ -20,6 +20,7 @@ from steward.analytics.ratio_set import COMPANY_RATIOS
 from steward.analytics.ratios import RatioValue
 from steward.analytics.thresholds import THRESHOLDS
 from steward.analytics.versions import version
+from steward.company import peer_coverage
 from steward.company.currency import Translator, translate
 from steward.company.multiple_path import MultipleAssumptions, MultipleRequest
 from steward.company.ratios import (
@@ -38,6 +39,7 @@ from steward.company.valuation import Assumptions, ValuationRequest
 from steward.discovery import read as discovery_read
 from steward.discovery.build import StockInputs
 from steward.discovery.read import _member, provider_states
+from steward.discovery.universe import UniverseMember
 from steward.peer_metrics import ALIASES as PEER_ALIASES
 
 Scope = Literal["confirmed", "group", "home_market", "global"]
@@ -76,6 +78,56 @@ async def _inputs(pool: asyncpg.Pool, tickers: list[str]) -> dict[str, tuple[Any
         "select * from public.investment_universe where ticker = any($1::text[])", tickers
     )
     members = [_member(r) for r in rows]
+    if not members:
+        return {}
+    data = await discovery_read.load_stock_inputs(
+        pool,
+        members,
+        dt.date.today(),
+        cutoff=None,
+        reconciled_only=False,
+        access=await provider_states(pool),
+    )
+    return {m.ticker: (m, data[m.ticker]) for m in members if m.ticker in data}
+
+
+async def _peer_inputs(
+    pool: asyncpg.Pool, tickers: list[str]
+) -> dict[str, tuple[Any, StockInputs]]:
+    """Confirmed US peers not held, from the statements and closes stored under their peer key
+    (steward.company.peer_coverage). A peer with no stored statements is left out."""
+    keys = [t for t in tickers if peer_coverage.peer_symbol(t)]
+    if not keys:
+        return {}
+    rows = await pool.fetch(
+        "select distinct ticker from public.financial_statement_fact"
+        " where ticker = any($1::text[]) and source = 'sec_xbrl'",
+        keys,
+    )
+    members = [
+        UniverseMember(
+            ticker=r["ticker"],
+            name=None,
+            isin=None,
+            asset_type="Common Stock",
+            issuer_id=None,
+            security_id=None,
+            listing_id=None,
+            mic=None,
+            exchange=None,
+            country="US",
+            currency="USD",
+            status="active",
+            active_from=None,
+            active_to=None,
+            identity_status=None,
+            has_statements=True,
+            has_prices=True,
+            history_from=None,
+            price_symbol=peer_coverage.price_symbol(peer_coverage.peer_symbol(r["ticker"]) or ""),
+        )
+        for r in rows
+    ]
     if not members:
         return {}
     data = await discovery_read.load_stock_inputs(
@@ -224,10 +276,20 @@ async def resolve_peers(
     """Peer tickers for a scope, plus the scope's description and peers dropped before loading."""
     excluded: list[PeerExcluded] = []
     if scope == "confirmed":
-        rows = await pool.fetch(
+        stored = await pool.fetch(
             "select distinct peer_ticker as t from public.peer_set where ticker=$1 and status='confirmed' order by 1",
             company.ticker,
         )
+        # A confirmed peer is a plain symbol: the held instrument trading under it, else the
+        # key the peer jobs store its statements and closes under.
+        by_symbol = await peer_coverage.universe_symbols(pool)
+        universe = set(by_symbol.values())
+        rows = [
+            {"t": t}
+            for t in dict.fromkeys(
+                peer_coverage.resolve(r["t"], universe, by_symbol) for r in stored
+            )
+        ]
         label = "confirmed peers"
     elif scope == "group":
         row = await pool.fetchrow(
@@ -338,12 +400,19 @@ async def load_peer_views(
     list[PeerExcluded],
 ]:
     got = await _inputs(pool, tickers)
+    got.update(await _peer_inputs(pool, [t for t in tickers if t not in got]))
     views: dict[str, tuple[StatementsView, Market, str | None, str | None]] = {}
     names: dict[str, str | None] = {}
     excluded: list[PeerExcluded] = []
     for t in tickers:
         if t not in got:
-            excluded.append(PeerExcluded(ticker=t, reason="not in the covered universe"))
+            reason = (
+                "a US peer whose statements are not loaded yet (the weekly SEC XBRL job reads "
+                "confirmed peers that file a 10-K)"
+                if peer_coverage.peer_symbol(t)
+                else "not in the covered universe"
+            )
+            excluded.append(PeerExcluded(ticker=t, reason=reason))
             continue
         member, data = got[t]
         rows = await load_rows(pool, t)
