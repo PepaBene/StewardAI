@@ -8,8 +8,10 @@ import { Blueprint } from "@/components/ui/blueprint";
 import { parseMarkdown } from "@/lib/methods/markdown";
 import { methodSlugs, readMethod } from "@/lib/methods/read";
 
-// One page per document in docs/methods/, built ahead of time; unknown slugs 404.
-export const dynamic = "force-static";
+// One page per document in docs/methods/; unknown slugs 404. Rendered per request like every
+// page under the auth layout: built static, the layout ran without cookies and baked in its
+// redirect to /login, which sent a signed-in owner on to the overview. next.config.ts traces
+// content/methods into the server bundle.
 export const dynamicParams = false;
 
 export function generateStaticParams() {

@@ -28,6 +28,11 @@ function loadRepoRootEnv(): void {
 loadRepoRootEnv();
 
 const nextConfig: NextConfig = {
+  // The method pages read their markdown at request time (src/lib/methods/read.ts).
+  outputFileTracingIncludes: {
+    "/methods": ["./content/methods/**/*"],
+    "/methods/*": ["./content/methods/**/*"],
+  },
   // Moved routes (lib/nav.ts REDIRECTS). Temporary until the IA migration is complete.
   async redirects() {
     return REDIRECTS.map((r) => ({ ...r, permanent: false }));

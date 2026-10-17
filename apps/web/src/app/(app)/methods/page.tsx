@@ -6,7 +6,6 @@ import { Blueprint } from "@/components/ui/blueprint";
 import { parseIndex } from "@/lib/methods/markdown";
 import { methodSlugs, readMethod } from "@/lib/methods/read";
 
-export const dynamic = "force-static";
 export const metadata: Metadata = { title: "Methods" };
 
 export default function MethodsPage() {
