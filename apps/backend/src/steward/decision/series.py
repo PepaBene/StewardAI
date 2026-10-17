@@ -4,10 +4,12 @@ All series are simple daily returns in the base currency, weekdays only, from st
 
 - the portfolio: the deposit- and withdrawal-adjusted daily index (`/portfolio/history`);
 - the benchmark: the stored closes converted to the base currency at each day's reference rate;
-- each holding: the change in its stored base-currency value with the owner's own trading netted
-  out (the change in cost basis between two snapshot days), the same principle as the per-holding
-  contribution report. A holding that was traded heavily or that has gaps in its snapshots has a
-  noisier series, and is only used where it has enough aligned days.
+- each holding: its security's stored adjusted closes in the base currency, where they reach
+  further back than the owner's snapshots; otherwise the change in its stored base-currency value
+  with the owner's own trading netted out (the change in cost basis between two snapshot days),
+  the same principle as the per-holding contribution report. A holding that was traded heavily or
+  that has gaps in its snapshots has a noisier series, and is only used where it has enough
+  aligned days.
 
 Nothing is fetched from a provider on a request.
 """
@@ -107,11 +109,67 @@ def organic_returns(items: Sequence[Mapping[str, Any]]) -> dict[dt.date, Decimal
     return out
 
 
+async def market_returns(
+    pool: asyncpg.Pool, tickers: Sequence[str], base: str, since: dt.date
+) -> dict[str, dict[dt.date, Decimal]]:
+    """Daily returns of each security from the stored adjusted closes its price readers use,
+    converted to the base currency at each day's reference rate. These do not depend on when
+    the owner bought, so a holding bought last month still has a year of behaviour to measure."""
+    from steward.config.holding_profiles import HoldingProfilesConfig
+    from steward.config.store import load_active
+    from steward.reference.price_series import choose_series, holding_symbols
+
+    if not tickers:
+        return {}
+    profiles = await load_active(pool, "holding_profiles", HoldingProfilesConfig)
+    symbols = await holding_symbols(
+        pool, list(tickers), profiles.body if profiles else HoldingProfilesConfig()
+    )
+    refs = {t: ref for t, ref in (await choose_series(pool, symbols)).items() if ref}
+    if not refs:
+        return {}
+    rows = await pool.fetch(
+        "select symbol, source, date, close, currency from public.price_bar"
+        " where (symbol, source) in (select * from unnest($1::text[], $2::text[]))"
+        " and bar_type = 'adjusted' and access_state = 'available' and close > 0"
+        " and date >= $3 order by date",
+        [r.symbol for r in refs.values()],
+        [r.source for r in refs.values()],
+        since,
+    )
+    bars: dict[tuple[str, str], list[asyncpg.Record]] = {}
+    for row in rows:
+        bars.setdefault((row["symbol"], row["source"]), []).append(row)
+    currencies = {row["currency"] for row in rows if row["currency"]}
+    source = await _fx_source(pool, base)
+    end = max((row["date"] for row in rows), default=since)
+    fx = await load_fx_history(pool, source, currencies, since, end)
+    out: dict[str, dict[dt.date, Decimal]] = {}
+    for ticker, ref in refs.items():
+        if returns := converted_returns(bars.get((ref.symbol, ref.source), []), fx, base):
+            out[ticker] = returns
+    return out
+
+
+def converted_returns(
+    bars: Sequence[Mapping[str, Any]], fx: Any, base: str
+) -> dict[dt.date, Decimal]:
+    """Weekday returns of closes (`date`, `close`, `currency`) in the base currency; a day
+    without a reference rate is left out rather than valued at a stale or missing one."""
+    converted: list[tuple[dt.date, float]] = []
+    for row in bars:
+        rate = fx.conversion(row["currency"], base, row["date"]) if row["currency"] else None
+        if rate is not None:
+            converted.append((row["date"], float(row["close"]) * float(rate)))
+    return {r.end: _d(r.value) for r in trading_day_returns(converted)}
+
+
 async def holding_returns(
-    pool: asyncpg.Pool, since: dt.date
+    pool: asyncpg.Pool, since: dt.date, base: str | None = None
 ) -> tuple[dict[str, dict[dt.date, Decimal]], dict[str, Decimal]]:
-    """Per-holding organic daily returns from the stored position snapshots, and the latest
-    weights (of invested value)."""
+    """Per-holding daily returns and the latest weights (of invested value). A holding's
+    security returns from stored closes are used where they reach further back than its own
+    snapshots; otherwise the organic returns of the snapshots."""
     rows = await pool.fetch(
         "select snapshot_date, ticker, quantity, avg_price, fx_rate, value_base"
         " from public.position_history where snapshot_date >= $1 order by ticker, snapshot_date",
@@ -128,6 +186,11 @@ async def holding_returns(
     values = {r["ticker"]: r["value_base"] for r in rows if r["snapshot_date"] == latest}
     total = sum(values.values(), Decimal(0))
     weights = {t: v / total for t, v in values.items() if total > 0 and v > 0}
+    if base is not None:
+        market = await market_returns(pool, sorted(weights), base, since)
+        for ticker, returns in market.items():
+            if len(returns) > len(series.get(ticker, {})):
+                series[ticker] = returns
     return series, weights
 
 
@@ -168,7 +231,7 @@ async def load_bundle(
         bundle.risk_free, rates = found
         bundle.daily_risk_free = _daily_rf(rates, sorted(bundle.portfolio))
 
-    bundle.holdings, bundle.weights = await holding_returns(pool, points[0][0])
+    bundle.holdings, bundle.weights = await holding_returns(pool, points[0][0], base)
     return bundle
 
 

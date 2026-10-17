@@ -130,6 +130,29 @@ def test_a_move_in_the_exchange_rate_is_return_not_a_trade() -> None:
     assert bought[dt.date(2026, 3, 3)] == pytest.approx(D("0"))
 
 
+def test_security_returns_are_in_the_base_currency_and_skip_days_without_a_rate() -> None:
+    from steward.decision.series import converted_returns
+
+    rates = {dt.date(2026, 3, 2): D("20"), dt.date(2026, 3, 3): D("22"),
+             dt.date(2026, 3, 5): D("22")}  # fmt: skip
+
+    class Fx:
+        def conversion(self, quote: str, base: str, day: dt.date) -> D | None:
+            return rates.get(day) if (quote, base) == ("USD", "CZK") else None
+
+    def bar(day: int, close: str) -> dict[str, object]:
+        return {"date": dt.date(2026, 3, day), "close": D(close), "currency": "USD"}
+
+    got = converted_returns(
+        [bar(2, "100"), bar(3, "100"), bar(4, "500"), bar(5, "110")], Fx(), "CZK"
+    )
+    # Flat price, the dollar up 10 % against the koruna: 10 % in CZK. The 4th has no rate, so
+    # its bar is left out and the 5th is measured from the 3rd.
+    assert got[dt.date(2026, 3, 3)] == pytest.approx(D("0.10"))
+    assert dt.date(2026, 3, 4) not in got
+    assert got[dt.date(2026, 3, 5)] == pytest.approx(D("0.10"))
+
+
 def test_rolling_correlation_fills_only_full_windows() -> None:
     n = 100
     a = dec([0.01 * ((i % 7) - 3) for i in range(n)])

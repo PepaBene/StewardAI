@@ -245,7 +245,7 @@ def _holdings(bundle: SeriesBundle) -> tuple[CorrelationMatrix, AnalyticsResult,
         div = div.model_copy(
             update={
                 "coverage": covered,
-                "sources": [SourceRef(kind="position_snapshot", ref=", ".join(chosen))],
+                "sources": [SourceRef(kind="price_bar", ref=", ".join(chosen))],
             }
         )
 
