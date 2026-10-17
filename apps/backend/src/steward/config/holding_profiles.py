@@ -155,6 +155,14 @@ class HoldingProfile(ConfigModel):
     financial_calendar_url: AnyHttpUrl | None = Field(
         default=None, description="IR financial calendar page with upcoming report dates."
     )
+    statement_pdfs: list[AnyHttpUrl] = Field(
+        default_factory=list,
+        max_length=6,
+        description="Direct links to the company's own annual or interim report PDFs. For a "
+        "holding with no SEC or ESEF filing, the weekly PDF statements job reads its income "
+        "statement, balance sheet and cash flow from these (when empty it looks for the "
+        "newest annual and interim PDFs on the results and investor pages instead).",
+    )
     regulatory_news_urls: list[AnyHttpUrl] = Field(default_factory=list)
     extra_domains: list[Domain] = Field(
         default_factory=list,

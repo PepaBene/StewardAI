@@ -34,6 +34,7 @@ from steward.fundamentals.collect import sec_xbrl_handler
 from steward.fundamentals.fsds import sec_fsds_backfill_handler
 from steward.fundamentals.ir import ir_releases_handler
 from steward.fundamentals.ir_discovery import ir_discovery_handler
+from steward.fundamentals.pdf_statements import pdf_statements_handler
 from steward.fundresearch.issuer_sync import fund_issuer_facts_handler
 from steward.funds.drift import fund_characteristics_audit_handler
 from steward.graph.jobs import graph_review_handler
@@ -154,6 +155,7 @@ JobType = Literal[
     "autopilot",
     "autopilot_calibration",
     "ir_discovery",
+    "pdf_statements",
     "news_ai_search",
     "news_triage",
     "news_analysis",
@@ -241,6 +243,7 @@ JOB_HANDLERS: dict[str, JobHandler] = {
     "autopilot_calibration": autopilot_calibration_handler,
     "watchdog": watchdog_handler,
     "ir_discovery": ir_discovery_handler,
+    "pdf_statements": pdf_statements_handler,
     "news_ai_search": news_ai_search_handler,
     "news_triage": news_triage_handler,
     "news_analysis": news_analysis_handler,

@@ -640,6 +640,29 @@ class ExposureBuildSettings(ConfigModel):
     )
 
 
+class PdfStatementsSettings(ConfigModel):
+    """Reading the income statement, balance sheet and cash flow from a company's own PDF
+    report, for held equities no SEC or ESEF filing covers. Every value must be quoted from
+    the page it came from; a value whose quote is not found there is dropped, never stored."""
+
+    enabled: bool = Field(
+        default=True, description="Off: only a manual run (with a ticker) reads a report."
+    )
+    model: ModelId = Field(
+        default="gemini-3.8-flash", description="Reads the PDF (one call per report)."
+    )
+    effort: Effort | None = Field(default="low", description=EFFORT_HELP)
+    holdings_per_run: int = Field(
+        default=3, ge=1, le=20, description="Holdings read per run, those never read first."
+    )
+    docs_per_holding: int = Field(
+        default=2, ge=1, le=4, description="Reports read per holding per run (annual + interim)."
+    )
+    max_pdf_mb: int = Field(
+        default=40, ge=1, le=100, description="Larger PDFs are skipped, not truncated."
+    )
+
+
 class IrDiscoverySettings(ConfigModel):
     """Finding each holding's investor-relations pages by web search, checking them, and having
     AI approve them. Pages the owner already set are never changed."""
@@ -2813,6 +2836,12 @@ class JobsConfig(ConfigModel):
         description="Finds investor-relations pages for holdings that have none (web search, "
         "checked and approved by AI). Default: Mondays 07:30.",
     )
+    pdf_statements: JobSchedule = Field(
+        default_factory=lambda: JobSchedule(cron="20 8 * * 6"),
+        description="Reads the income statement, balance sheet and cash flow from the own PDF "
+        "reports of held equities that have no SEC or ESEF filing (AI reads the PDF; every "
+        "value must be quoted from its page). Default: Saturdays 08:20.",
+    )
     news_ai_search: JobSchedule = Field(
         default_factory=lambda: JobSchedule(cron="20 6 * * *"),
         description="Asks a search-capable model for recent news on holdings the wire covers "
@@ -2934,6 +2963,7 @@ class JobsConfig(ConfigModel):
         "changed ones; every fact must quote the document word for word.",
     )
     ir_discovery_settings: IrDiscoverySettings = Field(default_factory=IrDiscoverySettings)
+    pdf_statements_settings: PdfStatementsSettings = Field(default_factory=PdfStatementsSettings)
     gap_research_settings: GapResearchSettings = Field(default_factory=GapResearchSettings)
     ai_approval: AiApprovalSettings = Field(default_factory=AiApprovalSettings)
     earnings_calendar_settings: EarningsCalendarSettings = Field(
@@ -3004,6 +3034,7 @@ class JobsConfig(ConfigModel):
             "edinet_filings": self.edinet_filings,
             "ai_approvals": self.ai_approvals,
             "ir_discovery": self.ir_discovery,
+            "pdf_statements": self.pdf_statements,
             "news_ai_search": self.news_ai_search,
             "news_triage": self.news_triage,
             "news_analysis": self.news_analysis,

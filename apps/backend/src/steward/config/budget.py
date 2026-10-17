@@ -77,6 +77,7 @@ BudgetJobType = Literal[
     "autopilot_calibration",
     "watchdog",
     "ir_discovery",
+    "pdf_statements",
     "news_ai_search",
     "news_triage",
     "news_analysis",

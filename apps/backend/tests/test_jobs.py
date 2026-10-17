@@ -266,6 +266,7 @@ async def test_schedule_follows_the_jobs_config() -> None:
         "news_triage",
         "nport_holdings",
         "ownership_13f",
+        "pdf_statements",
         "portfolio_sync",
         "price_history",
         "public_data_collect",
