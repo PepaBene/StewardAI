@@ -151,6 +151,8 @@ def volatilities_of(
 
 
 def _number(value: Any) -> float | None:
+    if isinstance(value, dict):  # SEC figures are stored as {"value": ..., "inputs": [...]}
+        value = value.get("value")
     try:
         f = float(value)
     except (TypeError, ValueError):
@@ -175,14 +177,20 @@ async def load_fundamentals(pool: asyncpg.Pool, tickers: Sequence[str]) -> dict[
         figures = json.loads(figures) if isinstance(figures, str) else figures
         per.setdefault(r["ticker"], {})[r["source"]] = figures or {}
     losses = await _loss_years(pool, tickers)
+    stocks = await _broker_stocks(pool, tickers)
+    closes = await _usd_closes(pool, tickers)
     out: dict[str, Fundamentals] = {}
     for ticker, sources in per.items():
         av = sources.get("alphavantage", {})
         sec = sources.get("sec", {})
-        is_stock = av.get("AssetType") == "Common Stock" or bool(sec)
+        # An empty Alpha Vantage row (CSG's) says nothing; the broker's type still decides.
+        is_stock = av.get("AssetType") == "Common Stock" or bool(sec) or ticker in stocks
         cap = _number(av.get("MarketCapitalization"))
         if av.get("Currency") not in (None, "USD"):
             cap = None  # the threshold is in USD; a cap in another currency is not compared
+        shares = _number(sec.get("shares_outstanding"))
+        if cap is None and shares and ticker in closes:
+            cap = shares * closes[ticker]  # SEC cover-page shares x the latest USD close
         margin = _number(av.get("ProfitMargin"))
         net_income = _number(sec.get("net_income_ttm"))
         profitable = (
@@ -193,22 +201,58 @@ async def load_fundamentals(pool: asyncpg.Pool, tickers: Sequence[str]) -> dict[
         out[ticker] = Fundamentals(is_stock, cap, profitable, losses.get(ticker))
     # A stock with no fundamentals row is still a stock: judged as a fund it could be called
     # "core" on volatility alone. The broker's instrument type decides.
-    bare = [t for t in tickers if t not in out]
-    if bare:
-        try:
-            kinds = await pool.fetch(
-                "select t212_ticker, instrument_type, security_type from public.instrument"
-                " where t212_ticker = any($1::text[])",
-                bare,
-            )
-            for r in kinds:
-                if instrument_is_stock(r["instrument_type"], r["security_type"]):
-                    out[r["t212_ticker"]] = Fundamentals(
-                        True, None, None, losses.get(r["t212_ticker"])
-                    )
-        except Exception as exc:  # the tier must not depend on this
-            log.warning("could not read instrument types for the tiers: %s", exc)
+    for t in tickers:
+        if t not in out and t in stocks:
+            out[t] = Fundamentals(True, None, None, losses.get(t))
     return out
+
+
+async def _broker_stocks(pool: asyncpg.Pool, tickers: Sequence[str]) -> set[str]:
+    """The tickers the broker's instrument record lists as stocks."""
+    try:
+        rows = await pool.fetch(
+            "select t212_ticker, instrument_type, security_type from public.instrument"
+            " where t212_ticker = any($1::text[])",
+            list(tickers),
+        )
+    except Exception as exc:  # the tier must not depend on this
+        log.warning("could not read instrument types for the tiers: %s", exc)
+        return set()
+    return {
+        r["t212_ticker"]
+        for r in rows
+        if instrument_is_stock(r["instrument_type"], r["security_type"])
+    }
+
+
+async def _usd_closes(pool: asyncpg.Pool, tickers: Sequence[str]) -> dict[str, float]:
+    """The latest daily close in US dollars of the price series each ticker's readers use
+    (`choose_series`), where that series is quoted in dollars."""
+    from steward.config.holding_profiles import HoldingProfilesConfig
+    from steward.config.store import load_active
+    from steward.reference.price_series import choose_series, holding_symbols
+
+    try:
+        profiles = await load_active(pool, "holding_profiles", HoldingProfilesConfig)
+        symbols = await holding_symbols(
+            pool, list(tickers), profiles.body if profiles else HoldingProfilesConfig()
+        )
+        out: dict[str, float] = {}
+        for ticker, ref in (await choose_series(pool, symbols)).items():
+            if ref is None:
+                continue
+            close = await pool.fetchval(
+                "select close from public.price_bar where symbol = $1 and source = $2"
+                " and currency = 'USD' and close > 0 order by date desc limit 1",
+                ref.symbol,
+                ref.source,
+            )
+            if close is not None:
+                out[ticker] = float(close)
+        return out
+    except Exception as exc:  # the tier must not depend on this
+        log.warning("could not read closes for the market caps: %s", exc)
+        return {}
 
 
 # Annual (about one year, fiscal-year) net results of the 10-K and 20-F filings inside the SEC

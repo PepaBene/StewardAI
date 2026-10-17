@@ -80,6 +80,41 @@ def test_a_stock_without_fundamentals_cannot_be_core() -> None:
     assert derive_tier("F", 0.15, None, limits).tier == "core"  # type: ignore[union-attr]
 
 
+async def test_tier_fundamentals_read_sec_values_broker_types_and_derived_caps(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from steward.portfolio import risk_tier as rt
+
+    class Pool:
+        async def fetch(self, sql: str, *args: object) -> list[dict[str, object]]:
+            if "public.fundamentals" in sql:
+                return [
+                    # Uber: SEC figures only, stored as {"value": ...}; no Alpha Vantage cap.
+                    {"ticker": "U", "source": "sec", "figures": {
+                        "net_income_ttm": {"value": 9.6e9, "inputs": []},
+                        "shares_outstanding": 2.04e9}},
+                    # CSG: an empty Alpha Vantage row.
+                    {"ticker": "C", "source": "alphavantage", "figures": {}},
+                ]  # fmt: skip
+            return [
+                {"t212_ticker": "C", "instrument_type": None, "security_type": "Common Stock"},
+                {"t212_ticker": "U", "instrument_type": None, "security_type": "Common Stock"},
+            ]
+
+    async def no_losses(pool: object, tickers: object) -> dict[str, int]:
+        return {}
+
+    async def closes(pool: object, tickers: object) -> dict[str, float]:
+        return {"U": 70.0}
+
+    monkeypatch.setattr(rt, "_loss_years", no_losses)
+    monkeypatch.setattr(rt, "_usd_closes", closes)
+    facts = await rt.load_fundamentals(Pool(), ["U", "C"])  # type: ignore[arg-type]
+    assert facts["U"].profitable is True
+    assert facts["U"].market_cap == pytest.approx(2.04e9 * 70.0)
+    assert facts["C"].is_stock is True  # judged as a stock, not tiered on volatility alone
+
+
 def test_cornish_fisher_gives_nothing_where_the_expansion_folds_over() -> None:
     import numpy as np
 
