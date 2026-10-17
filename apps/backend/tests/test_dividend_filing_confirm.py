@@ -8,7 +8,12 @@ import datetime as dt
 from decimal import Decimal
 
 from steward.dividends.model import DeclaredEvent
-from steward.dividends.reconcile import FiledDividend, filing_confirmable, group_events
+from steward.dividends.reconcile import (
+    FiledDividend,
+    filing_confirmable,
+    group_events,
+    implied_fourth_quarters,
+)
 
 D = Decimal
 
@@ -96,3 +101,18 @@ def test_confirmed_events_count_but_are_not_returned() -> None:
     done = [event(e.id, e.ex_date.isoformat(), str(e.amount), status="confirmed") for e in INSIDE]
     checks = filing_confirmable(group_events([*done, event(9, "2019-03-14", "0.40")]), FILED)
     assert ids(checks) == {9: False}
+
+
+def test_a_fourth_quarter_dividend_is_the_year_less_nine_months() -> None:
+    year, nine = paid("2024-01-01", "2024-12-31", "1.94"), paid("2024-01-01", "2024-09-30", "1.455")
+    (q4,) = implied_fourth_quarters([year], [nine])
+    assert (q4.period_start, q4.period_end, q4.per_share) == (
+        dt.date(2024, 10, 1),
+        dt.date(2024, 12, 31),
+        D("0.485"),
+    )
+    checks = filing_confirmable(group_events([event(7, "2024-11-29", "0.485")]), [q4])
+    assert ids(checks) == {7: True}
+    # A year without its nine-month figure, or in another currency, implies nothing.
+    assert implied_fourth_quarters([year], []) == []
+    assert implied_fourth_quarters([year], [paid("2024-01-01", "2024-09-30", "1.455", "EUR")]) == []

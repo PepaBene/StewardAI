@@ -259,6 +259,42 @@ SPLIT_RATIOS = (2, 3, 4, 5, 10, 20)  # provider history is split-adjusted, older
 MIN_CORROBORATED = 4  # filed matches needed before a series' older history counts
 
 
+def implied_fourth_quarters(
+    annual: Sequence[FiledDividend], nine_months: Sequence[FiledDividend]
+) -> list[FiledDividend]:
+    """The fourth quarter no 10-Q covers: the 10-K's fiscal-year figure minus the third 10-Q's
+    nine-month year-to-date figure (same concept, start date and currency). A year with no
+    nine-month figure, or one larger than the year, gives nothing."""
+    out: list[FiledDividend] = []
+    for year in annual:
+        ytd = max(
+            (
+                n
+                for n in nine_months
+                if (n.ticker, n.concept, n.period_start, n.currency)
+                == (year.ticker, year.concept, year.period_start, year.currency)
+                and n.period_end < year.period_end
+            ),
+            key=lambda n: n.period_end,
+            default=None,
+        )
+        if ytd is None or ytd.per_share > year.per_share:
+            continue
+        out.append(
+            FiledDividend(
+                ticker=year.ticker,
+                period_start=ytd.period_end + dt.timedelta(days=1),
+                period_end=year.period_end,
+                per_share=year.per_share - ytd.per_share,
+                currency=year.currency,
+                concept=year.concept,
+                form=f"{year.form or '10-K'} less nine months",
+                url=year.url,
+            )
+        )
+    return out
+
+
 @dataclass(frozen=True)
 class FilingCheck:
     group: EventGroup

@@ -44,6 +44,7 @@ from steward.dividends.reconcile import (
     Reconciliation,
     filing_confirmable,
     group_events,
+    implied_fourth_quarters,
     reconcile,
 )
 from steward.fx.convert import FxSourceName, normalise_currency
@@ -1264,13 +1265,18 @@ async def load_filed_dividends(pool: asyncpg.Pool, tickers: Sequence[str]) -> li
         " period_end, value, coalesce(nullif(substring(unit from '^(?:iso4217:)?([A-Z]{3})(?:/|$)'), ''),"
         " nullif(currency, '')) currency, form, coalesce(filing_url, source_url, '') url"
         " from public.financial_statement_fact where ticker = any($1::text[]) and concept = any($2::text[])"
-        " and value is not null and period_end - period_start between 80 and 100"
+        # Quarters, and the nine-month and fiscal-year figures the fourth quarter is implied by.
+        " and value is not null and (period_end - period_start between 80 and 100"
+        "  or period_end - period_start between 260 and 380)"
         " and coalesce(dimensions -> 'members', '[]'::jsonb) = '[]'::jsonb"
         " order by ticker, concept, period_start, period_end, known_at desc",
         list(tickers), FILED_DPS_CONCEPTS,
     )  # fmt: skip
-    return [
-        FiledDividend(
+    quarters: list[FiledDividend] = []
+    nine_months: list[FiledDividend] = []
+    years: list[FiledDividend] = []
+    for r in rows:
+        f = FiledDividend(
             ticker=r["ticker"],
             period_start=r["period_start"],
             period_end=r["period_end"],
@@ -1280,7 +1286,14 @@ async def load_filed_dividends(pool: asyncpg.Pool, tickers: Sequence[str]) -> li
             form=r["form"],
             url=r["url"],
         )
-        for r in rows
+        days = (f.period_end - f.period_start).days
+        (quarters if days <= 100 else nine_months if days <= 290 else years).append(f)
+    # A 10-K states no fourth quarter of its own, so a Q4 dividend is never in a quarter row.
+    filed = {(f.ticker, f.concept, f.period_end) for f in quarters}
+    return quarters + [
+        q
+        for q in implied_fourth_quarters(years, nine_months)
+        if (q.ticker, q.concept, q.period_end) not in filed
     ]
 
 
