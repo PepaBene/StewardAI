@@ -235,7 +235,11 @@ export function InsiderTable({ txs, editable, onChanged }: { txs: readonly Insid
                 </th>
                 <td className="py-1.5 pr-3">
                   <ClassCell t={t} />
-                  {t.override_reason ? <span className="block text-xs text-text-muted">Reviewer changed this from “{t.classifier_class ?? "no class"}”: {t.override_reason}</span> : null}
+                  {t.override_reason ? (
+                    <span className="block text-xs text-text-muted">
+                      {t.classifier_class === t.economic_class ? "Reviewer kept this class" : `Reviewer changed this from “${t.classifier_class ?? "no class"}”`}: {t.override_reason}
+                    </span>
+                  ) : null}
                   <DerivativeTerms t={t} />
                   {t.footnote ? <span className="mt-1 block max-w-[44ch] border-l-2 border-border pl-2 text-xs text-text-muted">{t.footnote}</span> : null}
                   {editable ? (
@@ -399,11 +403,19 @@ export function ContextPanel({ view }: { view: InsiderActivity }) {
 function OverrideForm({ t, onChanged }: { t: InsiderTx; onChanged: () => void }) {
   return (
     <DecisionForm
-      summary="Change the class"
-      // an empty first choice so nothing is preselected; the current class is not offered and is rejected if chosen
-      options={[{ value: "", label: "Choose the correct class…" }, ...CLASS_OPTIONS.filter((o) => o.value !== t.economic_class)]}
+      summary="Review the class"
+      // An empty first choice so nothing is preselected. Keeping the current class is a decision
+      // too: a line the classifier left as "other" that really is other (a forward contract's
+      // settlement) otherwise stays open for review with no way to settle it.
+      options={[
+        { value: "", label: "Choose the correct class…" },
+        ...(t.economic_class in CLASS_META && t.economic_class !== "unclassified"
+          ? [{ value: t.economic_class, label: `Keep as: ${CLASS_META[t.economic_class as ClassKey].label} (reviewed)` }]
+          : []),
+        ...CLASS_OPTIONS.filter((o) => o.value !== t.economic_class),
+      ]}
       validate={(value, reason) => ({
-        reason: value === "" ? "Choose a class." : value === t.economic_class ? "That is already the current class; choose a different one." : validateReason(reason, 10, DECISION_REASON_MAX),
+        reason: value === "" ? "Choose a class." : validateReason(reason, 10, DECISION_REASON_MAX),
       })}
       onSubmit={async (value, reason) => {
         const r = await callApi(
