@@ -18,6 +18,7 @@ import asyncpg
 from pydantic import BaseModel, Field
 
 from steward.analytics.versions import version
+from steward.valuation.drafted import OWNED_POINT_SQL
 
 BASES = (
     "dcf_default",
@@ -209,8 +210,8 @@ async def portfolio_fair_value(
     tickers = [r["ticker"] for r in pos]
     wanted = list(HEADLINE_ORDER) if basis == HEADLINE else [basis]
     pts = await pool.fetch(
-        """select * from public.fair_value_point where owner_id = $1 and basis = any($2::text[]) and ticker = any($3::text[])
-             and as_of >= $4 order by ticker, as_of""",
+        f"""select * from public.fair_value_point where owner_id = $1 and basis = any($2::text[]) and ticker = any($3::text[])
+             and as_of >= $4 and {OWNED_POINT_SQL} order by ticker, as_of""",  # noqa: S608
         owner_id, wanted, tickers, today - dt.timedelta(days=730),
     )  # fmt: skip
     by_basis: dict[tuple[str, str], list[Any]] = {}
@@ -327,8 +328,8 @@ async def history(
     basis), each holding is valued on the basis it shows today."""
     wanted = sorted(set(chosen.values())) if chosen else [basis]
     pts = await pool.fetch(
-        "select ticker, basis, as_of, value, currency from public.fair_value_point"
-        " where owner_id = $1 and basis = any($2::text[]) order by as_of",
+        "select ticker, basis, as_of, value, currency from public.fair_value_point"  # noqa: S608
+        f" where owner_id = $1 and basis = any($2::text[]) and {OWNED_POINT_SQL} order by as_of",
         owner_id,
         wanted,
     )

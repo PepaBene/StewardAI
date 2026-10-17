@@ -30,6 +30,7 @@ import asyncpg
 
 from steward.analytics.versions import version
 from steward.jobs.runner import JobContext
+from steward.valuation.drafted import OWNED_SET_SQL
 
 METHOD = "fair_value_snapshot"
 DCF_NAMES = ("bear", "base", "bull")
@@ -104,9 +105,9 @@ async def _latest_saved(
     pool: asyncpg.Pool, owner_id: Any, ticker: str, method: str
 ) -> asyncpg.Record | None:
     return await pool.fetchrow(
-        """select * from public.company_valuation_scenario
-            where owner_id = $1 and ticker = $2 and method = $3
-            order by created_at desc, id desc limit 1""",
+        f"""select * from public.company_valuation_scenario
+            where owner_id = $1 and ticker = $2 and method = $3 and {OWNED_SET_SQL}
+            order by created_at desc, id desc limit 1""",  # noqa: S608
         owner_id, ticker, method,
     )  # fmt: skip
 

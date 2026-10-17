@@ -15,6 +15,7 @@ import asyncpg
 from steward.analytics.ratio_set import debt_of
 from steward.checks.inputs import CheckInputs, RatioFacts
 from steward.fx.convert import normalise_currency
+from steward.valuation.drafted import OWNED_SET_SQL
 
 D = Decimal
 
@@ -175,8 +176,9 @@ async def load_inputs(pool: asyncpg.Pool, owner_id: Any, ticker: str, *, div_ctx
         inp.dcf_reason = "; ".join(base.value_per_share.warnings) or None
         inp.risk_free = base.assumptions.risk_free
     saved = await pool.fetchrow(
-        """select id, name, version, assumptions from public.company_valuation_scenario
-            where owner_id = $1 and ticker = $2 and method = 'dcf' order by created_at desc, id desc limit 1""",
+        f"""select id, name, version, assumptions from public.company_valuation_scenario
+            where owner_id = $1 and ticker = $2 and method = 'dcf' and {OWNED_SET_SQL}
+            order by created_at desc, id desc limit 1""",  # noqa: S608
         owner_id, ticker,
     )  # fmt: skip
     if saved is not None:

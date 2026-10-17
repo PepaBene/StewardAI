@@ -27,6 +27,7 @@ from steward.earnings.verdicts import NEWEST_PERIOD_FIRST, in_active_thesis
 from steward.news.read_analysis import like_pattern
 from steward.portfolio.transactions import TransactionFilters, list_transactions
 from steward.research.sources import Registry
+from steward.valuation.drafted import is_drafted
 
 REPORT_PATHS = {"research": "/research/{}", "review": "/reviews/{}"}
 EVIDENCE_SECTIONS = (
@@ -346,7 +347,9 @@ async def valuation_scenarios(
     )
     saved = None
     if owner_id:
-        sets = await service.list_scenarios(pool, owner_id, ticker)
+        # A drafted starting set is the default DCF saved for the owner, not their view.
+        sets = [s for s in await service.list_scenarios(pool, owner_id, ticker)
+                if not is_drafted(s.note)]  # fmt: skip
         # A set is append-only, so the newest row is the latest version of the latest-saved set.
         saved = max(sets, key=lambda x: x.created_at, default=None)
     if saved is not None:

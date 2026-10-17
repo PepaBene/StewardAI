@@ -18,6 +18,7 @@ import asyncpg
 from pydantic import BaseModel, Field
 
 from steward.company.quote import Q4, Quote, load_member, load_quote
+from steward.valuation.drafted import OWNED_POINT_SQL
 from steward.valuation.fair_value_view import BASIS_LABELS, HEADLINE_ORDER, convert, latest_fx
 
 # The order the app picks a default in (holdings, drawer and watchlist use the same): your
@@ -148,9 +149,10 @@ async def fair_values(
     points = [
         dict(r)
         for r in await pool.fetch(
-            """select distinct on (basis) basis, value, currency, as_of, source, method_version
+            f"""select distinct on (basis) basis, value, currency, as_of, source, method_version
                  from public.fair_value_point where owner_id = $1 and ticker = $2
-                order by basis, as_of desc""",
+                  and {OWNED_POINT_SQL}
+                order by basis, as_of desc""",  # noqa: S608
             owner_id, ticker,
         )
     ]  # fmt: skip
