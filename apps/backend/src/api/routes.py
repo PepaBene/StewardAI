@@ -502,7 +502,10 @@ async def list_jobs(
         " and ($2::text[] is null or j.status = any($2))"
         " and ($3::text is null or j.params ->> 'ticker' = $3)"
         " and ($4::bigint is null or j.id < $4)"
-        " and (not $6 or not exists (select 1 from public.job k where k.job_type = j.job_type"
+        # A thesis run starts with the same research run, so it settles a failed research run
+        # too (GOOGL's research stopped as a duplicate of a thesis job that then succeeded).
+        " and (not $6 or not exists (select 1 from public.job k where (k.job_type = j.job_type"
+        "  or (j.job_type = 'research' and k.job_type = 'thesis'))"
         "  and k.status = 'succeeded' and k.id > j.id"
         "  and k.params ->> 'ticker' is not distinct from j.params ->> 'ticker'))"
         " order by j.id desc limit $5",
