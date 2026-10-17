@@ -92,6 +92,10 @@ def _choose(obs: Sequence[Obs], view: View) -> dict[tuple[dt.date | None, dt.dat
     return out
 
 
+def _quarterly_form(form: str | None) -> bool:
+    return (form or "").upper().startswith("10-Q")
+
+
 def _months(days: int) -> int:
     return round(days / 30.44)
 
@@ -105,6 +109,11 @@ def build_series(key: str, obs: Sequence[Obs], view: View = "restated") -> Serie
             series.instant[end] = val
             continue
         days = (end - start).days
+        if _within(days, ANNUAL_DAYS) and _quarterly_form(val.obs.form):
+            # A twelve-month figure in a 10-Q is a trailing disclosure (Amazon's cash-flow
+            # statement gives net income for the last twelve months), not a fiscal year: read
+            # as one it made a "FY Jun 2026" column with nothing but net income in it.
+            continue
         if _within(days, ANNUAL_DAYS):
             series.annual[end] = val
             cumulative[start][end] = val

@@ -101,3 +101,16 @@ def test_ttm_stays_the_last_fiscal_year_when_the_prior_year_to_date_is_missing()
     ]
     s = build_series("rev", data)
     assert s.ttm_end == dt.date(2026, 1, 25) and s.ttm is not None and s.ttm.derived is None
+
+
+def test_a_twelve_month_figure_in_a_10q_is_not_a_fiscal_year() -> None:
+    # Amazon's 10-Q cash-flow statement gives net income for the trailing twelve months.
+    import dataclasses
+
+    fy = obs("net_income", "USD", dt.date(2025, 1, 1), dt.date(2025, 12, 31), "77670")
+    trailing = dataclasses.replace(
+        obs("net_income", "USD", dt.date(2025, 7, 1), dt.date(2026, 6, 30), "135281"),
+        form="10-Q",
+    )
+    s = build_series("net_income", [fy, trailing])
+    assert list(s.annual) == [dt.date(2025, 12, 31)]
