@@ -148,6 +148,16 @@ def resolve(listings: list[FigiListing], isin: str) -> Resolution:
     return Resolution(share_class, home or (composites[0] if composites else None), composites)
 
 
+def held_listing(resolution: Resolution, broker_ticker: str) -> FigiListing | None:
+    """The listing the broker line trades on, where it differs from the home one: a Trading212
+    `_US_EQ` line of a foreign share (AstraZeneca's GB ordinary shares on NYSE) is priced in
+    USD in New York, so its series must be the US one, not London's in pence. None when the
+    broker line is not a US line or the share has no US composite listing."""
+    if not broker_ticker.endswith("_US_EQ"):
+        return None
+    return next((x for x in resolution.composites if x.exch_code == "US"), None)
+
+
 def stooq_symbol(listing: FigiListing | None) -> str | None:
     """ "AAPL" on US -> "aapl.us"; "VOD" on LN -> "vod.uk". None where Stooq has no market."""
     if listing is None or not listing.ticker or listing.exch_code not in STOOQ_SUFFIX:

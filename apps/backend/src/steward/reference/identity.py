@@ -783,7 +783,9 @@ async def resolve_holding(
         resolution = openfigi.resolve(listings, isin)
     if resolution is not None:
         result.share_class_figi = resolution.share_class_figi
-        derived = openfigi.stooq_symbol(resolution.home)
+        derived = openfigi.stooq_symbol(
+            openfigi.held_listing(resolution, ticker) or resolution.home
+        )
         result.price_symbol = (profile.price_symbol if profile else None) or derived
     if result.share_class_figi is None:
         result.problems.append("no share-class FIGI")

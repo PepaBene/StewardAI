@@ -68,6 +68,25 @@ def test_openfigi_resolves_share_class_and_home_listing() -> None:
     assert resolution.home.ticker == "SAP" and resolution.home.figi == "BBG000BG7DY8"
     assert openfigi.stooq_symbol(resolution.home) == "sap.de"
     assert openfigi.parse_mapping({"error": "No identifier found."}) == []
+    # SAP's Xetra line has no US composite to switch to, and a non-US broker line keeps home.
+    assert openfigi.held_listing(resolution, TICKER) is None
+
+
+def test_a_us_broker_line_of_a_foreign_share_prices_on_its_us_listing() -> None:
+    def listing(figi: str, ticker: str, exch: str) -> openfigi.FigiListing:
+        return openfigi.FigiListing(
+            figi, figi, "BBG001S5TSD3", ticker, exch, "ASTRAZENECA", "Common Stock", None,
+            "Equity", None, {},
+        )  # fmt: skip
+
+    resolution = openfigi.resolve(
+        [listing("BBG000BWP1Q1", "AZN", "LN"), listing("BBG000C0F2J9", "AZN", "US")],
+        "GB0009895292",
+    )
+    assert openfigi.stooq_symbol(resolution.home) == "azn.uk"
+    held = openfigi.held_listing(resolution, "AZN_US_EQ")
+    assert openfigi.stooq_symbol(held) == "azn.us"
+    assert openfigi.held_listing(resolution, "AZNl_EQ") is None
 
 
 def test_firds_and_fitrs() -> None:
