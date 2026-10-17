@@ -43,6 +43,17 @@ async def test_a_claim_with_a_link_is_checked_on_its_words_not_the_address() -> 
     assert out.results[0].status == "unchecked"
 
 
+async def test_todays_date_is_the_answers_as_of_not_an_unsourced_claim() -> None:
+    import datetime as dt
+
+    evidence = ("Q2 revenue was $12.56 billion.",)
+    today = Claim(0, "As of October 17, 2026, Q2 revenue was $12.56 billion.", evidence)
+    other = Claim(1, "On October 3, 2026, Q2 revenue was $12.56 billion.", evidence)
+    out = await check_claims([today, other], ClaimVerifierSettings(), None, dt.date(2026, 10, 17))
+    assert out.results[0].status == "unchecked"
+    assert out.results[1].status == "unsupported"
+
+
 def test_passages_are_copied_lines_that_share_the_sentences_figures() -> None:
     got = best_passages(PAGE, ["Operating cash flow was 84,859 million and capex 80,598 million."])
     assert "84,859" in got and "80,598" in got

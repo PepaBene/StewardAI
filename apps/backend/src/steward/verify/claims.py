@@ -502,7 +502,8 @@ async def check_claims(
                 )
                 continue
         if settings.date_check:
-            wrong = missing_dates(claim.text, claim.evidence)
+            # Today's date is the answer's own "as of", not a claim a source must carry.
+            wrong = [d for d in missing_dates(claim.text, claim.evidence) if d != today.isoformat()]
             if wrong:
                 results[claim.index] = ClaimResult(
                     claim.index,
