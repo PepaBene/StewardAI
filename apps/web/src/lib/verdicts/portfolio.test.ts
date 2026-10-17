@@ -7,6 +7,7 @@ import {
   incomeChangeVerdict,
   overvaluedWeightVerdict,
   staleVerdict,
+  timingVerdict,
   unrealisedVerdict,
   valueGapVerdict,
 } from "./portfolio";
@@ -18,6 +19,15 @@ describe("portfolio verdicts", () => {
     expect(benchmarkVerdict(0.1, 0.102).tone).toBe("neutral");
     expect(benchmarkVerdict(null, 0.1).tone).toBe("unknown");
     expect(benchmarkVerdict(0.1, null).tone).toBe("neutral");
+  });
+
+  it("explains a holdings return and a money return that disagree", () => {
+    expect(timingVerdict(0.127, -0.051, "Since the first snapshot")?.text).toBe(
+      "Since the first snapshot: the holdings returned +12.7%, your money −5.1%. The holdings did best while little of your money was in them; most of it arrived later and has done worse.",
+    );
+    expect(timingVerdict(0.02, 0.08, "1 month")?.text).toContain("more than the holdings' +2.0%");
+    expect(timingVerdict(0.071, 0.06, "1 month")).toBeNull();
+    expect(timingVerdict(null, 0.06, "1 month")).toBeNull();
   });
 
   it("states unrealised result against cost", () => {

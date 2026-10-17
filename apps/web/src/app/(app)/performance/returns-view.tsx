@@ -11,7 +11,8 @@ import { KpiStrip, type KpiTileProps } from "@/components/insight/kpi-tile";
 import { LineChart } from "@/components/performance/line-chart";
 import { MonthlyHeatmapSection } from "@/components/portfolio/moved-sections";
 import { DrawdownSection, WaterfallSection } from "@/components/portfolio/performance-curves";
-import { benchmarkVerdict } from "@/lib/verdicts/portfolio";
+import { VerdictLine } from "@/components/insight/verdict-line";
+import { benchmarkVerdict, timingVerdict } from "@/lib/verdicts/portfolio";
 import { Blueprint, PanelHeading } from "@/components/ui/blueprint";
 import { getBrowserApiClient } from "@/lib/api/client";
 import { formatDate, formatPercent } from "@/lib/format";
@@ -132,8 +133,17 @@ function StatementTable({ data }: { data: PerformanceData }) {
         <span className="font-medium text-text">Your money</span> is the annual rate on what you actually paid in and when, so it depends on your timing. Under a year it is the return over the window itself.
         Gain is in {data.base_currency}, after flows.
       </p>
+      <TimingNote data={data} />
     </div>
   );
+}
+
+/** The longest window whose two returns disagree, explained in one sentence. */
+function TimingNote({ data }: { data: PerformanceData }) {
+  const both = data.windows.filter((w) => w.twr.value != null && w.xirr.value != null);
+  const w = both[both.length - 1];
+  const v = w ? timingVerdict(Number(w.twr.value), Number(w.xirr.value), windowName(w.label)) : null;
+  return v ? <VerdictLine verdict={v.tone} className="max-w-3xl">{v.text}</VerdictLine> : null;
 }
 
 /** Answer strip: the investment return for up to four windows, each against the benchmark. */

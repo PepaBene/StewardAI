@@ -27,6 +27,26 @@ export function benchmarkVerdict(portfolio: number | null, benchmark: number | n
     : { tone: "bad", text: `${Math.abs(gap).toFixed(1)} points behind ${benchmarkName}.` };
 }
 
+/** Why the holdings' return and the return on the owner's own money can point different ways:
+ * the first weights every day the same, the second weights each day by the money invested. */
+export function timingVerdict(investments: number | null, money: number | null, windowName: string): VerdictResult | null {
+  if (investments === null || money === null) return null;
+  const gap = (investments - money) * 100;
+  if (Math.abs(gap) < 2) return null;
+  const inv = signedPct(investments);
+  const mine = signedPct(money);
+  if (investments > money) {
+    return {
+      tone: "neutral",
+      text: `${windowName}: the holdings returned ${inv}, your money ${mine}. The holdings did best while little of your money was in them; most of it arrived later and has done worse.`,
+    };
+  }
+  return {
+    tone: "neutral",
+    text: `${windowName}: your money returned ${mine}, more than the holdings' ${inv}, because more of it was invested in the periods that did well.`,
+  };
+}
+
 /** Unrealised profit or loss as a share of what was paid. */
 export function unrealisedVerdict(pctOnCost: number | null): VerdictResult {
   if (pctOnCost === null) return { tone: "unknown", text: "No cost basis to compare with." };
