@@ -163,10 +163,15 @@ def _return(closes: Series, as_of: dt.date, days: int) -> tuple[Decimal | None, 
     return end_c / start_c - ONE, None
 
 
+def price_currency(member: UniverseMember) -> str | None:
+    """The currency of the member's stored closes. They are read by the price symbol, so they are
+    in that market's currency: AZN_US_EQ trades on NYSE (azn.us, in dollars) while its identity
+    links the London listing (GBP)."""
+    return "USD" if (member.price_symbol or "").lower().endswith(".us") else member.currency
+
+
 def _price_major(member: UniverseMember, closes: Series) -> tuple[Decimal, str] | None:
-    # Closes are read by the price symbol, so they are in that market's currency: AZN_US_EQ is
-    # the US ADR (azn.us, in dollars) while its identity links the London listing (GBP).
-    currency = "USD" if (member.price_symbol or "").lower().endswith(".us") else member.currency
+    currency = price_currency(member)
     if not closes or not currency:
         return None
     return to_major_unit(closes[-1][1], currency)

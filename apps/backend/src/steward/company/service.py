@@ -37,7 +37,7 @@ from steward.company.ratios import (
 from steward.company.statements import StatementsView, build_view, load_rows
 from steward.company.valuation import Assumptions, ValuationRequest
 from steward.discovery import read as discovery_read
-from steward.discovery.build import StockInputs
+from steward.discovery.build import StockInputs, price_currency
 from steward.discovery.read import _member, provider_states
 from steward.discovery.universe import UniverseMember
 from steward.peer_metrics import ALIASES as PEER_ALIASES
@@ -143,7 +143,7 @@ async def _peer_inputs(
 
 def _market(member: Any, data: StockInputs) -> Market:
     shares = data.shares[-1][1] if data.shares else None
-    return market_from(data.closes, member.currency, shares)
+    return market_from(data.closes, price_currency(member), shares)
 
 
 async def load_market(pool: asyncpg.Pool, ticker: str) -> tuple[Any, Market] | None:
