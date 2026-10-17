@@ -49,3 +49,27 @@ def test_names_competitor_ignores_case_punctuation_and_suffixes() -> None:
     assert names_competitor("Alphabet Inc.", ["alphabet", "Meta Platforms"])
     assert not names_competitor("Microsoft Teams Ltd", ["Microsoft"])
     assert not names_competitor("Oracle Corp", [])
+
+
+def test_proposed_peers_are_kept_only_when_they_name_a_real_other_company() -> None:
+    # Production, 17 Oct 2026: Finnhub's peers of GOOGL were Snap, Reddit and Grindr; the
+    # proposals fill in the large competitors, but each must be a listed symbol.
+    from steward.approvals.ai import ProposedPeer, ProposedPeers, proposal_rows
+
+    known = {
+        "GOOGL": {"cik": 1652044, "title": "Alphabet Inc."},
+        "GOOG": {"cik": 1652044, "title": "Alphabet Inc."},
+        "MSFT": {"cik": 789019, "title": "MICROSOFT CORP"},
+        "META": {"cik": 1326801, "title": "Meta Platforms, Inc."},
+    }
+    answer = ProposedPeers(
+        peers=[
+            ProposedPeer(ticker=t, name=t, reason="r")
+            for t in ("msft", "META", "GOOG", "AMZNX", "BIDU.HK", "not a ticker", "GOOGL")
+        ]
+    )
+    keep, dropped = proposal_rows(answer, "GOOGL", known, {"META"})
+    assert [p.ticker for p in keep] == ["MSFT", "BIDU.HK"]
+    assert "META: already recorded" in dropped and "GOOG: the same issuer" in dropped
+    assert "AMZNX: not on the SEC's company list" in dropped
+    assert any(d.startswith("NOT A TICKER") for d in dropped)

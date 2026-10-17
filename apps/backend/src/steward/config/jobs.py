@@ -228,6 +228,15 @@ class AiApprovalSettings(ConfigModel):
     )
     peer_refresh_days: int = Field(default=30, ge=1, le=365)
     peer_refresh_per_run: int = Field(default=8, ge=1, le=40)
+    propose_peers: bool = Field(
+        default=True,
+        description="Ask the model for the closest listed competitors of each company with "
+        "fewer than `min_confirmed_peers` confirmed peers (any market, not only the US). They "
+        "are suggestions, reviewed like the vendor's. Finnhub lists by sector and size: for "
+        "GOOGL it gave Snap and Reddit, not Microsoft or Amazon.",
+    )
+    min_confirmed_peers: int = Field(default=4, ge=1, le=20)
+    peer_proposals_per_run: int = Field(default=12, ge=1, le=60)
     min_confidence: float = Field(
         default=0.8,
         ge=0.5,

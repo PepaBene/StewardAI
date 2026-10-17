@@ -524,8 +524,8 @@ async def fetch_sec_facts(symbols: set[str], use_sic: bool) -> SecFacts | None:
 
 async def _peer_load(pool: asyncpg.Pool, limit: int) -> list[Candidate]:
     rows = await pool.fetch(
-        "select id, ticker, peer_ticker from public.peer_set"
-        " where status = 'suggested' and source = 'finnhub'"
+        "select id, ticker, peer_ticker, detail->>'name' as proposed_name from public.peer_set"
+        " where status = 'suggested' and source in ('finnhub', 'ai_proposed')"
         " and jsonb_array_length(status_history) <= 1 order by known_at, id limit $1",
         limit * 3,  # some rows are skipped below (no holding profile, not SEC-listed)
     )
@@ -557,7 +557,13 @@ async def _peer_load(pool: asyncpg.Pool, limit: int) -> list[Candidate]:
         if info is None:
             # Listed outside the US (Finnhub's home-market peers of an ADR) or off the SEC's
             # list (delisted, over the counter): judged on the ticker alone.
-            info = {"cik": None, "title": "not in the SEC's ticker list; the app has no name"}
+            named = r["proposed_name"]
+            info = {
+                "cik": None,
+                "title": f"{named} (the name a model proposed it under; not in the SEC's list)"
+                if named
+                else "not in the SEC's ticker list; the app has no name",
+            }
         if profile is None:
             continue
         own = sec.companies.get(profile.edgar_ticker().upper())
