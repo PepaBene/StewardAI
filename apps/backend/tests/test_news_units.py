@@ -110,6 +110,30 @@ def test_search_urls_are_checked_not_trusted() -> None:
     assert len(rejected) == 3
 
 
+def test_a_json_answer_is_checked_against_every_page_the_search_returned() -> None:
+    from types import SimpleNamespace
+
+    from steward.news.corroborate import _result_urls
+
+    # A structured answer cites nothing: only the returned-pages block lists what was found.
+    content = [
+        SimpleNamespace(type="text", text="{}"),
+        SimpleNamespace(
+            type="web_search_sources",
+            content=[SimpleNamespace(url="https://www.cnbc.com/2026/10/15/oracle-pipeline/")],
+        ),
+    ]
+    seen = _result_urls(content)
+    kept, rejected = verify_urls(
+        ["https://cnbc.com/2026/10/15/oracle-pipeline?utm_source=x"],
+        seen,
+        frozenset(),
+        NewsSourcesConfig().domain_tier,
+    )
+    assert kept == [("https://cnbc.com/2026/10/15/oracle-pipeline?utm_source=x", 2)]
+    assert rejected == []
+
+
 # ---------------------------------------------------------------------------
 # Routing
 # ---------------------------------------------------------------------------

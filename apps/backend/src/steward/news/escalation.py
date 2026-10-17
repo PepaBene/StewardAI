@@ -43,7 +43,7 @@ from steward.llm.client import create_llm
 from steward.llm.routing import RoutingClient, routing_client
 from steward.llm.types import LLMError
 from steward.news.api_search import ApiSearcher, ApiSearchRound, api_searcher
-from steward.news.corroborate import _result_urls
+from steward.news.corroborate import _result_urls, url_key
 from steward.settings import get_settings
 from steward.verify.claims import SYSTEM as CLAIM_SYSTEM
 from steward.verify.claims import (
@@ -292,10 +292,10 @@ def check_draft(
 ) -> tuple[EscalationBody, int]:
     """Apply the code-side rules; returns the body and how many sentences were dropped."""
     given = {s.url for s in request.sources}
-    allowed = given | search_urls
+    allowed = {url_key(u) for u in given | search_urls}
     kept, dropped = [], 0
     for sentence in draft.sentences:
-        urls = [u for u in sentence.source_urls if u in allowed]
+        urls = [u for u in sentence.source_urls if url_key(u) in allowed]
         if not sentence.text.strip() or not urls or len(urls) != len(sentence.source_urls):
             dropped += 1
             continue

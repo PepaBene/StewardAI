@@ -21,6 +21,7 @@ from steward.config.jobs import effort_kwargs
 from steward.earnings.periods import period_label
 from steward.llm.routing import RoutingClient
 from steward.llm.types import LLMError
+from steward.news.corroborate import url_key
 from steward.research.writer import web_search_tool
 
 
@@ -95,9 +96,10 @@ def host_allowed(url: str, domains: list[str]) -> bool:
 
 
 def _result_urls(content: list[Any]) -> set[str]:
+    """Every page the search returned, cited or not: a JSON answer carries no citations."""
     urls: set[str] = set()
     for block in content:
-        if getattr(block, "type", None) != "web_search_tool_result":
+        if getattr(block, "type", None) not in ("web_search_tool_result", "web_search_sources"):
             continue
         results = getattr(block, "content", None)
         if isinstance(results, list):
@@ -154,7 +156,7 @@ class LLMSearchLocator:
         answer = response.parsed_output
         if answer is None or not answer.url:
             return None, usage
-        if answer.url not in seen:
+        if url_key(answer.url) not in {url_key(u) for u in seen}:
             raise LocateError(
                 f"the search answer {answer.url} was not among the search results", usage
             )

@@ -28,6 +28,7 @@ import datetime as dt
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 from typing import Any, Literal, Protocol
+from urllib.parse import urlsplit
 
 from pydantic import BaseModel, Field
 
@@ -196,10 +197,11 @@ def verify_urls(
     not already come from. Returns (kept with tier, rejected with reason)."""
     kept: list[tuple[str, int]] = []
     rejected: list[str] = []
+    seen_keys = {url_key(u) for u in seen}
     for url in dict.fromkeys(urls):
         host = host_of(url)
         tier = tier_of(host)
-        if url not in seen:
+        if url_key(url) not in seen_keys:
             rejected.append(f"{url}: not among the search results")
         elif tier is None or tier > 2:
             rejected.append(f"{url}: outlet has no tier 1 or 2")
@@ -210,10 +212,20 @@ def verify_urls(
     return kept, rejected
 
 
+def url_key(url: str) -> str:
+    """A URL as the same page: host without "www.", path without a trailing slash, no query or
+    fragment (a model often drops "www." or a tracking parameter when it repeats a URL)."""
+    parts = urlsplit(url.strip())
+    host = (parts.hostname or "").lower().removeprefix("www.")
+    return f"{host}{parts.path.rstrip('/')}"
+
+
 def _result_urls(content: list[Any]) -> set[str]:
+    """Every page the search returned. A JSON answer cites nothing, so the cited-pages block is
+    empty there; the returned-pages block (`web_search_sources`) still lists what was found."""
     urls: set[str] = set()
     for block in content:
-        if getattr(block, "type", None) != "web_search_tool_result":
+        if getattr(block, "type", None) not in ("web_search_tool_result", "web_search_sources"):
             continue
         results = getattr(block, "content", None)
         if isinstance(results, list):
