@@ -12,6 +12,7 @@ Started by the owner (never by a schedule or the autopilot), it runs without fur
    "Needs you" notice. Nothing is ever traded.
 """
 
+import asyncio
 import datetime as dt
 import json
 import logging
@@ -43,6 +44,12 @@ STANCE_TASK = "thesis_stance"
 MAX_OUTPUT_TOKENS = 12000
 AUTHOR_ATTEMPTS = 3
 SAVE_ATTEMPTS = 4
+# A provider error that passes (a gateway 5xx, a rate limit, a dropped connection) is tried
+# again after these pauses before the run fails: the research behind the call is already paid.
+TRANSIENT_PAUSES = (10.0, 45.0)
+TRANSIENT_STATUSES = frozenset({408, 409, 429, 500, 502, 503, 504, *range(520, 530)})
+# How long a failed thesis run's research report stays reusable by the next run.
+REUSE_HOURS = 48
 
 
 async def _thesis_settings(ctx: JobContext) -> ThesisSettings:
@@ -86,6 +93,32 @@ def _body(raw: Any) -> dict[str, Any]:
     return cast("dict[str, Any]", data)
 
 
+def transient(exc: LLMError) -> bool:
+    """An error worth waiting out: a gateway or server error, a rate limit, or no status at all
+    (the connection dropped)."""
+    return exc.status is None or exc.status in TRANSIENT_STATUSES
+
+
+async def unused_report(pool: asyncpg.Pool, ticker: str, profile: str) -> int | None:
+    """A research report an earlier thesis run for this holding paid for but never turned into
+    a thesis (its authoring failed), made under the research profiles in force now. Writing the
+    thesis from it costs one model call instead of the whole research again."""
+    found = await pool.fetchval(
+        "select r.id from public.report r join public.job j on j.id = r.job_id"
+        " where r.ticker = $1 and r.type = 'research' and r.profile = $2"
+        " and j.job_type = 'thesis' and j.status = 'failed'"
+        " and r.created_at > now() - make_interval(hours => $3)"
+        " and (select id from public.config_version"
+        "      where domain = 'research_profiles' and active) = any(r.config_version_ids)"
+        " and not exists (select 1 from public.thesis_memo m where m.research_report_id = r.id)"
+        " order by r.id desc limit 1",
+        ticker,
+        profile,
+        REUSE_HOURS,
+    )
+    return int(found) if found is not None else None
+
+
 async def author_from_report(
     ctx: JobContext, report_id: int, mode: Mode, cfg: ThesisSettings
 ) -> dict[str, Any]:
@@ -127,16 +160,23 @@ async def author_from_report(
         # A draft the rules refuse (scenario values out of order, say) is asked for once more
         # with the reason: the research behind it is already paid for.
         for attempt in range(AUTHOR_ATTEMPTS):
-            try:
-                response = await client.messages.parse(
-                    model=cfg.model,
-                    system=author.system_for(mode) + ("\n\n" + corrections if corrections else ""),
-                    messages=[{"role": "user", "content": ask}],
-                    output_format=author.ThesisDraft,
-                    **effort_kwargs(cfg.model, cfg.effort, MAX_OUTPUT_TOKENS),
-                )
-            except LLMError as exc:
-                raise JobFailed(f"the model call failed: {str(exc)[:200]}") from exc
+            pauses = list(TRANSIENT_PAUSES)
+            while True:
+                try:
+                    response = await client.messages.parse(
+                        model=cfg.model,
+                        system=author.system_for(mode)
+                        + ("\n\n" + corrections if corrections else ""),
+                        messages=[{"role": "user", "content": ask}],
+                        output_format=author.ThesisDraft,
+                        **effort_kwargs(cfg.model, cfg.effort, MAX_OUTPUT_TOKENS),
+                    )
+                    break
+                except LLMError as exc:
+                    if not (transient(exc) and pauses):
+                        raise JobFailed(f"the model call failed: {str(exc)[:200]}") from exc
+                    step.detail["transient_retries"] = step.detail.get("transient_retries", 0) + 1
+                    await asyncio.sleep(pauses.pop(0))
             usage.add(response.usage)
             step.usage = usage.step_usage()
             draft = response.parsed_output
@@ -301,6 +341,12 @@ async def thesis_handler(ctx: JobContext) -> None:
         if found is None:
             raise JobFailed(f"research report {reuse} is not one of {ticker}")
         report_id = int(found)
+    elif (earlier := await unused_report(ctx.pool, ticker, str(ctx.params["profile"]))) is not None:
+        # A run that failed after its research (the authoring call, a refused draft) left a
+        # report this run can write from instead of paying for the research again.
+        report_id = earlier
+        ctx.params["report_id"] = earlier
+        logger.info("thesis for %s reuses research report %s of a failed run", ticker, earlier)
     else:
         report_id = await run_research_job(ctx)
     await author_from_report(ctx, report_id, mode, cfg)

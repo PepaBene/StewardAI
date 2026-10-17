@@ -276,6 +276,24 @@ def material_text(g: Gathered, reg: Registry) -> str:
     return "\n".join(lines)
 
 
+PLANNER_DIGEST_CHARS = 9000
+PLANNER_HEADLINES = 25
+
+
+def planner_digest(g: Gathered, reg: Registry) -> str:
+    """What the planner reads before it writes the questions: the holding, thesis and strategy
+    context, what the code already wrote from stored records, and the newest source titles. A
+    planner that sees what is on file can aim the run at what is not."""
+    lines = [neutralise(g.context), "", "Already on file:"]
+    for section in g.sections.values():
+        lines += [f"- {neutralise(s.text)}" for s in section.sentences]
+    dated = sorted((s for s in reg.sources if s.as_of), key=lambda s: s.as_of or "", reverse=True)
+    if dated:
+        lines += ["", "Newest stored sources:"]
+        lines += [f"- {s.as_of} {neutralise(s.title)}" for s in dated[:PLANNER_HEADLINES]]
+    return "\n".join(lines)[:PLANNER_DIGEST_CHARS]
+
+
 def added_material_text(reg: Registry, start: int) -> str:
     """Sources earlier sections found by web search (registry entries from `start` on)."""
     added = reg.sources[start:]
@@ -450,32 +468,69 @@ def single_source_claims(
     return {k: v[:MAX_CORROBORATE] for k, v in out.items()}
 
 
-# Positions in the version list whose whole-config id changes with every other holding's thesis
-# or profile edit; a resume compares only this holding's own entry of them.
-_PER_HOLDING = (1, 3)
+# Positions in the version list whose whole-config id changes with edits this run does not read
+# (another holding's thesis or profile, another research profile): a resume compares the
+# fingerprint of the part it reads instead, at this position of `run_inputs`.
+_FINGERPRINT_OF = {1: 0, 3: 1, 0: 2}
 
 
-def run_inputs(ticker: str, theses_v: Any, profiles_v: Any) -> list[str | None]:
-    """A fingerprint of this holding's own thesis and profile entry (None: it has none)."""
+def _fingerprint(data: Any) -> str | None:
+    if data is None:
+        return None
+    text = (
+        data.model_dump_json()
+        if hasattr(data, "model_dump_json")
+        else json.dumps(data, sort_keys=True, default=str)
+    )
+    return hashlib.sha256(text.encode()).hexdigest()[:16]
+
+
+def run_inputs(
+    ticker: str,
+    theses_v: Any,
+    profiles_v: Any,
+    research_v: Any = None,
+    profile_id: str | None = None,
+) -> list[str | None]:
+    """A fingerprint of this holding's own thesis and profile entry, and of the research profile
+    and template the run uses (None: there is none)."""
     thesis = (
         next((t for t in theses_v.body.theses if t.ticker == ticker), None) if theses_v else None
     )
     profile = profiles_v.body.for_ticker(ticker) if profiles_v else None
-    return [
-        hashlib.sha256(m.model_dump_json().encode()).hexdigest()[:16] if m is not None else None
-        for m in (thesis, profile)
-    ]
+    used = None
+    chosen = research_v.body.get(profile_id) if research_v else None
+    if chosen is not None:
+        template = research_v.body.template_for(chosen)
+        used = {
+            "profile": chosen.model_dump(mode="json"),
+            "template": template.model_dump(mode="json") if template else None,
+        }
+    return [_fingerprint(thesis), _fingerprint(profile), _fingerprint(used)]
 
 
 def same_run_inputs(first: dict[str, Any], versions: list[Any], own: list[str | None]) -> bool:
     """Whether a resume runs under what the first attempt used. Another holding's thesis being
-    saved (a batch drafts many at once) is not a change; this holding's own entry is."""
-    shared = [i for i in range(len(versions)) if i not in _PER_HOLDING]
+    saved (a batch drafts many at once), or another research profile being edited, is not a
+    change; this holding's own entry and the profile the run uses are."""
     then = first.get("ids") or []
-    if len(then) != len(versions) or any(then[i] != versions[i] for i in shared):
+    if len(then) != len(versions):
         return False
-    # A run checkpointed before `own` existed has only the ids; its own entry is unknown.
-    return "own" not in first or first["own"] == own
+    before = first.get("own")
+    # A checkpoint from before a fingerprint existed is judged on that config's id instead;
+    # one from before any fingerprint has no own entries to compare at all.
+    known = len(before) if before is not None else 2
+    # A research fingerprint of None means no profile was resolved, not "none in use": then
+    # the research id is compared as before.
+    unresolved = known > 2 and (before is None or before[2] is None or own[2] is None)
+    by_id = [
+        i
+        for i in range(len(versions))
+        if i not in _FINGERPRINT_OF or _FINGERPRINT_OF[i] >= known or (i == 0 and unresolved)
+    ]
+    if any(then[i] != versions[i] for i in by_id):
+        return False
+    return before is None or before == own[:known]
 
 
 async def run_research(ctx: JobContext, deps: ResearchDeps) -> int:
@@ -493,7 +548,7 @@ async def run_research(ctx: JobContext, deps: ResearchDeps) -> int:
         versions = [v.id if v else None for v in (
             research_v, theses_v, strategy_v, profiles_v, sources_v, verification_v
         )]  # fmt: skip
-        own = run_inputs(ticker, theses_v, profiles_v)
+        own = run_inputs(ticker, theses_v, profiles_v, research_v, ctx.params.get("profile"))
 
         async def first_versions() -> dict[str, Any]:
             return {"ids": versions, "own": own}
@@ -594,6 +649,7 @@ async def run_research(ctx: JobContext, deps: ResearchDeps) -> int:
                     deps.planner,
                     name=gathered.name,
                     use_model=profile.planning == "model",
+                    context=planner_digest(gathered, reg),
                 )
             part: dict[str, Any] | None = None
             if result is not None:
@@ -743,6 +799,7 @@ async def run_research(ctx: JobContext, deps: ResearchDeps) -> int:
                     registry=reg,
                     tier_of=tier_of,
                     cost_of=lambda u: cost_of(u),
+                    questions=plan.questions,
                 )
                 total = Usage(model=profile.worker_model)
                 for rec in run_out.records:
@@ -1654,7 +1711,9 @@ async def run_research_job(ctx: JobContext) -> int:
             worker = LLMWorker(llm)
         cheap = (verification.body if verification else VerificationConfig()).claim_verifier.model
         if profile and profile.planning == "model":
-            planner = LLMResearchPlanner(client, profile.planner_model or cheap)
+            planner = LLMResearchPlanner(
+                client, profile.planner_model or cheap, effort=profile.planner_effort
+            )
         # D5: a run nobody waits on may take the discounted tier (flex), and its independent
         # claim checks the batch API.
         tier = "flex" if profile and profile.priority in ("flex", "batch") else "standard"

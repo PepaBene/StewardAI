@@ -171,6 +171,11 @@ class ResearchProfile(ConfigModel):
     planner_model: ModelId | None = Field(
         default=None, description="The model that writes the plan; unset = the claim verifier's."
     )
+    planner_effort: Literal["low", "medium", "high"] = Field(
+        default="low",
+        description="Reasoning effort of the planning call. Deciding what is worth researching "
+        "about a company is the run's hardest judgement: medium or high on a strong model.",
+    )
     # Agentic engine: specialist workers gather the evidence with the app's read tools (and web
     # search where their lens allows it), the profile's model then writes the sections from
     # their findings. "fixed" is the original pipeline: the writer searches inside each section.

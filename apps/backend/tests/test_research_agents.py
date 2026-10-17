@@ -61,6 +61,55 @@ def make_request(registry: Registry, tier_of: Any = lambda host: None) -> Worker
     )
 
 
+def test_each_lens_gets_the_plan_questions_for_its_area_and_the_brief_asks_them() -> None:
+    from steward.research.agents import brief_for, lens_questions
+    from steward.research.plan import PlanQuestion
+
+    def q(qid: str, section: str | None, groups: list[str], web: str | None = None) -> Any:
+        return PlanQuestion(
+            id=qid,
+            section=section,
+            question=f"{qid}?",
+            internal_tools=[],
+            web_intent=web,
+            source_groups=groups,
+        )
+
+    plan = [
+        q("margin", "financial_trend", ["financials"]),
+        q("guidance", "catalysts", ["filings", "web"], web="Acme Q3 guidance cut"),
+        q("short", "counter_case", ["news", "web"], web="Acme short seller report"),
+        q("fit", "strategy_fit", ["portfolio"]),
+    ]
+    assert lens_questions(plan, "financials") == ("margin?",)
+    assert lens_questions(plan, "portfolio_risk") == ("fit?",)
+    # Web lenses get the search a question carries; the others do not.
+    assert lens_questions(plan, "filings_events") == ("guidance?",)
+    assert lens_questions(plan, "news_web") == (
+        "guidance? (search for: Acme Q3 guidance cut)",
+        "short? (search for: Acme short seller report)",
+    )
+    assert lens_questions(plan, "counter_case") == (
+        "short? (search for: Acme short seller report)",
+    )
+    request = WorkerRequest(
+        lens="financials",
+        name="Acme",
+        ticker="ACME",
+        today="2026-10-17",
+        model="m",
+        effort="low",
+        max_steps=4,
+        max_searches=0,
+        domains=(),
+        caller=lambda _n, _a: asyncio.sleep(0, {}),  # type: ignore[arg-type,return-value]
+        registry=Registry(),
+        tier_of=lambda _h: None,
+        questions=("margin?",),
+    )
+    assert "Questions to investigate first:\n- margin?" in brief_for(request)
+
+
 def test_only_findings_with_a_checkable_citation_are_kept() -> None:
     reg = Registry()
     sid = reg.add("fact", "f1", "Revenue", snippet="Revenue grew")

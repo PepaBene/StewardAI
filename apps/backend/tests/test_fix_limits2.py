@@ -446,6 +446,34 @@ def test_a_thesis_run_resumes_after_another_holdings_thesis_is_saved() -> None:
     assert same_run_inputs({"ids": [1, 10, 2, 20, 3, 4]}, [1, 12, 2, 22, 3, 4], own)
 
 
+def test_a_thesis_run_resumes_after_another_research_profile_is_edited() -> None:
+    from types import SimpleNamespace
+
+    from steward.config.research import ResearchProfilesConfig
+    from steward.research.run import run_inputs, same_run_inputs
+
+    def research(**changes: Any) -> Any:
+        body = ResearchProfilesConfig()
+        profiles = [p.model_copy(update=changes.get(p.id, {})) for p in body.profiles]
+        return SimpleNamespace(body=body.model_copy(update={"profiles": profiles}))
+
+    none = SimpleNamespace(body=SimpleNamespace(theses=[], for_ticker=lambda t: None))
+    own = run_inputs("A", none, none, research(), "deep-thesis")
+    first = {"ids": [94, 10, 2, 20, 3, 4], "own": own}
+    # The quick profile was edited: a new research version, but not the profile this run uses.
+    other = run_inputs("A", none, none, research(quick={"max_searches": 5}), "deep-thesis")
+    assert same_run_inputs(first, [95, 10, 2, 20, 3, 4], other)
+    # The profile this run uses changed: the resume stops.
+    mine = run_inputs(
+        "A", none, none, research(**{"deep-thesis": {"max_searches": 5}}), "deep-thesis"
+    )
+    assert not same_run_inputs(first, [95, 10, 2, 20, 3, 4], mine)
+    # A checkpoint with only the two older fingerprints still compares the research id.
+    assert not same_run_inputs(
+        {"ids": [94, 10, 2, 20, 3, 4], "own": own[:2]}, [95, 10, 2, 20, 3, 4], other
+    )
+
+
 class _ConsensusPool:
     def __init__(self, row: dict[str, Any] | None) -> None:
         self.row = row

@@ -149,3 +149,14 @@ def test_report_text_drops_unsupported_sentences() -> None:
     assert "Revenue grew 14%. [S1]" in text
     assert "win AI" not in text
     assert figures == ["pe_ttm: 24x (price / eps)"]
+
+
+def test_only_passing_provider_errors_are_waited_out() -> None:
+    from steward.llm.types import LLMError
+    from steward.thesis.job import transient
+
+    assert transient(LLMError("gateway", status=520))
+    assert transient(LLMError("rate limited", status=429))
+    assert transient(LLMError("connection reset"))
+    assert not transient(LLMError("bad request", status=400))
+    assert not transient(LLMError("no key", status=401))
