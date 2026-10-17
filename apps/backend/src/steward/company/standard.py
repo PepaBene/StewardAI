@@ -80,11 +80,17 @@ def _free_cash_flow(get: Get) -> tuple[Decimal | None, str]:
 
 def _depreciation_amortization(get: Get) -> tuple[Decimal | None, str]:
     dep, amort = get("depreciation"), get("amortization_of_intangibles")
+    what = "depreciation"
+    if dep is None and (ppe := get("depreciation_ppe")) is not None:
+        # IFRS 16: right-of-use assets are depreciated apart from property, plant and equipment.
+        rou = get("depreciation_right_of_use")
+        dep = ppe + (rou or Decimal(0))
+        what = "depreciation of PP&E" + (" and right-of-use assets" if rou is not None else "")
     if dep is None:
         return None, ""
     if amort is None:
-        return dep, "depreciation (no amortization of intangibles filed)"
-    return dep + amort, "depreciation + amortization of intangibles"
+        return dep, f"{what} (no amortization of intangibles filed)"
+    return dep + amort, f"{what} + amortization of intangibles"
 
 
 def _liabilities(get: Get) -> tuple[Decimal | None, str]:

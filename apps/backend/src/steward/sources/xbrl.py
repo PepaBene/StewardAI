@@ -44,7 +44,7 @@ XLINK = "http://www.w3.org/1999/xlink"
 XML_LANG = "{http://www.w3.org/XML/1998/namespace}lang"
 
 # Bump when the parse changes, so stored filings are parsed again on the next run.
-PARSER_VERSION = 4  # 4: depreciation and amortization of intangibles filed apart
+PARSER_VERSION = 5  # 5: IFRS depreciation and amortisation filed apart (AZN, TSM)
 
 # Standard taxonomies by namespace URI prefix -> the prefix used in stored names, whatever
 # prefix a filing declares for them.

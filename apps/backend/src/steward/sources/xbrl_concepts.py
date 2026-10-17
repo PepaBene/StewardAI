@@ -532,12 +532,35 @@ _ENTRIES: tuple[tuple[str, Statement, str, tuple[str, ...]], ...] = (
     ),
     # Many filers (Alphabet, AMD, Broadcom, Intuit, Oracle) tag the two halves separately and no
     # combined line; the statement view adds them up when the combined one is missing.
-    ("cash_flow", "cash_flow", "depreciation", ("us-gaap:Depreciation",)),
+    (
+        "cash_flow",
+        "cash_flow",
+        "depreciation",
+        ("us-gaap:Depreciation", "ifrs-full:DepreciationExpense"),
+    ),
+    # IFRS filers (AstraZeneca) may tag only property, plant and equipment, with right-of-use
+    # assets apart (IFRS 16); the statement view adds the two when no total is filed.
+    (
+        "cash_flow",
+        "cash_flow",
+        "depreciation_ppe",
+        ("ifrs-full:DepreciationPropertyPlantAndEquipment",),
+    ),
+    (
+        "cash_flow",
+        "cash_flow",
+        "depreciation_right_of_use",
+        ("ifrs-full:DepreciationRightofuseAssets",),
+    ),
     (
         "cash_flow",
         "cash_flow",
         "amortization_of_intangibles",
-        ("us-gaap:AmortizationOfIntangibleAssets",),
+        (
+            "us-gaap:AmortizationOfIntangibleAssets",
+            "ifrs-full:AmortisationIntangibleAssetsOtherThanGoodwill",
+            "ifrs-full:AmortisationExpense",
+        ),
     ),
     (
         "cash_flow",
