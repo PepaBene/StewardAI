@@ -120,6 +120,18 @@ def test_a_rounded_magnitude_matches_and_a_wrong_one_is_flagged() -> None:
     assert missing_numbers("Its 10-K shows revenue of 94.0 billion.", ["94,036"]) == []
 
 
+def test_a_growth_rate_worked_out_from_one_cited_row_is_supported() -> None:
+    # Production chat, 17 Oct 2026: a correct NFLX answer ("revenue was $12.56 billion, up
+    # 13.4%" for the quarter ended June 30) was thrown away as unsupported.
+    row = ["Revenues | $12,559,938 | $12,249,757 | $11,079,166 | $24,809,695 | $21,621,967"]
+    sentence = "In the quarter ended June 30, revenue was $12.56 billion, up 13.4% year over year."
+    assert missing_numbers(sentence, row) == []
+    assert missing_numbers("Revenue was up 14.9%.", row) == ["14.9"]
+    # Figures from two different snippets are not combined.
+    split = ["Revenues | 12,559,938", "Revenues | 11,079,166"]
+    assert missing_numbers("Revenue was up 13.4%.", split) == ["13.4"]
+
+
 # ---------------------------------------------------------------------------
 # Review compliance: rules evaluate() ran no check for
 # ---------------------------------------------------------------------------

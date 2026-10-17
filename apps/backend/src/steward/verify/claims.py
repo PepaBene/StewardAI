@@ -126,11 +126,39 @@ def missing_numbers(sentence: str, evidence: Sequence[str]) -> list[str]:
     date's day and month ("31 July 2026", "2026-07-31") are not figures: `missing_dates` checks
     the date whole."""
     available = [n for snippet in evidence for n in numbers_in(snippet)]
+    text = _without_dates(sentence)
+    percents = {m.group(1) for m in _PERCENT.finditer(text)}
     return [
         n.text
-        for n in numbers_in(_without_dates(sentence))
-        if not (n.decimals == 0 and _YEAR.match(n.text)) and not _matches(n, available)
+        for n in numbers_in(text)
+        if not (n.decimals == 0 and _YEAR.match(n.text))
+        and not _matches(n, available)
+        and not (n.text in percents and _derived(n, evidence))
     ]
+
+
+_PERCENT = re.compile(r"(\d+(?:\.\d+)?)\s?(?:%|percent\b|per cent\b)")
+
+
+def _derived(figure: Number, evidence: Sequence[str]) -> bool:
+    """A percentage with a decimal that is one snippet figure's change on, or share of, another
+    figure in the same snippet: "revenue up 13.4%" from a statement row "12,559,938 |
+    11,079,166". Only within one snippet (a statement row or a passage), and only to a tenth of
+    a point or finer, so two unrelated figures rarely make a match by chance."""
+    if figure.decimals < 1:
+        return False
+    step = Decimal(1).scaleb(-figure.decimals)
+    target = abs(figure.value)
+    for snippet in evidence:
+        values = [n.value for n in numbers_in(snippet) if n.value != 0]
+        for a in values:
+            for b in values:
+                if a is b:
+                    continue
+                for derived in (a / b * 100, (a / b - 1) * 100):
+                    if abs(abs(derived) - target) <= step / 2:
+                        return True
+    return False
 
 
 _MONTHS = {
@@ -178,9 +206,14 @@ def dates_in(text: str) -> set[dt.date]:
 
 
 def _without_dates(text: str) -> str:
-    for pattern in (_DATE_ISO, _DATE_DMY, _DATE_MDY):
+    for pattern in (_DATE_ISO, _DATE_DMY, _DATE_MDY, _DAY_MONTH, _MONTH_DAY):
         text = pattern.sub(" ", text)
     return text
+
+
+# A day of a month without its year ("the quarter ended June 30"): the day is not a figure.
+_DAY_MONTH = re.compile(rf"(?<!\d)(\d{{1,2}})(?:st|nd|rd|th)?\s+({_MONTH})\b", re.I)
+_MONTH_DAY = re.compile(rf"\b({_MONTH})\.?\s+(\d{{1,2}})(?:st|nd|rd|th)?(?![\d.,]*\d)", re.I)
 
 
 def missing_dates(sentence: str, evidence: Sequence[str]) -> list[str]:

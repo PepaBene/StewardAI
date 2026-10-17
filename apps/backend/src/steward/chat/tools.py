@@ -1352,7 +1352,19 @@ class ChatTools:
             f"Portfolio snapshot {overview.freshness.snapshot_date}",
             app_path="/",
             tier=1,
-            snippet=f"total {overview.base.total} {overview.base.base_currency}",
+            # The figures the model is given, so the claim check can find a weight it quotes
+            # (with only the total here, "CSG at 5.84%" was flagged as unsupported).
+            snippet="; ".join(
+                [
+                    f"total {overview.base.total} {overview.base.base_currency}",
+                    f"cash {overview.base.cash}",
+                    *(
+                        f"{a.label} ({a.key}) {a.value_base:.2f}"
+                        + ("" if a.weight is None else f", weight {a.weight * 100:.2f}%")
+                        for a in overview.allocation
+                    ),
+                ]
+            ),
             as_of=str(overview.freshness.snapshot_date),
         )
         drift = overview.drift
