@@ -845,6 +845,14 @@ class NewsSettings(ConfigModel):
     corroboration_max_searches: int = Field(
         default=10, ge=0, le=50, description="Web searches per corroboration call."
     )
+    corroboration_search_via_api: bool = Field(
+        default=False,
+        description="Cost lever: run the corroboration searches through a plain search API "
+        "(needs BRAVE_API_KEY) instead of the model provider's built-in search, and keep "
+        "identical searches for a day. The model then only reads the titles, snippets and "
+        "links of outlets in the allowed tiers. Falls back to the provider's search when no "
+        "key is set.",
+    )
     corroboration_rounds: int = Field(
         default=3,
         ge=0,
@@ -1400,6 +1408,13 @@ class EscalationSettings(ConfigModel):
         default=30, ge=1, le=100, description="Model calls plus web searches per escalation."
     )
     max_searches: int = Field(default=15, ge=0, le=50)
+    search_via_api: bool = Field(
+        default=False,
+        description="Cost lever: search for context through a plain search API (needs "
+        "BRAVE_API_KEY) instead of the model provider's built-in search, and keep identical "
+        "searches for a day. The model then only reads titles, snippets and links of outlets "
+        "in the allowed tiers. Falls back to the provider's search when no key is set.",
+    )
     min_severity: int = Field(default=2, ge=1, le=3)
     source_tiers: list[SourceTier] = Field(
         default_factory=lambda: list(DEFAULT_SOURCE_TIERS),

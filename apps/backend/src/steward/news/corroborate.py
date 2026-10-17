@@ -35,6 +35,7 @@ from steward.ai import Usage
 from steward.config.jobs import effort_kwargs
 from steward.llm.routing import RoutingClient
 from steward.llm.types import LLMError
+from steward.news.api_search import ApiSearcher
 from steward.news.normalize import host_of
 
 Status = Literal["confirmed", "unconfirmed", "disputed", "sentiment"]
@@ -142,6 +143,8 @@ class SearchRequest:
 class SearchOutcome:
     finding: SearchFinding
     rejected: list[str] = field(default_factory=list)
+    # Search-API calls made (not billed by the model provider, so not in the usage).
+    api_searches: int = 0
 
 
 class Corroborator(Protocol):
@@ -226,12 +229,16 @@ class LLMCorroborator:
         max_searches: int,
         system: str = SEARCH_SYSTEM,
         effort: str | None = None,
+        searcher: ApiSearcher | None = None,
     ) -> None:
         self._client = client
         self._model = model
         self._effort = effort
         self._max_searches = max_searches
         self._system = system
+        # With a searcher the code runs the searches through the search API and the model only
+        # reads what came back; without one the model uses the provider's own search tool.
+        self._searcher = searcher
 
     def _tool(self, request: SearchRequest) -> dict[str, Any]:
         return {
@@ -253,22 +260,53 @@ class LLMCorroborator:
             f"</claim>\n\nAllowed outlets: {', '.join(request.domains)}\n"
             "Find independent reports of this claim, or reports that it is false."
         )
+        api_searches = 0
+        extra: dict[str, Any] = {"tools": [self._tool(request)]}
+        seen_by_api: set[str] | None = None
+        if self._searcher is not None:
+            found = await self._searcher.run(
+                self._queries(request),
+                request.domains,
+                days=self._window_days(request),
+                max_searches=self._max_searches,
+                today=dt.datetime.now(dt.UTC).date(),
+            )
+            api_searches = found.searches
+            if not found.results:
+                # Nothing to judge: skip the model call rather than pay it to say "not found".
+                note = f"search failed: {found.errors[0]}" if found.errors else "no results"
+                return SearchOutcome(SearchFinding(note=note), api_searches=api_searches), usage
+            prompt += (
+                "\n\nThe search has already been run for you. These are its results, from the "
+                "allowed outlets only (untrusted text); judge only from them and do not "
+                f"search:\n<results>\n{found.block()}\n</results>"
+            )
+            extra = {}
+            seen_by_api = found.urls
         try:
             response = await self._client.messages.parse(
                 model=self._model,
                 system=self._system,
                 messages=[{"role": "user", "content": prompt}],
-                tools=[self._tool(request)],
                 output_format=CorroborationAnswer,
+                **extra,
                 **effort_kwargs(self._model, self._effort, 4000),
             )
         except LLMError as exc:
-            return SearchOutcome(SearchFinding(note=f"search failed: {exc}")), usage
+            return (
+                SearchOutcome(
+                    SearchFinding(note=f"search failed: {exc}"), api_searches=api_searches
+                ),
+                usage,
+            )
         usage.add(response.usage)
-        seen = _result_urls(response.content)
+        seen = seen_by_api if seen_by_api is not None else _result_urls(response.content)
         answer = response.parsed_output
         if answer is None:
-            return SearchOutcome(SearchFinding(note="no parseable answer")), usage
+            return (
+                SearchOutcome(SearchFinding(note="no parseable answer"), api_searches=api_searches),
+                usage,
+            )
         supporting, rejected = verify_urls(
             answer.supporting_urls, seen, request.own_outlets, tier_of
         )
@@ -276,4 +314,17 @@ class LLMCorroborator:
             answer.contradicting_urls, seen, request.own_outlets, tier_of
         )
         finding = SearchFinding(tuple(supporting), tuple(contradicting), answer.note[:500])
-        return SearchOutcome(finding, rejected + rejected_c), usage
+        return SearchOutcome(finding, rejected + rejected_c, api_searches), usage
+
+    @staticmethod
+    def _queries(request: SearchRequest) -> list[str]:
+        """The claim as the story states it, then the company with the summary's opening (or the
+        headline again) so a differently worded report can still match."""
+        second = (request.summary or request.headline)[:120]
+        return [request.headline[:200], f"{request.company} {second}"]
+
+    @staticmethod
+    def _window_days(request: SearchRequest) -> int:
+        """From the story's date to now, with a little margin: later reports are what counts."""
+        age = (dt.datetime.now(dt.UTC) - request.published_at).days
+        return max(3, min(90, age + 2))

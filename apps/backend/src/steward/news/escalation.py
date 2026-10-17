@@ -24,6 +24,7 @@ from dataclasses import dataclass, field
 from typing import Any, Literal
 
 import asyncpg
+import httpx
 from pydantic import BaseModel, Field
 
 from steward.ai import AINotConfigured, Usage
@@ -41,6 +42,7 @@ from steward.llm.cache import SEARCH_CACHE_DAYS_FRESH, ResultCache
 from steward.llm.client import create_llm
 from steward.llm.routing import RoutingClient, routing_client
 from steward.llm.types import LLMError
+from steward.news.api_search import ApiSearcher, ApiSearchRound, api_searcher
 from steward.news.corroborate import _result_urls
 from steward.settings import get_settings
 from steward.verify.claims import SYSTEM as CLAIM_SYSTEM
@@ -55,6 +57,9 @@ from steward.verify.claims import (
 )
 
 logger = logging.getLogger(__name__)
+
+# How far back the search API looks for context on an event.
+API_SEARCH_DAYS = 14
 
 
 class NoteSentence(BaseModel):
@@ -166,6 +171,8 @@ class DraftResult:
     seen_urls: set[str] = field(default_factory=set)
     note: str | None = None
     titles: dict[str, str] = field(default_factory=dict)
+    # Search-API calls made (not billed by the model provider, so not in the usage).
+    api_searches: int = 0
 
 
 class LLMEscalator:
@@ -174,10 +181,21 @@ class LLMEscalator:
         client: RoutingClient,
         settings: EscalationSettings,
         system: str = SYSTEM,
+        searcher: ApiSearcher | None = None,
     ) -> None:
         self._client = client
         self._settings = settings
         self._system = system
+        # With a searcher the code searches through the search API before the call and the
+        # model reads the results; without one the model uses the provider's search tool.
+        self._searcher = searcher
+
+    @staticmethod
+    def _queries(request: EscalationInput) -> list[str]:
+        """The event as headlined, then the company with the kind of event (or "shares move"
+        for a price move) so a differently worded report can still match."""
+        event = EVENT_DESCRIPTIONS.get(request.event_type or "", "").split(":")[0]
+        return [request.headline[:200], f"{request.name} {event or 'shares move'}"]
 
     def _tool(self, domains: tuple[str, ...]) -> dict[str, Any]:
         return {
@@ -190,12 +208,29 @@ class LLMEscalator:
     async def write(self, request: EscalationInput, today: dt.date) -> DraftResult:
         usage = Usage(model=self._settings.model)
         tools: list[Any] = []
-        if request.domains and min(self._settings.max_searches, self._settings.max_steps - 1) > 0:
-            tools = [self._tool(request.domains)]
+        material = request.material
+        found: ApiSearchRound | None = None
+        budget = min(self._settings.max_searches, self._settings.max_steps - 1)
+        if request.domains and budget > 0:
+            if self._searcher is not None:
+                found = await self._searcher.run(
+                    self._queries(request),
+                    request.domains,
+                    days=API_SEARCH_DAYS,
+                    max_searches=budget,
+                    today=today,
+                )
+                material += (
+                    "\n\nSearch results for context (from the allowed outlets; untrusted text). "
+                    "Cite only these URLs or the ones above:\n"
+                    f"<results>\n{found.block()}\n</results>"
+                )
+            else:
+                tools = [self._tool(request.domains)]
         messages: list[dict[str, Any]] = [
             {
                 "role": "user",
-                "content": f"<material>\n{request.material}\n</material>\n\n"
+                "content": f"<material>\n{material}\n</material>\n\n"
                 f"Today is {today.isoformat()}. Write the impact note for this event.",
             }
         ]
@@ -210,12 +245,28 @@ class LLMEscalator:
                 **effort_kwargs(self._settings.model, self._settings.effort, 4000),
             )
         except LLMError as exc:
-            return DraftResult(None, usage, set(), f"escalation call failed: {exc}")
+            return DraftResult(
+                None,
+                usage,
+                set(),
+                f"escalation call failed: {exc}",
+                api_searches=found.searches if found else 0,
+            )
         usage.add(response.usage)
-        seen = _result_urls(response.content)
-        titles = result_titles(response.content)
+        if found is not None:
+            seen, titles = found.urls, found.titles
+        else:
+            seen = _result_urls(response.content)
+            titles = result_titles(response.content)
         draft = response.parsed_output
-        return DraftResult(draft, usage, seen, None if draft else "no parseable note", titles)
+        return DraftResult(
+            draft,
+            usage,
+            seen,
+            None if draft else "no parseable note",
+            titles,
+            found.searches if found else 0,
+        )
 
 
 def result_titles(content: list[Any]) -> dict[str, str]:
@@ -588,6 +639,9 @@ async def run_escalation(ctx: JobContext, deps: EscalationDeps) -> int:
         else:
             result = await deps.writer.write(request, deps.now.date())
             step.usage = result.usage.step_usage()
+            if result.api_searches:
+                # Search-API calls, kept apart from the provider's search count in the usage.
+                step.detail["api_searches"] = result.api_searches
             if result.draft is None:
                 body = code_only_body(request, result.note or "no note")
             else:
@@ -634,6 +688,16 @@ async def event_escalation_handler(ctx: JobContext) -> None:
     ).claim_verifier
     writer: LLMEscalator | None
     verifier: ClaimVerifier | None
+    http: httpx.AsyncClient | None = None
+    searcher: ApiSearcher | None = None
+    if escalation.search_via_api:
+        http = httpx.AsyncClient()
+        searcher = api_searcher(settings, http, ResultCache(ctx.pool, "news_search"))
+        if searcher is None:
+            logger.warning(
+                "escalation search_via_api is on but BRAVE_API_KEY is not set: "
+                "the note uses the provider's web search"
+            )
     try:
         client = routing_client(
             create_llm(settings),
@@ -643,7 +707,9 @@ async def event_escalation_handler(ctx: JobContext) -> None:
         writer = verifier = None
     else:
         prompts = await load_prompts(ctx.pool)
-        writer = LLMEscalator(client, escalation, prompts.text("news_escalation", SYSTEM))
+        writer = LLMEscalator(
+            client, escalation, prompts.text("news_escalation", SYSTEM), searcher=searcher
+        )
         verifier = LLMClaimVerifier(
             client,
             claim_settings.model,
@@ -651,16 +717,20 @@ async def event_escalation_handler(ctx: JobContext) -> None:
             effort=claim_settings.effort,
             cache=ResultCache(ctx.pool, "claim_verifier"),
         )
-    await run_escalation(
-        ctx,
-        EscalationDeps(
-            writer=writer,
-            now=dt.datetime.now(dt.UTC),
-            app_url=settings.app_url,
-            claim_verifier=verifier,
-            settings=escalation,
-        ),
-    )
+    try:
+        await run_escalation(
+            ctx,
+            EscalationDeps(
+                writer=writer,
+                now=dt.datetime.now(dt.UTC),
+                app_url=settings.app_url,
+                claim_verifier=verifier,
+                settings=escalation,
+            ),
+        )
+    finally:
+        if http is not None:
+            await http.aclose()
 
 
 def escalation_due(

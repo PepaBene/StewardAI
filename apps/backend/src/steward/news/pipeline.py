@@ -53,6 +53,7 @@ from steward.llm.cache import SEARCH_CACHE_DAYS_FRESH, ResultCache
 from steward.llm.client import LLM, create_llm
 from steward.llm.routing import routing_client
 from steward.news import classify_rules
+from steward.news.api_search import api_searcher
 from steward.news.classify import SYSTEM_PROMPT as CLASSIFICATION_PROMPT
 from steward.news.classify import (
     Candidate,
@@ -1630,6 +1631,9 @@ async def corroborate_story(
             rejected=outcome.rejected[:10],
             note=outcome.finding.note,
         )
+        if outcome.api_searches:
+            # Search-API calls, kept apart from the provider's search count in the usage.
+            step.detail["api_searches"] = outcome.api_searches
         await ctx.pool.execute(
             "update public.story_cluster set search_rounds = search_rounds + 1,"
             " last_searched_at = $2, corroboration = $3::jsonb where id = $1",
@@ -2069,19 +2073,6 @@ async def news_ingest_handler(ctx: JobContext) -> None:
             effort=news.classification_effort,
             cache=ResultCache(ctx.pool, "news_classification"),
         )
-    if llm.configured(news.corroboration_model):
-        corroborator = LLMCorroborator(
-            routing_client(
-                llm,
-                ResultCache(
-                    ctx.pool, "news_corroboration", search_ttl_days=SEARCH_CACHE_DAYS_FRESH
-                ),
-            ),
-            news.corroboration_model,
-            news.corroboration_max_searches,
-            prompts.text("news_corroboration", SEARCH_SYSTEM, news.corroboration_model),
-            effort=news.corroboration_effort,
-        )
     translator: LlmTranslator | None = None
     if usable_model(llm, news.translation_model):
         translator = LlmTranslator(
@@ -2094,6 +2085,28 @@ async def news_ingest_handler(ctx: JobContext) -> None:
     async with httpx.AsyncClient(
         timeout=30.0, headers={"User-Agent": f"StewardAI/{__version__}"}
     ) as http:
+        if llm.configured(news.corroboration_model):
+            searcher = None
+            if news.corroboration_search_via_api:
+                searcher = api_searcher(settings, http, ResultCache(ctx.pool, "news_search"))
+                if searcher is None:
+                    logger.warning(
+                        "corroboration_search_via_api is on but BRAVE_API_KEY is not set: "
+                        "corroboration uses the provider's web search"
+                    )
+            corroborator = LLMCorroborator(
+                routing_client(
+                    llm,
+                    ResultCache(
+                        ctx.pool, "news_corroboration", search_ttl_days=SEARCH_CACHE_DAYS_FRESH
+                    ),
+                ),
+                news.corroboration_model,
+                news.corroboration_max_searches,
+                prompts.text("news_corroboration", SEARCH_SYSTEM, news.corroboration_model),
+                effort=news.corroboration_effort,
+                searcher=searcher,
+            )
         embedder: Embedder | None = (
             GeminiEmbedder(
                 http,
