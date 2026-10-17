@@ -471,7 +471,9 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
         "financials, valuation and scenarios, fit with the strategy, risks and pre-mortem, KPIs, "
         "catalysts, next steps) with the KPIs, exit conditions and targets. Use it for 'why do I "
         "own X', 'what does my thesis for X say', 'should I sell X' and 'what was the case for "
-        "buying X'. Newest first; say when none exists and offer to start one.",
+        "buying X'. Newest first; current=true marks the memo that stands for its ticker, and "
+        "an older one (current=false) was replaced: answer from the current memo and use older "
+        "ones only to say how the view changed. Say when none exists and offer to start one.",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -652,9 +654,11 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
         "description": "Every thesis as it stands now, in one call: per holding (and bench "
         "idea) its state (intact, watch, at_risk, unjudged), 0-100 thesis score, KPI "
         "pass/breach/unknown counts and the breached KPIs, review date, risk-adjusted rank, "
-        "annualised expected return against the strategy's return hurdle, and the latest "
-        "memo's stance. Use it first for 'which theses are at risk', 'how are my theses "
-        "doing', 'what should I sell or add to'; it is current, while reports and memos are "
+        "annualised expected return against the strategy's return hurdle, the thesis bear/base/"
+        "bull targets with the price and base_vs_price (negative: the price is above the base), "
+        "and the latest memo's stance. Use it first for 'which theses are at risk', 'how are my "
+        "theses doing', 'what looks overvalued against its thesis', 'what should I sell or add "
+        "to'; it is current, while reports and memos are "
         "dated snapshots that may predate the thesis.",
         "input_schema": {"type": "object", "properties": {}, "additionalProperties": False},
     },
@@ -1034,6 +1038,16 @@ class ChatTools:
                     "breached_kpis": [k.kpi.metric for k in row.kpis if k.status == "breach"],
                     "review_date": row.review_date,
                     "review_overdue": row.review_overdue,
+                    # The thesis scenarios against the price, so "which looks most overvalued
+                    # against its thesis" is read from the standing targets, not an old memo.
+                    "price": rank.price if rank else None,
+                    "currency": rank.currency if rank else None,
+                    "thesis_scenarios": rank.scenarios if rank else None,
+                    "base_vs_price": (
+                        round(rank.scenarios["base"] / rank.price - 1, 4)
+                        if rank and rank.price and rank.scenarios and rank.scenarios.get("base")
+                        else None
+                    ),
                     "expected_return_annualized": ret.annualized if ret else None,
                     "meets_hurdle": ret.meets_hurdle if ret else None,
                     "rank": rank.rank if rank else None,
@@ -1255,12 +1269,18 @@ class ChatTools:
             3 if (full and ticker) else 8,
         )
         memos: list[dict[str, Any]] = []
+        seen: set[str] = set()
         for r in rows:
             body = json.loads(r["body"]) if isinstance(r["body"], str) else r["body"]
+            # Newest first, so a ticker's first row is its standing memo; the rest were replaced
+            # (FB's morning "trim" answered an overvaluation question after the evening "keep").
+            current = r["ticker"] not in seen
+            seen.add(r["ticker"])
             sid = self.registry.add(
                 "thesis",
                 f"thesis_memo:{r['id']}",
-                f"Thesis memo for {r['ticker']} ({r['stance']})",
+                f"Thesis memo for {r['ticker']} ({r['stance']})"
+                + ("" if current else f", replaced by a later memo, {r['created_at'].date()}"),
                 app_path=f"/thesis/memos/{r['id']}",
                 tier=1,
                 snippet=r["executive_summary"],
@@ -1272,6 +1292,7 @@ class ChatTools:
                 "mode": r["mode"],
                 "stance": r["stance"],
                 "status": r["status"],
+                "current": current,
                 "written": str(r["created_at"].date()),
                 "executive_summary": r["executive_summary"],
                 "stance_reason": body.get("stance_reason"),
