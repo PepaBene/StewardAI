@@ -825,7 +825,35 @@ function RiskPanel({ form, errors, set }: SectionProps) {
         <TextField label="Max yearly cash flow growth in a valuation (%)" path="risk.max_valuation_growth" errors={errors} inputMode="decimal" value={form.risk_max_valuation_growth} onChange={(v) => set({ risk_max_valuation_growth: v })} hint="Flags saved valuations with faster growth in any year." />
         <SelectField label="On breach" path="risk.on_breach" errors={errors} value={form.risk_on_breach} options={ON_BREACH} onChange={(v) => set({ risk_on_breach: v })} />
       </div>
+      <TierSettings form={form} set={set} />
     </Blueprint>
+  );
+}
+
+/** Automatic risk tiers: the editor's only control over `risk.auto_tiers`; the thresholds it
+ *  names are read from the saved strategy (defaults where none is set). */
+function TierSettings({ form, set }: Pick<SectionProps, "form" | "set">) {
+  const extra = form.risk_extra;
+  const spec = Math.round((extra.tier_speculative_volatility ?? 0.35) * 100);
+  const core = Math.round((extra.tier_core_max_volatility ?? 0.25) * 100);
+  const small = (extra.tier_speculative_market_cap ?? 2e9) / 1e9;
+  const large = (extra.tier_core_min_market_cap ?? 1e10) / 1e9;
+  return (
+    <div className="space-y-2 border-t border-border-soft pt-4">
+      <h3 className="text-sm font-semibold">Risk tiers</h3>
+      <CheckboxField
+        label="Work out each holding's tier from its own numbers"
+        checked={extra.auto_tiers ?? false}
+        onChange={(v) => set({ risk_extra: { ...extra, auto_tiers: v } })}
+        hint={
+          <>
+            Speculative: a year&apos;s volatility above {spec}%, a market cap below ${small}bn, or no profit. Core: a market cap above ${large}bn,
+            volatility at or below {core}% and profitable. Growth: everything else. A fund is judged on volatility alone. Re-worked at every
+            sync; a tier you set by hand under Categories still wins, and a holding that changes tier is listed for you to check.
+          </>
+        }
+      />
+    </div>
   );
 }
 
