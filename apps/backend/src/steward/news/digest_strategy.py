@@ -294,6 +294,7 @@ def _implication(
     start_value: float | None,
     end_value: float | None,
     no_tiers: bool = False,
+    start_words: str = "at the start of the period",
 ) -> str:
     """A factual sentence: the weight against the owner's target, the move, and the owner's own
     rule text where there is one. It never says what to do."""
@@ -307,10 +308,12 @@ def _implication(
             text += f", {verb} from {_shown(start_value, item.unit)}"
         else:
             text += f", about where it was ({_shown(start_value, item.unit)})"
+        if start_words != "at the start of the period":
+            text += f" {start_words}"
     text += "."
     phrase = {
-        "new": " It was within the target at the start of the period.",
-        "cleared": " It was outside the target at the start of the period.",
+        "new": f" It was within the target {start_words}.",
+        "cleared": f" It was outside the target {start_words}.",
         "worse": " It was already outside the target and is further outside now.",
         "better": " It was already outside the target and is closer now.",
         "unchanged": " It was outside the target throughout." if status == "outside" else "",
@@ -334,11 +337,19 @@ def strategy_deviations(
     end: DriftReport | None,
     strategy: StrategyConfig,
     names: Mapping[str, str] | None = None,
+    first_snapshot: dt.date | None = None,
 ) -> list[StrategyDeviation]:
     """Every enabled rule plus the cash target and the category targets, read on the drift
     reports at the start and end of the window. Outside items come first, the furthest outside
     first, then the rest by label. A rule over many positions or buckets is shown by its worst
-    subject (the one furthest outside at the end, else the one with the largest value)."""
+    subject (the one furthest outside at the end, else the one with the largest value).
+    `first_snapshot` is set when the window opens before the first portfolio snapshot and
+    `start` was read on that snapshot instead; the sentences then name its date."""
+    start_words = (
+        f"on {first_snapshot.day} {first_snapshot:%b}, the first portfolio snapshot"
+        if first_snapshot is not None
+        else "at the start of the period"
+    )
     out: list[tuple[tuple[int, float, str], StrategyDeviation]] = []
     names = names or {}
     no_tiers = untiered(end)
@@ -377,7 +388,7 @@ def strategy_deviations(
             status=status,
             change=change,
             implication=_implication(
-                item, label, status, change, before.value, after.value, no_tiers
+                item, label, status, change, before.value, after.value, no_tiers, start_words
             ),
         )
         rank = {"outside": 0, "within": 1, "unknown": 2}[status]
@@ -387,15 +398,22 @@ def strategy_deviations(
 
 
 async def _drift_at(
-    pool: asyncpg.Pool, day: dt.date, strategy: StrategyConfig
-) -> DriftReport | None:
-    """The drift report of the newest snapshot taken on or before `day`, None when there is
-    none (the portfolio was not yet synced)."""
+    pool: asyncpg.Pool, day: dt.date, strategy: StrategyConfig, until: dt.date | None = None
+) -> tuple[dt.date, DriftReport] | None:
+    """The drift report of the newest snapshot taken on or before `day`. With `until`, when
+    there is none, the oldest snapshot up to `until` (a window that opens before the first
+    sync). None when there is no snapshot at all."""
     account = await pool.fetchrow(
         "select snapshot_date, cash_base from public.account_snapshot"
         " where snapshot_date <= $1 order by snapshot_date desc limit 1",
         day,
     )
+    if account is None and until is not None:
+        account = await pool.fetchrow(
+            "select snapshot_date, cash_base from public.account_snapshot"
+            " where snapshot_date <= $1 order by snapshot_date limit 1",
+            until,
+        )
     if account is None:
         return None
     rows = await pool.fetch(
@@ -404,7 +422,7 @@ async def _drift_at(
         account["snapshot_date"],
     )
     holdings = [HoldingValue(r["ticker"], r["instrument_currency"], r["value_base"]) for r in rows]
-    return compute_drift(holdings, account["cash_base"], strategy)
+    return account["snapshot_date"], compute_drift(holdings, account["cash_base"], strategy)
 
 
 async def load_strategy_deviations(
@@ -415,10 +433,15 @@ async def load_strategy_deviations(
     if stored is None:
         return []
     strategy = await with_saved_tiers(pool, stored.body)
-    start = await _drift_at(pool, window_start.date(), strategy)
     end = await _drift_at(pool, window_end.date(), strategy)
+    start = await _drift_at(pool, window_start.date(), strategy, until=window_end.date())
+    if start is not None and end is not None and start[0] == end[0]:
+        start = None  # one snapshot only: there is no start to compare with
+    first = start[0] if start is not None and start[0] > window_start.date() else None
     rows = await pool.fetch(
         "select t212_ticker, name from public.instrument where name is not null"
     )
     names = {r["t212_ticker"]: r["name"] for r in rows}
-    return strategy_deviations(start, end, strategy, names)
+    return strategy_deviations(
+        start[1] if start else None, end[1] if end else None, strategy, names, first
+    )

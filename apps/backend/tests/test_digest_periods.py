@@ -197,6 +197,15 @@ def test_no_start_snapshot_leaves_the_change_unknown() -> None:
     assert "could not be read" in cash.implication
 
 
+def test_a_window_before_the_first_snapshot_names_the_date_it_reads() -> None:
+    first = dt.date(2026, 9, 27)
+    rows = strategy_deviations(drift(20, 40, 40), drift(27, 40, 33), strategy(), None, first)
+    cash = by_key(rows)["cash"]
+    assert cash.start_value == pytest.approx(0.2)
+    assert cash.change == "worse"
+    assert "up from 20% on 27 Sep, the first portfolio snapshot." in cash.implication
+
+
 def test_no_snapshot_at_all_gives_unknown_rows() -> None:
     rows = strategy_deviations(None, None, strategy())
     assert rows
