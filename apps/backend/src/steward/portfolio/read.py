@@ -540,21 +540,36 @@ class ContributionReport(BaseModel):
     gap: str | None = Field(description="Why there is no contribution report, when there is none.")
 
 
-async def contribution_to_return(pool: asyncpg.Pool, days: int) -> ContributionReport:
-    latest_date = await pool.fetchval("select max(snapshot_date) from public.position_snapshot")
+async def contribution_to_return(
+    pool: asyncpg.Pool,
+    days: int,
+    *,
+    start: dt.date | None = None,
+    end: dt.date | None = None,
+) -> ContributionReport:
+    latest_date = (
+        await pool.fetchval(
+            "select max(snapshot_date) from public.position_history where snapshot_date <= $1",
+            end,
+        )
+        if end is not None
+        else await pool.fetchval("select max(snapshot_date) from public.position_snapshot")
+    )
     if latest_date is None:
         return ContributionReport(
             as_of=None, period_start=None, base_currency=None, holdings=[],
             gap="no position snapshot yet",
         )  # fmt: skip
 
-    since = latest_date - dt.timedelta(days=days)
+    since = start or latest_date - dt.timedelta(days=days)
     rows = await pool.fetch(
         "select p.snapshot_date, p.ticker, i.name, p.quantity, p.avg_price, p.fx_rate,"
         " p.value_base from public.position_history p"
         " left join public.instrument i on i.t212_ticker = p.ticker"
-        " where p.snapshot_date >= $1 order by p.ticker, p.snapshot_date",
+        " where p.snapshot_date >= $1 and p.snapshot_date <= $2"
+        " order by p.ticker, p.snapshot_date",
         since,
+        latest_date,
     )
     if not rows:
         return ContributionReport(

@@ -399,6 +399,23 @@ async def test_buying_more_of_a_holding_does_not_inflate_its_contribution(
 
 
 @pytestmark_db
+async def test_a_dated_window_counts_only_its_own_days(backend_pool: asyncpg.Pool) -> None:
+    # A digest asks for its own window; a later session must not leak into it.
+    job_id = await _job(backend_pool)
+    for i, (total, value) in enumerate([(1000, 100), (1010, 110), (1050, 150)]):
+        await _snapshot(backend_pool, job_id, day(i), Decimal(total))
+        await _position(
+            backend_pool, job_id, day(i), "AAPL_US_EQ",
+            quantity=Decimal(10), avg_price=Decimal(10), value_base=Decimal(value),
+        )  # fmt: skip
+
+    result = await contribution_to_return(backend_pool, 1, start=day(0), end=day(1))
+    assert (result.period_start, result.as_of) == (day(0), day(1))
+    [holding] = result.holdings
+    assert round(holding.contribution_base, 4) == 10.0
+
+
+@pytestmark_db
 async def test_holdings_are_ranked_by_contribution_largest_first(
     backend_pool: asyncpg.Pool,
 ) -> None:

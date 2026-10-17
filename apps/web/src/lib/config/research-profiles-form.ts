@@ -221,6 +221,7 @@ export const PROFILE_DEFAULTS = {
   cheap_sections: [] as CheapSection[],
   cheap_model: "gpt-6-luna",
   cheap_effort: "medium",
+  planner_effort: "low",
   follow_up_cheap: false,
   search_mode: "model",
   scout_model: "gpt-6-luna",

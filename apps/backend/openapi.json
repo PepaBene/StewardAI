@@ -2103,7 +2103,7 @@
           "portfolio"
         ],
         "summary": "Get Portfolio Contribution",
-        "description": "Every holding's contribution to the portfolio's return over the window, in base\ncurrency: its own trading (buying or selling more of it) netted out, so a holding is\nranked by what the market actually did to it, not by how much was bought or sold.\nEmpty (with `gap` set) before the first sync, or with no position snapshot in the\nwindow.",
+        "description": "Every holding's contribution to the portfolio's return over the window, in base\ncurrency: its own trading (buying or selling more of it) netted out, so a holding is\nranked by what the market actually did to it, not by how much was bought or sold.\nThe window is the `days` before the latest snapshot, or `start` to `end` when given (a\ndigest's own window). Empty (with `gap` set) before the first sync, or with no position\nsnapshot in the window.",
         "operationId": "get_portfolio_contribution",
         "security": [
           {
@@ -2121,6 +2121,40 @@
               "minimum": 1,
               "default": 365,
               "title": "Days"
+            }
+          },
+          {
+            "name": "start",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Start"
+            }
+          },
+          {
+            "name": "end",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "End"
             }
           }
         ],
@@ -56121,6 +56155,12 @@
             "description": "Largest gap between the declared gross and the received amount (net of withholding) as a share of the declared amount that still counts as agreeing.",
             "default": 0.35
           },
+          "confirm_from_filings": {
+            "type": "boolean",
+            "title": "Confirm From Filings",
+            "description": "Confirm a suggested dividend event automatically when the issuer's filed per-share dividend for a nearby quarter agrees (history from before the holding has no payment to match). Older history is confirmed only when the filings agree with at least four of the holding's events and contradict none.",
+            "default": true
+          },
           "match_window_days": {
             "type": "integer",
             "maximum": 90.0,
@@ -58223,6 +58263,12 @@
             "minimum": 0.0,
             "title": "Max Searches",
             "default": 15
+          },
+          "search_via_api": {
+            "type": "boolean",
+            "title": "Search Via Api",
+            "description": "Cost lever: search for context through a plain search API (needs BRAVE_API_KEY) instead of the model provider's built-in search, and keep identical searches for a day. The model then only reads titles, snippets and links of outlets in the allowed tiers. Falls back to the provider's search when no key is set.",
+            "default": false
           },
           "min_severity": {
             "type": "integer",
@@ -89006,6 +89052,12 @@
             "description": "Web searches per corroboration call.",
             "default": 10
           },
+          "corroboration_search_via_api": {
+            "type": "boolean",
+            "title": "Corroboration Search Via Api",
+            "description": "Cost lever: run the corroboration searches through a plain search API (needs BRAVE_API_KEY) instead of the model provider's built-in search, and keep identical searches for a day. The model then only reads the titles, snippets and links of outlets in the allowed tiers. Falls back to the provider's search when no key is set.",
+            "default": false
+          },
           "corroboration_rounds": {
             "type": "integer",
             "maximum": 20.0,
@@ -107209,6 +107261,17 @@
             ],
             "title": "Planner Model",
             "description": "The model that writes the plan; unset = the claim verifier's."
+          },
+          "planner_effort": {
+            "type": "string",
+            "enum": [
+              "low",
+              "medium",
+              "high"
+            ],
+            "title": "Planner Effort",
+            "description": "Reasoning effort of the planning call. Deciding what is worth researching about a company is the run's hardest judgement: medium or high on a strong model.",
+            "default": "low"
           },
           "engine": {
             "type": "string",

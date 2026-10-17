@@ -746,8 +746,9 @@ export interface paths {
          * @description Every holding's contribution to the portfolio's return over the window, in base
          *     currency: its own trading (buying or selling more of it) netted out, so a holding is
          *     ranked by what the market actually did to it, not by how much was bought or sold.
-         *     Empty (with `gap` set) before the first sync, or with no position snapshot in the
-         *     window.
+         *     The window is the `days` before the latest snapshot, or `start` to `end` when given (a
+         *     digest's own window). Empty (with `gap` set) before the first sync, or with no position
+         *     snapshot in the window.
          */
         get: operations["get_portfolio_contribution"];
         put?: never;
@@ -18717,6 +18718,12 @@ export interface components {
              */
             auto_confirm_tolerance: number;
             /**
+             * Confirm From Filings
+             * @description Confirm a suggested dividend event automatically when the issuer's filed per-share dividend for a nearby quarter agrees (history from before the holding has no payment to match). Older history is confirmed only when the filings agree with at least four of the holding's events and contradict none.
+             * @default true
+             */
+            confirm_from_filings: boolean;
+            /**
              * Match Window Days
              * @description Days around the pay date (or ex-date) a payment may land.
              * @default 21
@@ -19573,6 +19580,12 @@ export interface components {
              * @default 15
              */
             max_searches: number;
+            /**
+             * Search Via Api
+             * @description Cost lever: search for context through a plain search API (needs BRAVE_API_KEY) instead of the model provider's built-in search, and keep identical searches for a day. The model then only reads titles, snippets and links of outlets in the allowed tiers. Falls back to the provider's search when no key is set.
+             * @default false
+             */
+            search_via_api: boolean;
             /**
              * Min Severity
              * @default 2
@@ -30055,6 +30068,12 @@ export interface components {
              */
             corroboration_max_searches: number;
             /**
+             * Corroboration Search Via Api
+             * @description Cost lever: run the corroboration searches through a plain search API (needs BRAVE_API_KEY) instead of the model provider's built-in search, and keep identical searches for a day. The model then only reads the titles, snippets and links of outlets in the allowed tiers. Falls back to the provider's search when no key is set.
+             * @default false
+             */
+            corroboration_search_via_api: boolean;
+            /**
              * Corroboration Rounds
              * @description Corroboration searches per story: one when it is first seen, the rest spread over the re-check window.
              * @default 3
@@ -36562,6 +36581,13 @@ export interface components {
              * @description The model that writes the plan; unset = the claim verifier's.
              */
             planner_model?: string | null;
+            /**
+             * Planner Effort
+             * @description Reasoning effort of the planning call. Deciding what is worth researching about a company is the run's hardest judgement: medium or high on a strong model.
+             * @default low
+             * @enum {string}
+             */
+            planner_effort: "low" | "medium" | "high";
             /**
              * Engine
              * @description fixed: one writer call per section, searching inside it. agentic: specialist workers gather findings first (cheap model, own tools, own caps), then the profile's model writes each section from them. Both keep the claim check.
@@ -47116,6 +47142,8 @@ export interface operations {
         parameters: {
             query?: {
                 days?: number;
+                start?: string | null;
+                end?: string | null;
             };
             header?: never;
             path?: never;

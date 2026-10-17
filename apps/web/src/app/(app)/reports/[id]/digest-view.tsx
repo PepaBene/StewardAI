@@ -37,6 +37,7 @@ import {
   type DigestFactSource,
   type DigestSentence,
   type DigestSource,
+  type PortfolioHistory,
   type ReportOut,
 } from "@/lib/api/client";
 import { formatPct, formatSigned } from "@/lib/charts/format";
@@ -73,7 +74,10 @@ import {
   whatHappened,
   windowReturn,
   type Ratio,
+  type WindowReturn,
 } from "@/lib/reports/digest-overview";
+import { moversSentence, splitMovers, type Mover } from "@/lib/verdicts/movers";
+import { shortTicker } from "@/lib/portfolio/ticker";
 import { isExternalUrl } from "@/lib/sources/sources";
 import { cn } from "@/lib/utils";
 import { decodeEntities } from "@/lib/news/entities";
@@ -217,7 +221,28 @@ function useOptional<T>(fetcher: () => Promise<{ data?: T }>): T | null | undefi
 const fetchTrust = () => getBrowserApiClient().GET("/sources/trust");
 const fetchHoldings = () => getBrowserApiClient().GET("/portfolio/holdings");
 const fetchAlerts = () => getBrowserApiClient().GET("/alerts", { params: { query: { limit: 100 } } });
-const fetchMovers = () => getBrowserApiClient().GET("/portfolio/contribution", { params: { query: { days: 1 } } });
+
+/**
+ * Each holding's contribution over the digest's own window (the closes the hero's portfolio
+ * move spans), not the latest session. Undefined while loading, null when there is none.
+ */
+function useWindowMovers(window: WindowReturn | null | undefined): ContributionReport | null | undefined {
+  const [value, setValue] = useState<ContributionReport | null | undefined>(undefined);
+  const key = window === undefined ? "" : window ? `${window.from}/${window.to}` : "none";
+  useEffect(() => {
+    let cancelled = false;
+    if (key === "" || key === "none") return;
+    const [start, end] = key.split("/");
+    getBrowserApiClient()
+      .GET("/portfolio/contribution", { params: { query: { start, end } } })
+      .then(({ data }) => !cancelled && setValue(data ?? null))
+      .catch(() => !cancelled && setValue(null));
+    return () => {
+      cancelled = true;
+    };
+  }, [key]);
+  return key === "none" ? null : value;
+}
 
 /** Trust scores the owner's feedback has moved, by host (unlisted hosts are at 1). */
 function useTrust(): Map<string, { score: number; demoted: boolean }> {
@@ -235,7 +260,20 @@ function Digest({ report }: { report: ReportOut }) {
   const trust = useTrust();
   const holdings = useOptional(fetchHoldings);
   const alerts = useOptional(fetchAlerts);
-  const movers = useOptional(fetchMovers);
+  const history = usePortfolioHistory();
+  const days = digestDays(body);
+  const own = history ? windowReturn(history.points, days.start, days.end) : history === null ? null : undefined;
+  const bench = history ? windowReturn(history.benchmark, days.start, days.end) : null;
+  const movers = useWindowMovers(own);
+  const moverRows = useMemo(
+    () =>
+      (movers?.holdings ?? [])
+        .filter((h) => h.contribution_pct !== null)
+        .map((h) => ({ ticker: h.ticker, name: h.name || shortTicker(h.ticker), pct: h.contribution_pct ?? 0 })),
+    [movers],
+  );
+  const benchName = history?.benchmark_symbol ? indexName(history.benchmark_symbol) : "benchmark";
+  const moved = own && movers && !movers.gap ? moversSentence(own.pct, bench ? { pct: bench.pct, name: benchName } : null, moverRows) : null;
   const happened = useMemo(() => whatHappened(body), [body]);
   const checks = digestChecks(body, holdings ? holdings.holdings.map((h) => h.ticker) : null);
 
@@ -243,7 +281,7 @@ function Digest({ report }: { report: ReportOut }) {
   // the reports page's right-hand pane, where viewport breakpoints squeezed it into slivers.
   return (
     <div className="@container flex flex-col gap-5">
-      <Hero report={report} alerts={alerts ?? null} />
+      <Hero report={report} alerts={alerts ?? null} history={history} own={own ?? null} bench={bench} moved={moved} />
 
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-text-muted">
         <AsOfLabel at={body.window_end} kind={digestFreshnessKind(body.kind)} nextDueAt={report.next_due_at} prefix="News as of" />
@@ -257,7 +295,7 @@ function Digest({ report }: { report: ReportOut }) {
 
       <AskAboutSelection>
         <div className="grid grid-cols-1 gap-5 @4xl:grid-cols-2">
-          <Movers movers={movers} />
+          <Movers movers={movers} rows={moverRows} />
           <Blueprint aria-labelledby="happened-heading" className="flex flex-col gap-3 px-6 py-5">
             <PanelHeading
               kicker="What happened"
@@ -456,12 +494,23 @@ function Digest({ report }: { report: ReportOut }) {
 }
 
 /** The accent hero: headline, the portfolio's move over the digest window, vs benchmark, alerts. */
-function Hero({ report, alerts }: { report: ReportOut; alerts: AlertOut[] | null }) {
+function Hero({
+  report,
+  alerts,
+  history,
+  own,
+  bench,
+  moved,
+}: {
+  report: ReportOut;
+  alerts: AlertOut[] | null;
+  history: PortfolioHistory | null | undefined;
+  own: WindowReturn | null;
+  bench: WindowReturn | null;
+  moved: string | null;
+}) {
   const body = report.body;
-  const history = usePortfolioHistory();
   const days = digestDays(body);
-  const own = history ? windowReturn(history.points, days.start, days.end) : null;
-  const bench = history ? windowReturn(history.benchmark, days.start, days.end) : null;
   const spark = history ? historyUpTo(history.points, days.end, 10) : [];
   const times = alerts ? telegramTimes(alerts, body.window_start, body.window_end) : [];
   const vs = own && bench ? (own.pct - bench.pct) * 100 : null;
@@ -479,6 +528,7 @@ function Hero({ report, alerts }: { report: ReportOut; alerts: AlertOut[] | null
             {body.nothing_material ? <CheckCircle2Icon aria-hidden="true" className="mt-1.5 size-6 shrink-0" /> : null}
             {decodeEntities(body.headline)}
           </h2>
+          {moved ? <p className="mt-2 max-w-[62ch] text-sm leading-snug">{moved}</p> : null}
           <p className="mt-1 text-xs opacity-85">{report.title}</p>
         </div>
         <HeroStat
@@ -519,54 +569,62 @@ function HeroStat({ label, value, sub, children }: { label: string; value: strin
   );
 }
 
-/** Contribution of each holding to the latest session's return (`/portfolio/contribution?days=1`). */
-function Movers({ movers }: { movers: ContributionReport | null | undefined }) {
-  const rows = (movers?.holdings ?? []).filter((h) => h.contribution_pct !== null);
-  const max = Math.max(1e-9, ...rows.map((h) => Math.abs(h.contribution_pct ?? 0)));
-  const moved = rows.some((h) => (h.contribution_pct ?? 0) !== 0);
+/** Each holding's contribution over the digest's own days (`/portfolio/contribution?start&end`). */
+function Movers({ movers, rows }: { movers: ContributionReport | null | undefined; rows: Mover[] }) {
+  const { up, down, still } = splitMovers(rows, 5);
+  const max = Math.max(1e-9, ...[...up, ...down].map((m) => Math.abs(m.pct)));
   return (
     <Blueprint aria-labelledby="movers-heading" className="flex flex-col gap-3 px-6 py-5">
-      <PanelHeading kicker="Movers" title={<span id="movers-heading">Contribution to the latest session</span>} />
+      <PanelHeading kicker="Movers" title={<span id="movers-heading">What moved the portfolio</span>} />
       {movers === undefined ? <p className="text-sm text-text-muted">Loading…</p> : null}
-      {movers === null ? <p className="text-sm text-text-muted">Contribution is unavailable.</p> : null}
+      {movers === null ? <p className="text-sm text-text-muted">Contribution is unavailable for this digest&rsquo;s days.</p> : null}
       {movers && movers.gap ? <p className="text-sm text-text-muted">{movers.gap}</p> : null}
       {movers && !movers.gap ? (
         <p className="num text-xs text-text-muted">
-          {movers.period_start && movers.as_of ? `${formatDate(movers.period_start)} → ${formatDate(movers.as_of)}` : null}
-          {" · "}percentage points of the portfolio; the latest session, not necessarily this digest&rsquo;s day.
+          {movers.period_start && movers.as_of ? `Closes ${formatDate(movers.period_start)} → ${formatDate(movers.as_of)}, ` : null}
+          in percentage points of the portfolio.
         </p>
       ) : null}
-      {movers && !movers.gap && rows.length > 0 && !moved ? (
-        <p className="text-sm text-text-muted">No holding moved between these snapshots (no trading session).</p>
+      {movers && !movers.gap && up.length + down.length === 0 ? (
+        <p className="text-sm text-text-muted">No holding moved the portfolio by 0.01 points or more.</p>
       ) : null}
-      {rows.length > 0 && moved ? (
-        <ul className="m-0 flex list-none flex-col gap-1.5 p-0" aria-label="Contribution by holding">
-          {rows.map((h) => {
-            const v = h.contribution_pct ?? 0;
-            const w = (Math.abs(v) / max) * 50;
-            return (
-              <li key={h.ticker} className="grid grid-cols-[5.5rem_1fr_4.5rem] items-center gap-3 text-xs">
-                <Link href={`/companies/${encodeURIComponent(h.ticker)}`} className="truncate font-mono text-xs hover:underline" title={h.name ?? h.ticker}>
-                  {h.ticker}
-                </Link>
-                <span aria-hidden="true" className="relative h-3">
-                  <span className="absolute inset-y-[-2px] left-1/2 w-px bg-border" />
-                  {v !== 0 ? (
-                    <span
-                      className={cn("absolute inset-y-0", v > 0 ? "bg-accent" : "bg-loss")}
-                      style={{ left: v > 0 ? "50%" : `${50 - w}%`, width: `${w}%` }}
-                    />
-                  ) : null}
-                </span>
-                <span className={cn("num text-right", v > 0 ? "text-gain" : v < 0 ? "text-loss" : "text-text-muted")}>
-                  {formatSigned(v * 100, 2)} pp
-                </span>
-              </li>
-            );
-          })}
-        </ul>
+      {up.length + down.length > 0 ? (
+        <div className="grid grid-cols-1 gap-4 @xl:grid-cols-2">
+          <MoverList title="Pulled it down" movers={down} max={max} />
+          <MoverList title="Lifted it" movers={up} max={max} />
+        </div>
+      ) : null}
+      {movers && !movers.gap && still > 0 && up.length + down.length > 0 ? (
+        <p className="text-xs text-text-muted">
+          {still} other holding{still === 1 ? "" : "s"} moved it less than 0.01 points.
+        </p>
       ) : null}
     </Blueprint>
+  );
+}
+
+function MoverList({ title, movers, max }: { title: string; movers: Mover[]; max: number }) {
+  return (
+    <div className="min-w-0">
+      <p className="text-xs font-semibold text-text-muted">{title}</p>
+      {movers.length === 0 ? (
+        <p className="mt-1.5 text-xs text-text-muted">No holding.</p>
+      ) : (
+        <ul className="m-0 mt-1.5 flex list-none flex-col gap-1.5 p-0" aria-label={title}>
+          {movers.map((m) => (
+            <li key={m.ticker} className="grid grid-cols-[minmax(0,1fr)_5rem_4.5rem] items-center gap-3 text-xs">
+              <Link href={`/companies/${encodeURIComponent(m.ticker)}`} className="min-w-0 truncate hover:underline">
+                <EntityName id={m.ticker} name={m.name} chip={false} />
+              </Link>
+              <span aria-hidden="true" className="relative h-2.5 bg-surface-muted">
+                <span className={cn("absolute inset-y-0 left-0", m.pct > 0 ? "bg-gain" : "bg-loss")} style={{ width: `${(Math.abs(m.pct) / max) * 100}%` }} />
+              </span>
+              <span className={cn("num text-right", m.pct > 0 ? "text-gain" : "text-loss")}>{formatSigned(m.pct * 100, 2)} pp</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   );
 }
 

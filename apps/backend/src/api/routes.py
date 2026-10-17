@@ -138,13 +138,16 @@ async def get_portfolio_contribution(
     pool: Pool,
     _owner: Owner,
     days: Annotated[int, Query(ge=1, le=3700)] = 365,
+    start: dt.date | None = None,
+    end: dt.date | None = None,
 ) -> ContributionReport:
     """Every holding's contribution to the portfolio's return over the window, in base
     currency: its own trading (buying or selling more of it) netted out, so a holding is
     ranked by what the market actually did to it, not by how much was bought or sold.
-    Empty (with `gap` set) before the first sync, or with no position snapshot in the
-    window."""
-    return await contribution_to_return(pool, days)
+    The window is the `days` before the latest snapshot, or `start` to `end` when given (a
+    digest's own window). Empty (with `gap` set) before the first sync, or with no position
+    snapshot in the window."""
+    return await contribution_to_return(pool, days, start=start, end=end)
 
 
 @router.get("/portfolio/risk", tags=["portfolio"])
