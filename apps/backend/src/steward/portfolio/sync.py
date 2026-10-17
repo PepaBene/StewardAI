@@ -160,6 +160,10 @@ async def portfolio_sync(ctx: JobContext, deps: SyncDeps) -> None:
                 from steward.portfolio.risk_tier import with_saved_tiers
 
                 strategy = await with_saved_tiers(pool, strategy)
+    else:
+        from steward.portfolio.classify import with_derived_classes
+
+        strategy = await with_derived_classes(pool, strategy)
 
     async with ctx.step("drift") as step:
         report = compute_drift(

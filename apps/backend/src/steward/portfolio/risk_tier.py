@@ -298,8 +298,11 @@ async def save_tiers(pool: asyncpg.Pool, tiers: Mapping[str, DerivedTier]) -> No
 
 
 async def with_saved_tiers(pool: asyncpg.Pool, strategy: StrategyConfig) -> StrategyConfig:
-    """The strategy with the stored tiers filled in, when it asks for them. Read paths use this;
-    it never fails a page."""
+    """The strategy with the stored tiers filled in, when it asks for them, and the derived
+    sectors and countries (`classify`). Read paths use this; it never fails a page."""
+    from steward.portfolio.classify import with_derived_classes  # classify imports this module
+
+    strategy = await with_derived_classes(pool, strategy)
     if not strategy.risk.auto_tiers:
         return strategy
     try:

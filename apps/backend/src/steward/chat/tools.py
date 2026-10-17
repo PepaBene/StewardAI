@@ -364,7 +364,10 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
         "first while below target, then the most under-represented tier, sector or country, "
         "then the best idea above the hurdle, else a core ETF. Whole shares, every rule, cap, "
         "band and ex-ante limit respected, risk impact per line. Read-only. Use for 'where "
-        "should my next deposit go?'.",
+        "should my next deposit go?' and, with from_cash, for 'what should I do with my "
+        "cash?'. Its notes say what the owner's strategy requires when nothing can be bought "
+        "(cash above its band, no risk tiers, no core ETF): relay them, never 'hold the cash' "
+        "when a note says the strategy puts it to work.",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -372,10 +375,15 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
                     "type": "number",
                     "exclusiveMinimum": 0,
                     "maximum": 1e9,
-                    "description": "Base currency.",
-                }
+                    "description": "Base currency. With from_cash it may be left out: the cash "
+                    "above the strategy's cash target.",
+                },
+                "from_cash": {
+                    "type": "boolean",
+                    "description": "The money is cash already in the account, not a new "
+                    "deposit: it is taken from the cash the portfolio holds.",
+                },
             },
-            "required": ["amount"],
             "additionalProperties": False,
         },
     },
@@ -638,6 +646,17 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
             },
             "additionalProperties": False,
         },
+    },
+    {
+        "name": "theses_overview",
+        "description": "Every thesis as it stands now, in one call: per holding (and bench "
+        "idea) its state (intact, watch, at_risk, unjudged), 0-100 thesis score, KPI "
+        "pass/breach/unknown counts and the breached KPIs, review date, risk-adjusted rank, "
+        "annualised expected return against the strategy's return hurdle, and the latest "
+        "memo's stance. Use it first for 'which theses are at risk', 'how are my theses "
+        "doing', 'what should I sell or add to'; it is current, while reports and memos are "
+        "dated snapshots that may predate the thesis.",
+        "input_schema": {"type": "object", "properties": {}, "additionalProperties": False},
     },
     {
         "name": "strategy_rules",
@@ -977,6 +996,72 @@ class ChatTools:
             self.pool, self.registry, series_id, query, geography, limit
         )
 
+    async def _tool_theses_overview(self) -> dict[str, Any]:
+        """Every thesis as it stands now: KPI verdicts, score and state from the thesis board,
+        the risk-adjusted ranking with the return hurdle, and the latest memo's stance."""
+        from steward.decision.ranking_service import expected_returns
+        from steward.decision.service import NoStrategy
+        from steward.earnings.check import local_today
+        from steward.earnings.read import thesis_board
+
+        board = await thesis_board(self.pool, local_today())
+        try:
+            ranking = await expected_returns(self.pool)
+        except NoStrategy:
+            ranking = None
+        ranked = {r.ticker: r for r in (ranking.rows if ranking else [])}
+        stances = {
+            r["ticker"]: r
+            for r in await self.pool.fetch(
+                "select distinct on (ticker) ticker, stance, created_at from public.thesis_memo"
+                " where status <> 'failed' order by ticker, id desc"
+            )
+        }
+        rows: list[dict[str, Any]] = []
+        for row in board.rows:
+            rank = ranked.get(row.ticker)
+            memo = stances.get(row.ticker)
+            ret = rank.returns if rank else None
+            rows.append(
+                {
+                    "ticker": row.ticker,
+                    "name": row.name,
+                    "held": row.held,
+                    "weight": row.weight,
+                    "state": row.state,
+                    "score": row.score,
+                    "kpis": row.counts,
+                    "breached_kpis": [k.kpi.metric for k in row.kpis if k.status == "breach"],
+                    "review_date": row.review_date,
+                    "review_overdue": row.review_overdue,
+                    "expected_return_annualized": ret.annualized if ret else None,
+                    "meets_hurdle": ret.meets_hurdle if ret else None,
+                    "rank": rank.rank if rank else None,
+                    "why_no_return": rank.reasons if rank and not ret else None,
+                    "latest_memo_stance": memo["stance"] if memo else None,
+                    "latest_memo_at": memo["created_at"] if memo else None,
+                }
+            )
+        sid = self.registry.add(
+            "observation",
+            f"theses_overview:{board.theses_config_version_id}",
+            "Every thesis as it stands now",
+            app_path="/theses",
+            tier=1,
+            snippet=f"{len(rows)} theses; portfolio thesis score {board.portfolio_score}",
+        )
+        return {
+            "source_id": sid,
+            "as_of": board.as_of,
+            "theses_config_version_id": board.theses_config_version_id,
+            "portfolio_score": board.portfolio_score,
+            "return_hurdle": ranking.return_hurdle if ranking else None,
+            "score_method": board.score_method,
+            "states": "intact: no KPI breached; watch: one; at_risk: two or more; unjudged: no "
+            "KPI verdict yet",
+            "rows": rows,
+        }
+
     async def _tool_strategy_rules(self) -> dict[str, Any]:
         return await research_tools.strategy_rules(self.pool, self.registry)
 
@@ -1089,8 +1174,12 @@ class ChatTools:
     async def _tool_start_size(self, ticker: str) -> dict[str, Any]:
         return await analytics_tools.start_size_for(self.pool, self.registry, ticker)
 
-    async def _tool_deposit_allocation(self, amount: float) -> dict[str, Any]:
-        return await analytics_tools.deposit_allocation(self.pool, self.registry, amount)
+    async def _tool_deposit_allocation(
+        self, amount: float | None = None, from_cash: bool = False
+    ) -> dict[str, Any]:
+        return await analytics_tools.deposit_allocation(
+            self.pool, self.registry, amount, from_cash=from_cash
+        )
 
     async def _tool_rotation_candidates(self) -> dict[str, Any]:
         owner = await self._owner()

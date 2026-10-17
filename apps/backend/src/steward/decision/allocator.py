@@ -226,7 +226,11 @@ def allocate(
         if c.price_base <= 0:
             return "no price to size whole shares with"
         if c.is_etf:
-            return None
+            is_core = tier_of.get(c.ticker) == "core" or (
+                strategy_t.classifications.get(c.ticker, {}).get("risk") == "core"
+            )
+            # Only a core ETF is bought without a thesis (principle 2a).
+            return None if is_core else "a fund outside the core needs a thesis to be bought"
         if c.thesis_return is None:
             return "no thesis with a sell target (principle 8a)"
         if c.thesis_return < return_hurdle:
@@ -346,9 +350,10 @@ def allocate(
             "(principle 2c) is below its lower band edge without it."
         )
     if state.spent <= 0:
+        # What to do instead is the strategy's call (`strategy_notes`), not "hold the cash".
         notes.append(
-            "Nothing could be bought: no candidate passes the thesis and return tests and fits "
-            "the limits. Hold the cash, or add a thesis for a bench idea."
+            "Nothing could be bought from the current ideas: none passes the thesis and return "
+            "tests and fits the limits."
         )
     return AllocationPlan(
         amount=amount,
@@ -395,20 +400,41 @@ def _weights(values: dict[str, float], cash: float, strategy: StrategyConfig) ->
 # ------------------------------------------------------------------------------------------ I/O
 
 
-async def allocate_deposit(pool: asyncpg.Pool, amount: float) -> AllocationPlan:
+async def allocate_deposit(
+    pool: asyncpg.Pool, amount: float | None, *, from_cash: bool = False
+) -> AllocationPlan:
     """The plan for a deposit of `amount` (base currency) on the latest synced book. Candidates
-    are the holdings and the bench (theses for stocks not held) with a stored price series."""
+    are the holdings and the bench (theses for stocks not held) with a stored price series.
+
+    `from_cash`: the money is already in the account ("what do I do with my cash?"), so it is
+    taken out of the cash the book holds rather than added on top of it; without an `amount`
+    it is the cash above the strategy's cash target. Adding it on top counted the cash twice,
+    which read as cash at 43% instead of 27% and made every purchase look like it broke the
+    cash rules."""
     book, strategy = await ea.book_from_snapshot(pool)
     if book is None or strategy is None:
         raise LookupError("no portfolio snapshot yet; run the portfolio sync")
     held_values = {p.ticker: p.value_base for p in book.positions}
     currency = {p.ticker: p.currency for p in book.positions}
     cash_before = max(book.total_value - sum(held_values.values()), 0.0)
+    if from_cash:
+        target = strategy.cash_target.target_weight if strategy.cash_target else 0.0
+        spare = max(cash_before - target * book.total_value, 0.0)
+        amount = min(amount, cash_before) if amount is not None else spare
+        cash_before -= amount
+    if amount is None or amount <= 0:
+        raise LookupError("there is no cash above the strategy's cash target to put to work")
     records = await pool.fetch(
-        "select p.ticker, p.quantity, p.value_base from public.position_snapshot p"
+        "select p.ticker, p.quantity, p.value_base, p.current_price from public.position_snapshot p"
         " where p.snapshot_date = (select max(snapshot_date) from public.position_snapshot)"
     )
     quantity = {r["ticker"]: float(r["quantity"] or 0) for r in records}
+    # The broker's own price, in the instrument's currency: a stored series can be another
+    # listing of the same share (AZN's London line in pence for the NYSE line held in USD),
+    # whose close read as a 99% fall against a USD target.
+    broker_price = {
+        r["ticker"]: float(r["current_price"]) for r in records if r["current_price"] is not None
+    }
     theses = await load_active(pool, "theses", ThesesConfig)
     thesis_by = {t.ticker: t for t in (theses.body.theses if theses else [])}
     bench = sorted(t for t in thesis_by if t not in held_values)
@@ -440,7 +466,7 @@ async def allocate_deposit(pool: asyncpg.Pool, amount: float) -> AllocationPlan:
                 None,
                 currency[ticker],
                 value / qty if qty > 0 else 0.0,
-                None,
+                broker_price.get(ticker),
                 is_etf.get(ticker, False),
                 value,
             )
@@ -506,7 +532,56 @@ async def allocate_deposit(pool: asyncpg.Pool, amount: float) -> AllocationPlan:
             "The ex-ante risk model has no forecast for the current book, so the risk limits were "
             "not applied; only the rules, caps and bands were."
         )
+    plan.notes += strategy_notes(
+        strategy2,
+        cash_weight=(cash_before + amount) / book.total_value if book.total_value > 0 else 0.0,
+        tiered=bool(tier_of) or any("risk" in b for b in strategy2.classifications.values()),
+        core_etf=any(c.is_etf and tier_of.get(c.ticker) == "core" for c in candidates),
+    )
     return plan
+
+
+def strategy_notes(
+    strategy: StrategyConfig, *, cash_weight: float, tiered: bool, core_etf: bool
+) -> list[str]:
+    """What the owner's own principles say about the cash when the allocator cannot place it,
+    so "nothing could be bought" never reads as "hold the cash" when the strategy says
+    otherwise (principles 2a and 2c)."""
+    notes: list[str] = []
+    target = strategy.cash_target
+    if target is not None and cash_weight > target.target_weight + target.band:
+        notes.append(
+            f"Cash is {cash_weight:.0%} of the portfolio against a {target.target_weight:.0%} "
+            f"target. Your strategy (2c) puts cash above {target.target_weight + target.band:.0%}"
+            " for more than three months to work in the best bench idea or the core ETFs, so "
+            "holding it is not the strategy's answer."
+        )
+    core_min = next(
+        (
+            float(r.value)
+            for r in strategy.rules
+            if r.enabled
+            and getattr(r, "dimension", None) == "risk"
+            and getattr(r, "bucket", None) == "core"
+            and r.operator == ">="
+        ),
+        None,
+    )
+    if not tiered:
+        notes.append(
+            "No holding has a risk tier (automatic tiers are off in the strategy and none is set "
+            "by hand), so the core"
+            + (f" minimum of {core_min:.0%}" if core_min is not None else "")
+            + " cannot be measured and no purchase can count as core. Turn on automatic tiers "
+            "in the strategy's risk settings."
+        )
+    if not core_etf:
+        notes.append(
+            "No broad global equity ETF is held or on the bench. Your strategy (2a) builds the "
+            "core from one or two low-cost, accumulating UCITS world-equity ETFs, which need no "
+            "thesis; add one to the bench and deposits fill the core with it first."
+        )
+    return notes
 
 
 def _candidate(

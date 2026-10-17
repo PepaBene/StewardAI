@@ -353,21 +353,25 @@ async def start_size_for(pool: asyncpg.Pool, registry: Registry, ticker: str) ->
 
 
 async def deposit_allocation(
-    pool: asyncpg.Pool, registry: Registry, amount: float
+    pool: asyncpg.Pool, registry: Registry, amount: float | None, *, from_cash: bool = False
 ) -> dict[str, Any]:
-    """Where a deposit should go under principle 8c (plan Q5.4)."""
+    """Where a deposit (or, `from_cash`, the cash already held) should go under principle 8c
+    (plan Q5.4)."""
     from steward.decision.allocator import allocate_deposit
 
-    if not isinstance(amount, int | float) or not 0 < amount <= MAX_AMOUNT:
+    if amount is None and not from_cash:
+        return {"error": "give an amount, or from_cash for the cash already in the account"}
+    if amount is not None and (not isinstance(amount, int | float) or not 0 < amount <= MAX_AMOUNT):
         return {"error": f"the amount must be above 0 and at most {MAX_AMOUNT:,.0f}"}
     try:
-        plan = await allocate_deposit(pool, amount)
+        plan = await allocate_deposit(pool, amount, from_cash=from_cash)
     except LookupError as err:
         return {"unavailable": str(err)}
+    what = "Cash allocation" if from_cash else "Deposit allocation"
     sid = registry.add(
         "observation",
-        f"deposit:{amount:.0f}",
-        f"Deposit allocation of {amount:,.0f} {plan.base_currency}",
+        f"{'cash' if from_cash else 'deposit'}:{plan.amount:.0f}",
+        f"{what} of {plan.amount:,.0f} {plan.base_currency}",
         app_path="/risk/deposit",
         tier=1,
         snippet="; ".join(f"{x.ticker} x{x.shares}" for x in plan.lines)[:300],

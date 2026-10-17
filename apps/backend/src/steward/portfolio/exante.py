@@ -716,7 +716,11 @@ async def with_book_tiers(
     changes: list[str] | None = None,
 ) -> StrategyConfig:
     """The strategy with each holding's derived risk tier filled in (and stored), when the
-    strategy asks for derived tiers. Tier changes since the stored tiers go into `changes`."""
+    strategy asks for derived tiers, and the derived sectors and countries. Tier changes since
+    the stored tiers go into `changes`."""
+    from steward.portfolio.classify import with_derived_classes
+
+    strategy = await with_derived_classes(pool, strategy)
     tiers = await derive_for_book(
         pool, book.daily_closes, [p.ticker for p in book.positions], strategy, changes
     )
