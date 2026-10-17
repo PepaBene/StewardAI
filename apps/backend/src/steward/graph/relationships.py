@@ -208,7 +208,9 @@ async def detect_contradictions(pool: asyncpg.Pool, disclosure_id: int) -> list[
                     """select coalesce(sum(reported_share),0) from public.relationship_disclosure
                        where ticker=$1 and relationship=$2 and fiscal_period=$3
                          and share_basis=$4 and status<>'rejected'
-                         and reported_share is not null""",
+                         and reported_share is not null
+                         and claim_shape is distinct from 'group'
+                         and coalesce(counterparty_count, 1) = 1""",
                     d["ticker"],
                     d["relationship"],
                     d["fiscal_period"],

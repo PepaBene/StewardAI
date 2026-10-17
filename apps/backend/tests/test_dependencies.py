@@ -109,6 +109,21 @@ def test_xbrl_concentration_basis_and_names() -> None:
     ]
 
 
+def test_a_residual_bucket_is_skipped_and_a_lettered_customer_is_anonymous() -> None:
+    # Production, 17 Oct 2026: CELH's "All Other" 46% was stored as a named customer (its
+    # shares then summed to 143%), and NVDA's "Accounts Receivable Customer F" as a name.
+    rows = [
+        fact("celh:AllOtherMember", "us-gaap:SalesRevenueNetMember", 0.46),
+        fact("celh:PepsicoIncMember", "us-gaap:SalesRevenueNetMember", 0.43),
+        fact("nvda:AccountsReceivableCustomerFMember", "us-gaap:AccountsReceivableMember", 0.25),
+    ]
+    out = reported_concentrations(rows)
+    assert [(c.counterparty, c.basis) for c in out] == [
+        ("Pepsico Inc", "issuer_revenue"),
+        (None, "other"),
+    ]
+
+
 def test_a_counterparty_that_is_a_holding_is_resolved() -> None:
     holdings = [
         {"ticker": "TSM_US_EQ", "names": ["Taiwan Semiconductor Manufacturing Co., Ltd."]},

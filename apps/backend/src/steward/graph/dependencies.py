@@ -437,6 +437,14 @@ ANONYMOUS_MEMBER = re.compile(
     r"(?i)^(top|major|largest|significant|customer|client|vendor|supplier|distributor|reseller|"
     r"retailer|partner|one|two|three|four|five|a|b|c|d|\d+)( |$)"
 )
+# A member label naming an unnamed counterparty after a benchmark prefix, e.g. NVDA's
+# "Accounts Receivable Customer F", which is the 10-K's anonymous "Customer One" again.
+ANONYMOUS_LABEL = re.compile(
+    r"(?i)\b(customer|client|vendor|supplier|distributor|reseller|partner)s? "
+    r"([a-z]|one|two|three|four|five|six|seven|eight|nine|ten|\d+)$"
+)
+# The residual bucket of a concentration table (CELH's "All Other" 43-46%), not a counterparty.
+RESIDUAL_MEMBER = re.compile(r"(?i)^(all )?(other|others|remaining|rest)( customers?)?$")
 CONCENTRATION_AXES = ("MajorCustomersAxis", "ConcentrationRiskByBenchmarkAxis")
 TYPE_AXIS = "ConcentrationRiskByTypeAxis"
 GROUP_WORDS = re.compile(
@@ -478,6 +486,8 @@ def reported_concentrations(rows: list[asyncpg.Record]) -> list[ReportedConcentr
         if who is None:
             continue
         words = member_words(who)
+        if RESIDUAL_MEMBER.match(words):
+            continue
         if GROUP_WORDS.search(words) and not ANONYMOUS_MEMBER.match(words):
             continue
         benchmark = next((m for a, m in members.items() if "BenchmarkAxis" in a), "")
@@ -497,7 +507,7 @@ def reported_concentrations(rows: list[asyncpg.Record]) -> list[ReportedConcentr
             basis = "issuer_purchases"
         else:
             basis = "other"
-        anonymous = bool(ANONYMOUS_MEMBER.match(words))
+        anonymous = bool(ANONYMOUS_MEMBER.match(words) or ANONYMOUS_LABEL.search(words))
         share = Decimal(str(r["value"]))
         if not Decimal(0) <= share <= Decimal(1):
             continue
