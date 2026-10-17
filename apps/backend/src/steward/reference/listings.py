@@ -56,6 +56,24 @@ NON_FIRDS_COUNTRY: dict[str, str] = {
     "XSWX": "CH", "XTKS": "JP", "XHKG": "HK", "XKRX": "KR", "XTAI": "TW", "XASX": "AU",
     "XSES": "SG",
 }  # fmt: skip
+# FIRDS files a venue's listings under its segment MICs (Xetra as XETA/XETU, not XETR).
+FIRDS_SEGMENTS: dict[str, tuple[str, ...]] = {
+    "XETR": ("XETR", "XETA", "XETB", "XETU", "XETS"),
+    "XFRA": ("XFRA", "FRAA", "FRAB", "FRAU", "FRAS"),
+}
+# A fund has no home market: the line held is the one the broker trades, named by the
+# Trading212 ticker suffix.
+BROKER_VENUE: dict[str, str] = {"d": "XETR", "l": "XLON", "a": "XAMS", "p": "XPAR"}
+FUND_TYPES = frozenset({"mutual fund", "etf", "etp", "unit trust", "open-end fund"})
+MULTI_CURRENCY_VENUES = frozenset({"XLON"})
+
+
+def broker_root(ticker: str) -> tuple[str, str | None]:
+    """The exchange ticker and venue suffix of a Trading212 ticker ("SXRVd_EQ" -> SXRV, d)."""
+    head = ticker.split("_", 1)[0]
+    if "_US_" in ticker or not head[-1:].islower():
+        return head, None
+    return head[:-1], head[-1]
 
 
 @dataclass(frozen=True)
@@ -100,25 +118,35 @@ async def derive_candidate(
         " security_type, share_class_figi from public.instrument where t212_ticker = $1",
         ticker,
     )
-    if inst is None or not inst["home_mic"]:
+    if inst is None:
         return None
-    mic: str = inst["home_mic"]
+    root, suffix = broker_root(ticker)
+    fund = str(inst["security_type"] or "").lower() in FUND_TYPES
+    venue = BROKER_VENUE.get(suffix or "") if fund else None
+    mic_or_none: str | None = venue or inst["home_mic"]
+    if not mic_or_none:
+        return None
+    mic: str = mic_or_none
+    # A market outside FIRDS keeps only stale records there (London's all end 2020-12-31, when
+    # the UK left): they say nothing about the listing today.
     firds = (
         await pool.fetchrow(
             "select currency, status, terminated_at, first_trade_at from public.listing"
-            " where isin = $1 and mic = $2",
+            " where isin = $1 and mic = any($2::text[])"
+            " order by (terminated_at is null) desc, terminated_at desc limit 1",
             inst["isin"],
-            mic,
+            list(FIRDS_SEGMENTS.get(mic, (mic,))),
         )
-        if inst["isin"]
+        if inst["isin"] and mic not in NON_FIRDS_COUNTRY
         else None
     )
     figi = await pool.fetchrow(
         "select figi, listing_ticker from public.instrument_identifier"
         " where ticker = $1 and exch_code = $2 and listing_ticker is not null"
-        " order by (figi = composite_figi) desc, figi limit 1",
+        " order by (listing_ticker = $3) desc, (figi = composite_figi) desc, figi limit 1",
         ticker,
         COMPOSITE_BY_MIC.get(mic),
+        root,
     )
     gaps: list[str] = []
     listing_ticker: str | None = figi["listing_ticker"] if figi else None
@@ -135,12 +163,30 @@ async def derive_candidate(
     # The instrument's currency is the line the broker trades (EUR on Xetra for a Tokyo share);
     # the home listing trades in its own market's currency.
     market_ccy = MARKET_CURRENCY.get(mic)
-    currency = firds_ccy or market_ccy or instrument_ccy
+    # A fund's FIRDS currency is its base currency (USD for a Nasdaq-100 fund), not the
+    # currency its line trades in: that is the broker's line itself (EUR on Xetra; London lists
+    # a fund once per currency, each line under its own ticker, so there the ticker names it).
+    if venue:
+        currency = instrument_ccy or market_ccy
+        currency_agrees = instrument_ccy is not None and (
+            market_ccy == instrument_ccy or mic in MULTI_CURRENCY_VENUES
+        )
+    else:
+        currency = firds_ccy or market_ccy or instrument_ccy
+        currency_agrees = (
+            firds_ccy is not None and instrument_ccy is not None and firds_ccy == instrument_ccy
+        )
     if currency is None:
         return None
     isin_match = firds is not None
-    currency_agrees = (
-        firds_ccy is not None and instrument_ccy is not None and (firds_ccy == instrument_ccy)
+    # The fund line the broker holds: OpenFIGI lists the broker's own ticker on its venue, the
+    # venue trades in the broker's currency, and FIRDS has the ISIN there where it covers it.
+    fund_line = (
+        venue is not None
+        and figi is not None
+        and figi["listing_ticker"] == root
+        and currency_agrees
+        and (isin_match or mic in NON_FIRDS_COUNTRY)
     )
     country = NON_FIRDS_COUNTRY.get(mic)
     # Outside FIRDS the broker's line trades in its own currency (EUR on Xetra for a Tokyo
@@ -151,14 +197,16 @@ async def derive_candidate(
         and bool(inst["isin"])
         and str(inst["isin"])[:2] == country
     )
-    if not isin_match and not outside_firds:
+    if not isin_match and not outside_firds and not fund_line:
         gaps.append("no FIRDS record for the instrument's ISIN on the home MIC")
-    if firds_ccy is not None and instrument_ccy is not None and firds_ccy != instrument_ccy:
+    if venue is not None and not currency_agrees:
+        gaps.append(f"{mic} trades in {market_ccy}, the broker's line in {instrument_ccy}")
+    if venue is None and firds_ccy and instrument_ccy and firds_ccy != instrument_ccy:
         gaps.append(f"FIRDS currency {firds_ccy} differs from the instrument's {instrument_ccy}")
     terminated = _date(firds["terminated_at"]) if firds else None
     status = "terminated" if terminated is not None and terminated <= today else "active"
     score = round(
-        0.45 * (isin_match or outside_firds)
+        0.45 * (isin_match or outside_firds or fund_line)
         + 0.3 * (figi is not None)
         + 0.15 * (currency_agrees or outside_firds)
         + 0.1 * bool(mic),
@@ -169,6 +217,7 @@ async def derive_candidate(
         "isin": inst["isin"],
         "isin_has_firds_record_on_home_mic": isin_match,
         "outside_firds_isin_country_matches": outside_firds,
+        "fund_broker_line": fund_line,
         "openfigi_listing_ticker": listing_ticker if figi else None,
         "openfigi_figi": figi["figi"] if figi else None,
         "currency": {
@@ -196,7 +245,9 @@ async def derive_candidate(
         name=inst["name"] or ticker,
         kind=inst["security_type"] or "equity",
         issuer_lei=inst["issuer_lei"],
-        confirmable=(isin_match and figi is not None and currency_agrees) or outside_firds,
+        confirmable=(isin_match and figi is not None and currency_agrees and venue is None)
+        or outside_firds
+        or fund_line,
         gaps=gaps,
     )
 

@@ -377,8 +377,9 @@ async def test_a_tokyo_home_listing_is_in_yen_not_the_brokers_euro_line() -> Non
     }
 
     def pool(isin: str) -> Any:
+        # Tokyo is outside FIRDS, so no FIRDS record is read.
         answers = iter(
-            [{**instrument, "isin": isin}, None, {"figi": "BBG000BQWLX5", "listing_ticker": "4568"}]
+            [{**instrument, "isin": isin}, {"figi": "BBG000BQWLX5", "listing_ticker": "4568"}]
         )
 
         class FakePool:
