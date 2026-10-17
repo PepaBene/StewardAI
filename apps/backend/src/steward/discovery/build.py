@@ -61,6 +61,8 @@ class StockInputs:
     statement_currency: str | None = None
     # Home-market shares one priced share represents (TSMC's ADS = 5 common shares).
     ads_ratio: Decimal = Decimal(1)
+    # Latest ECB fixings: EUR per one unit of each currency.
+    fx_rates: dict[str, Decimal] = field(default_factory=dict)
     # Latest cached company checks (axis -> 0-6 score or None) and failed risk checks; empty when
     # the issuer has never been checked.
     check_scores: dict[str, Decimal | None] = field(default_factory=dict)
@@ -162,9 +164,21 @@ def _return(closes: Series, as_of: dt.date, days: int) -> tuple[Decimal | None, 
 
 
 def _price_major(member: UniverseMember, closes: Series) -> tuple[Decimal, str] | None:
-    if not closes or not member.currency:
+    # Closes are read by the price symbol, so they are in that market's currency: AZN_US_EQ is
+    # the US ADR (azn.us, in dollars) while its identity links the London listing (GBP).
+    currency = "USD" if (member.price_symbol or "").lower().endswith(".us") else member.currency
+    if not closes or not currency:
         return None
-    return to_major_unit(closes[-1][1], member.currency)
+    return to_major_unit(closes[-1][1], currency)
+
+
+def _fx(price: tuple[Decimal, str], target: str, data: StockInputs) -> Decimal | None:
+    """`price` in `target` at the latest fixings (`data.fx_rates`: EUR per one unit)."""
+    rates = {**data.fx_rates, "EUR": Decimal(1)}
+    src, dst = rates.get(price[1]), rates.get(target)
+    if src is None or not dst:
+        return None
+    return price[0] * src / dst
 
 
 def _roic(
@@ -310,15 +324,21 @@ def stock_record(member: UniverseMember, data: StockInputs, as_of: dt.date) -> R
         cap_reason = "no stored share count"
     elif not statement_ccy:
         cap_reason = "statement currency unknown, so price and share count cannot be matched"
-    elif price[1] != statement_ccy:
+    elif price[1] != statement_ccy and _fx(price, statement_ccy, data) is None:
         cap_reason = f"price currency {price[1]} differs from statement currency {statement_ccy}"
     else:
+        cap_price = price[0]
+        if price[1] != statement_ccy:
+            # ASML's dollar ADS against euro statements: the cap is put in the statement currency
+            # at the latest ECB fixing so the multiples compare like with like.
+            cap_price = _fx(price, statement_ccy, data) or price[0]
+            cap_source += f" (price in {price[1]} converted to {statement_ccy} at the ECB fixing)"
         # Closes are split-adjusted to today's share basis; the filed share count is not, so it is
         # scaled by every split after its period end (see `split_factor`).
         factor, how = split_factor(shares, data.splits, data.restated_shares)
         # The price is per listed share and the filed count is of home-market shares: TSM's
         # $412 ADS times 25.9bn common shares put its P/E at 198x instead of about 40x.
-        market_cap = price[0] * shares[1] * factor / data.ads_ratio
+        market_cap = cap_price * shares[1] * factor / data.ads_ratio
         if how:
             cap_source += f" ({how})"
         if data.ads_ratio != 1:

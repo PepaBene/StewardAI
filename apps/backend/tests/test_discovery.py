@@ -434,6 +434,31 @@ def test_currency_mismatch_blocks_market_cap_and_gbx_is_converted() -> None:
         eur_filer.values["market_cap"].reason or ""
     )
     assert eur_filer.values["earnings_yield"].value is None  # not a guess without a market cap
+    # With an ECB fixing on file, ASML's dollar ADS is put in euros: USD 10 at 0.9 EUR = EUR 9.
+    converted = stock_record(
+        m("Y", currency="USD"),
+        StockInputs(
+            periods=[period(unit="EUR")],
+            closes=closes(30, "10", "0"),
+            shares=[(dt.date(2025, 12, 31), D(10))],
+            fx_rates={"USD": D("0.9")},
+        ),
+        TODAY,
+    )
+    assert converted.values["market_cap"].value == D("9.0") * 10
+    assert "converted to EUR" in (converted.values["market_cap"].source or "")
+    # Closes follow the price symbol: AZN's US line trades in dollars though its identity
+    # carries the London listing's pounds.
+    adr = stock_record(
+        m("A", currency="GBP", price_symbol="azn.us"),
+        StockInputs(
+            periods=[period(unit="USD")],
+            closes=closes(30, "10", "0"),
+            shares=[(dt.date(2025, 12, 31), D(10))],
+        ),
+        TODAY,
+    )
+    assert adr.values["market_cap"].value == D(100)
     pence = stock_record(
         m("Z", currency="GBX"),
         StockInputs(

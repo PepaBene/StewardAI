@@ -428,6 +428,31 @@ async def load_stock_inputs(
         per_listed = r["ads_ratio_reported"] or (default.ads_ratio if default else None)
         if per_listed and r["ticker"] in out:
             out[r["ticker"]].ads_ratio = Decimal(str(per_listed))
+    # No share count in the statements (CSG files no XBRL; QNT's 10-K tags none): the resolved
+    # count the holding page uses, from a filing's cover or the owner's manual figure.
+    missing = [t for t, inputs in out.items() if not inputs.shares]
+    if missing:
+        resolved = await pool.fetch(
+            """select distinct on (ticker) ticker, as_of, shares from public.shares_outstanding
+               where ticker = any($1::text[]) and shares > 0 and as_of <= $2
+                 and ($3::timestamptz is null or fetched_at <= $3)
+               order by ticker, as_of desc, fetched_at desc""",
+            missing,
+            as_of,
+            cutoff,
+        )
+        for r in resolved:
+            out[r["ticker"]].shares = [(r["as_of"], Decimal(str(r["shares"])))]
+    # Latest ECB fixing on or before the as-of date, for a price quoted in another currency than
+    # the statements (ASML's dollar ADS against euro filings).
+    fx = await pool.fetch(
+        """select distinct on (currency) currency, rate from public.fx_rate
+           where source = 'ecb' and rate_date <= $1 order by currency, rate_date desc""",
+        as_of,
+    )
+    rates = {r["currency"]: Decimal(str(r["rate"])) for r in fx}
+    for inputs in out.values():
+        inputs.fx_rates = rates
     # Insider cluster: distinct insiders with counted open-market buys in 90 days.
     ins = await pool.fetch(
         """select f.ticker, count(distinct t.reporting_owner_cik) as buyers
