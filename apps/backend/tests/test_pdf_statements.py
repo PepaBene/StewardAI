@@ -15,11 +15,13 @@ from steward.fundamentals.pdf_statements import (
     accession_of,
     choose_newest,
     has_filed_statements,
+    pages_document,
     parse_printed_number,
     pick_amended,
     pick_documents,
     qualifies,
     quote_page,
+    statement_pages,
     statement_rows,
     to_value,
     validate_lines,
@@ -33,10 +35,10 @@ from steward.sources.xbrl_concepts import STATEMENT_CONCEPTS
     [
         ("1,234.5", Decimal("1234.5")),
         ("1 234", Decimal(1234)),
-        ("1 234 567", Decimal(1234567)),
+        ("1 234 567", Decimal(1234567)),  # noqa: RUF001
         ("(1,234)", Decimal(-1234)),
-        ("– 1,234", Decimal(-1234)),
-        ("−1,234", Decimal(-1234)),
+        ("– 1,234", Decimal(-1234)),  # noqa: RUF001
+        ("−1,234", Decimal(-1234)),  # noqa: RUF001
         ("1.234.567", Decimal(1234567)),
         ("12,5", Decimal("12.5")),
         ("1.234,56", Decimal("1234.56")),
@@ -44,7 +46,9 @@ from steward.sources.xbrl_concepts import STATEMENT_CONCEPTS
         ("0.31", Decimal("0.31")),
     ],
 )
-def test_printed_numbers_parse_with_separators_signs_and_marks(text: str, expected: Decimal) -> None:
+def test_printed_numbers_parse_with_separators_signs_and_marks(
+    text: str, expected: Decimal
+) -> None:
     parsed = parse_printed_number(text)
     assert parsed is not None and parsed[0] == expected
 
@@ -277,7 +281,8 @@ def test_a_report_for_the_same_period_end_amends_the_earlier_one_only() -> None:
 
 HTML = """
 <ul>
- <li>Annual Report 2025 <a href="https://cdn.example.com/files/aaa.pdf">Annual Report 2025 (PDF)</a></li>
+ <li>Annual Report 2025
+  <a href="https://cdn.example.com/files/aaa.pdf">Annual Report 2025 (PDF)</a></li>
  <li>Annual Report 2024 <a href="/files/bbb.pdf">Annual Report 2024</a></li>
  <li><a href="/files/ccc.pdf">H1 2026 results statement</a></li>
  <li><a href="/files/ddd.pdf">Q1 2026 results statement</a></li>
@@ -322,3 +327,44 @@ def test_only_held_non_fund_equities_without_sec_or_esef_facts_qualify() -> None
     assert not q(sources={"sec_xbrl"})
     assert not q(sources={"esef", "issuer_pdf"})
     assert has_filed_statements({"sec_fsds"}) and not has_filed_statements({"issuer_pdf"})
+
+
+HEADER = "CSG Annual Report 2025 Financial Part Consolidated Financial Statements\n375374\n"
+TABLE = "\n".join(f"Line {i} {i},{i:03d} ({i},{i + 1:03d})" for i in range(1, 12))
+
+
+def test_the_titled_statement_pages_are_sent_not_notes_or_parent_only_accounts() -> None:
+    # Production, 17 Oct 2026: the job sent the PDF bytes, which the router drops, so the model
+    # read nothing and made up a statement; the pages now go in as text, and only the
+    # statements: CSG's 282-page annual report prints them on pages 189-193.
+    pages = [
+        "Strategic report",
+        HEADER
+        + "Consolidated Statement \nof Profit or Loss and Other \nComprehensive Income\n"
+        + TABLE,
+        HEADER + "Consolidated Statement \nof Financial Position\n" + TABLE,
+        HEADER + "Attributable to the shareholders of the Company\n" + TABLE,  # runs on
+        HEADER + "Notes to the Consolidated \nFinancial Statements\n1. Description",
+        HEADER + "4) Credit Risk\nAs of the balance sheet date, the\n" + TABLE * 3,
+        "CSG Annual Report 2025 Financial Part Separate Financial Statements\n"
+        "Statement of Profit or Loss\n" + TABLE,
+    ]
+    assert statement_pages(pages) == [2, 3, 4]
+    text = pages_document(pages, [2, 3])
+    assert text.startswith('<page n="2">\nCSG Annual') and '<page n="3">' in text
+
+
+def test_a_statement_opening_at_the_foot_of_a_page_takes_that_page_too() -> None:
+    pages = [
+        "Results statement",
+        "Net debt was 2,914 million.\nGroup Financial Statements\n"
+        "Consolidated Statement of Profit and Loss\nRevenues 3,251 2,775",
+        "Consolidated Statement of Profit and Loss\n(1 Jan - 30 Jun 2026)\n" + TABLE,
+    ]
+    assert statement_pages(pages) == [2, 3]
+
+
+def test_a_report_with_no_titled_page_falls_back_to_the_densest_tables() -> None:
+    pages = ["Chairman's letter", "Key figures\n" + TABLE * 2, "Outlook\n" + TABLE]
+    assert statement_pages(pages, limit=1) == [2]
+    assert statement_pages(["No figures here"]) == []

@@ -11299,6 +11299,22 @@ export interface components {
              */
             peer_refresh_per_run: number;
             /**
+             * Propose Peers
+             * @description Ask the model for the closest listed competitors of each company with fewer than `min_confirmed_peers` confirmed peers (any market, not only the US). They are suggestions, reviewed like the vendor's. Finnhub lists by sector and size: for GOOGL it gave Snap and Reddit, not Microsoft or Amazon.
+             * @default true
+             */
+            propose_peers: boolean;
+            /**
+             * Min Confirmed Peers
+             * @default 4
+             */
+            min_confirmed_peers: number;
+            /**
+             * Peer Proposals Per Run
+             * @default 12
+             */
+            peer_proposals_per_run: number;
+            /**
              * Min Confidence
              * @description Below this the suggestion is left as it is, for the next run or the owner.
              * @default 0.8
@@ -13907,7 +13923,7 @@ export interface components {
              * Critical Job Types
              * @description Job types that run normally at the monthly cap.
              */
-            critical_job_types?: ("portfolio_sync" | "earnings_check" | "thesis_verdicts" | "earnings_calendar" | "earnings_calendar_full" | "earnings_due" | "fact_reconcile" | "reference_data" | "price_history" | "intraday_prices" | "holiday_refresh" | "macro_collect" | "public_data_collect" | "source_audit" | "event_escalation" | "monitor" | "news_ingest" | "daily_digest" | "weekly_digest" | "monthly_digest" | "quarterly_digest" | "research" | "ownership_13f" | "insider_trades" | "etf_look_through" | "monthly_review" | "chat" | "sec_xbrl" | "valuation_refresh" | "control_stakes" | "nport_holdings" | "fund_probes" | "fund_characteristics_audit" | "fund_issuer_facts" | "free_source_alerts" | "change_alerts" | "shadow_snapshot" | "shadow_report" | "raw_retention" | "research_trace_retention" | "zero_cost_gate" | "returns_refresh" | "exchange_probes" | "ir_releases" | "sec_fsds_backfill" | "pdmr_uk" | "graph_review" | "fmp_company" | "alpha_vantage_statements" | "epo_patents" | "companies_house_filings" | "edinet_filings" | "twelve_data_corporate_actions" | "ai_approvals" | "autopilot" | "autopilot_calibration" | "watchdog" | "ir_discovery" | "news_ai_search" | "news_triage" | "news_analysis" | "news_brief" | "gap_research" | "exposure_build" | "document_index" | "inbox_scan" | "inbox_agent" | "factor_returns" | "disclosure_sources" | "disclosure_ingest" | "disclosure_identifiers" | "disclosure_deals" | "disclosure_esef" | "disclosure_estimates" | "disclosure_alerts" | "thesis" | "portfolio_review" | "dividend_forecast" | "yahoo_dividends" | "consensus_snapshot" | "insight_access_probe" | "fair_value_snapshot" | "checks_refresh" | "screen_parse" | "earnings_summary")[];
+            critical_job_types?: ("portfolio_sync" | "earnings_check" | "thesis_verdicts" | "earnings_calendar" | "earnings_calendar_full" | "earnings_due" | "fact_reconcile" | "reference_data" | "price_history" | "intraday_prices" | "holiday_refresh" | "macro_collect" | "public_data_collect" | "source_audit" | "event_escalation" | "monitor" | "news_ingest" | "daily_digest" | "weekly_digest" | "monthly_digest" | "quarterly_digest" | "research" | "ownership_13f" | "insider_trades" | "etf_look_through" | "monthly_review" | "chat" | "sec_xbrl" | "valuation_refresh" | "control_stakes" | "nport_holdings" | "fund_probes" | "fund_characteristics_audit" | "fund_issuer_facts" | "free_source_alerts" | "change_alerts" | "shadow_snapshot" | "shadow_report" | "raw_retention" | "research_trace_retention" | "zero_cost_gate" | "returns_refresh" | "exchange_probes" | "ir_releases" | "sec_fsds_backfill" | "pdmr_uk" | "graph_review" | "fmp_company" | "alpha_vantage_statements" | "epo_patents" | "companies_house_filings" | "edinet_filings" | "twelve_data_corporate_actions" | "ai_approvals" | "autopilot" | "autopilot_calibration" | "watchdog" | "ir_discovery" | "pdf_statements" | "news_ai_search" | "news_triage" | "news_analysis" | "news_brief" | "gap_research" | "exposure_build" | "document_index" | "inbox_scan" | "inbox_agent" | "factor_returns" | "disclosure_sources" | "disclosure_ingest" | "disclosure_identifiers" | "disclosure_deals" | "disclosure_esef" | "disclosure_estimates" | "disclosure_alerts" | "thesis" | "portfolio_review" | "dividend_forecast" | "yahoo_dividends" | "consensus_snapshot" | "insight_access_probe" | "fair_value_snapshot" | "checks_refresh" | "screen_parse" | "earnings_summary")[];
             /**
              * Per Job Cap Usd
              * @description Most AI spend of one run of a job type, in USD. A run over it fails.
@@ -24641,6 +24657,11 @@ export interface components {
              * @description IR financial calendar page with upcoming report dates.
              */
             financial_calendar_url?: string | null;
+            /**
+             * Statement Pdfs
+             * @description Direct links to the company's own annual or interim report PDFs. For a holding with no SEC or ESEF filing, the weekly PDF statements job reads its income statement, balance sheet and cash flow from these (when empty it looks for the newest annual and interim PDFs on the results and investor pages instead).
+             */
+            statement_pdfs?: string[];
             /** Regulatory News Urls */
             regulatory_news_urls?: string[];
             /**
@@ -27083,6 +27104,8 @@ export interface components {
             ai_approvals?: components["schemas"]["JobSchedule"];
             /** @description Finds investor-relations pages for holdings that have none (web search, checked and approved by AI). Default: Mondays 07:30. */
             ir_discovery?: components["schemas"]["JobSchedule"];
+            /** @description Reads the income statement, balance sheet and cash flow from the own PDF reports of held equities that have no SEC or ESEF filing (AI reads the PDF; every value must be quoted from its page). Default: Saturdays 08:20. */
+            pdf_statements?: components["schemas"]["JobSchedule"];
             /** @description Asks a search-capable model for recent news on holdings the wire covers thinly. Results are leads at the lowest tier: they never alert on their own. On by default (it spends on web searches, within the budget). Default: daily 06:20. */
             news_ai_search?: components["schemas"]["JobSchedule"];
             /** @description Triages new wire items on a cheap model: relevance, topic, entities and a one-line gloss. On by default (it spends on a model, within the budget). Default: hourly at :10. */
@@ -27135,6 +27158,7 @@ export interface components {
              */
             fund_documents?: components["schemas"]["FundDocument"][];
             ir_discovery_settings?: components["schemas"]["IrDiscoverySettings"];
+            pdf_statements_settings?: components["schemas"]["PdfStatementsSettings"];
             gap_research_settings?: components["schemas"]["GapResearchSettings"];
             ai_approval?: components["schemas"]["AiApprovalSettings"];
             earnings_calendar_settings?: components["schemas"]["EarningsCalendarSettings"];
@@ -31953,6 +31977,53 @@ export interface components {
             limit_cash: number | string;
             /** Fiscal Year */
             fiscal_year: number | null;
+        };
+        /**
+         * PdfStatementsSettings
+         * @description Reading the income statement, balance sheet and cash flow from a company's own PDF
+         *     report, for held equities no SEC or ESEF filing covers. Every value must be quoted from
+         *     the page it came from; a value whose quote is not found there is dropped, never stored.
+         */
+        PdfStatementsSettings: {
+            /**
+             * Enabled
+             * @description Off: only a manual run (with a ticker) reads a report.
+             * @default true
+             */
+            enabled: boolean;
+            /**
+             * Model
+             * @description Reads the PDF (one call per report).
+             * @default gemini-3.8-flash
+             * @example gpt-6.1-sol
+             * @example gpt-6-luna
+             * @example gemini-3.8-flash
+             */
+            model: string;
+            /**
+             * Effort
+             * @description Unset: effort is not sent and the model's default applies.
+             * @default low
+             */
+            effort: ("low" | "medium" | "high" | "xhigh" | "max") | null;
+            /**
+             * Holdings Per Run
+             * @description Holdings read per run, those never read first.
+             * @default 3
+             */
+            holdings_per_run: number;
+            /**
+             * Docs Per Holding
+             * @description Reports read per holding per run (annual + interim).
+             * @default 2
+             */
+            docs_per_holding: number;
+            /**
+             * Max Pdf Mb
+             * @description Larger PDFs are skipped, not truncated.
+             * @default 40
+             */
+            max_pdf_mb: number;
         };
         /**
          * PdlRefreshResponse

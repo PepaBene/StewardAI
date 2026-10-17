@@ -34619,6 +34619,26 @@
             "title": "Peer Refresh Per Run",
             "default": 8
           },
+          "propose_peers": {
+            "type": "boolean",
+            "title": "Propose Peers",
+            "description": "Ask the model for the closest listed competitors of each company with fewer than `min_confirmed_peers` confirmed peers (any market, not only the US). They are suggestions, reviewed like the vendor's. Finnhub lists by sector and size: for GOOGL it gave Snap and Reddit, not Microsoft or Amazon.",
+            "default": true
+          },
+          "min_confirmed_peers": {
+            "type": "integer",
+            "maximum": 20.0,
+            "minimum": 1.0,
+            "title": "Min Confirmed Peers",
+            "default": 4
+          },
+          "peer_proposals_per_run": {
+            "type": "integer",
+            "maximum": 60.0,
+            "minimum": 1.0,
+            "title": "Peer Proposals Per Run",
+            "default": 12
+          },
           "min_confidence": {
             "type": "number",
             "maximum": 1.0,
@@ -42204,6 +42224,7 @@
                 "autopilot_calibration",
                 "watchdog",
                 "ir_discovery",
+                "pdf_statements",
                 "news_ai_search",
                 "news_triage",
                 "news_analysis",
@@ -42301,6 +42322,7 @@
                 "autopilot_calibration",
                 "watchdog",
                 "ir_discovery",
+                "pdf_statements",
                 "news_ai_search",
                 "news_triage",
                 "news_analysis",
@@ -42411,6 +42433,7 @@
                 "autopilot_calibration",
                 "watchdog",
                 "ir_discovery",
+                "pdf_statements",
                 "news_ai_search",
                 "news_triage",
                 "news_analysis",
@@ -73208,6 +73231,17 @@
             "title": "Financial Calendar Url",
             "description": "IR financial calendar page with upcoming report dates."
           },
+          "statement_pdfs": {
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "format": "uri"
+            },
+            "type": "array",
+            "maxItems": 6,
+            "title": "Statement Pdfs",
+            "description": "Direct links to the company's own annual or interim report PDFs. For a holding with no SEC or ESEF filing, the weekly PDF statements job reads its income statement, balance sheet and cash flow from these (when empty it looks for the newest annual and interim PDFs on the results and investor pages instead)."
+          },
           "regulatory_news_urls": {
             "items": {
               "type": "string",
@@ -80414,6 +80448,10 @@
             "$ref": "#/components/schemas/JobSchedule",
             "description": "Finds investor-relations pages for holdings that have none (web search, checked and approved by AI). Default: Mondays 07:30."
           },
+          "pdf_statements": {
+            "$ref": "#/components/schemas/JobSchedule",
+            "description": "Reads the income statement, balance sheet and cash flow from the own PDF reports of held equities that have no SEC or ESEF filing (AI reads the PDF; every value must be quoted from its page). Default: Saturdays 08:20."
+          },
           "news_ai_search": {
             "$ref": "#/components/schemas/JobSchedule",
             "description": "Asks a search-capable model for recent news on holdings the wire covers thinly. Results are leads at the lowest tier: they never alert on their own. On by default (it spends on web searches, within the budget). Default: daily 06:20."
@@ -80525,6 +80563,9 @@
           },
           "ir_discovery_settings": {
             "$ref": "#/components/schemas/IrDiscoverySettings"
+          },
+          "pdf_statements_settings": {
+            "$ref": "#/components/schemas/PdfStatementsSettings"
           },
           "gap_research_settings": {
             "$ref": "#/components/schemas/GapResearchSettings"
@@ -93958,6 +93999,76 @@
           "fiscal_year"
         ],
         "title": "Payout"
+      },
+      "PdfStatementsSettings": {
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled",
+            "description": "Off: only a manual run (with a ticker) reads a report.",
+            "default": true
+          },
+          "model": {
+            "type": "string",
+            "pattern": "^(gpt|gemini)-[a-z0-9.-]{1,64}$",
+            "title": "Model",
+            "description": "Reads the PDF (one call per report).",
+            "default": "gemini-3.8-flash",
+            "examples": [
+              "gpt-6.1-sol",
+              "gpt-6-luna",
+              "gemini-3.8-flash"
+            ]
+          },
+          "effort": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "low",
+                  "medium",
+                  "high",
+                  "xhigh",
+                  "max"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effort",
+            "description": "Unset: effort is not sent and the model's default applies.",
+            "default": "low"
+          },
+          "holdings_per_run": {
+            "type": "integer",
+            "maximum": 20.0,
+            "minimum": 1.0,
+            "title": "Holdings Per Run",
+            "description": "Holdings read per run, those never read first.",
+            "default": 3
+          },
+          "docs_per_holding": {
+            "type": "integer",
+            "maximum": 4.0,
+            "minimum": 1.0,
+            "title": "Docs Per Holding",
+            "description": "Reports read per holding per run (annual + interim).",
+            "default": 2
+          },
+          "max_pdf_mb": {
+            "type": "integer",
+            "maximum": 100.0,
+            "minimum": 1.0,
+            "title": "Max Pdf Mb",
+            "description": "Larger PDFs are skipped, not truncated.",
+            "default": 40
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "PdfStatementsSettings",
+        "description": "Reading the income statement, balance sheet and cash flow from a company's own PDF\nreport, for held equities no SEC or ESEF filing covers. Every value must be quoted from\nthe page it came from; a value whose quote is not found there is dropped, never stored."
       },
       "PdlRefreshResponse": {
         "properties": {

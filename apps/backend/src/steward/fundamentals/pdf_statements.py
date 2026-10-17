@@ -20,7 +20,6 @@ keyed by its content hash, so reading the same PDF twice replaces the same rows.
 from __future__ import annotations
 
 import asyncio
-import base64
 import dataclasses
 import datetime as dt
 import io
@@ -74,6 +73,23 @@ FILED_SOURCE_PREFIXES = ("sec",)
 FILED_SOURCES = ("esef",)
 MAX_PAGES_TRIED = 3  # the quoted page, then the pages either side of it
 MAX_DROPPED_LISTED = 40
+# Pages sent to the model: the primary statements fit in a handful of pages even in a
+# 280-page annual report, and the whole report would cost ~200k input tokens per read.
+MAX_STATEMENT_PAGES = 12
+_STATEMENT_HEADINGS = re.compile(
+    r"statements? of (consolidated )?(profit or loss|profit and loss|comprehensive income"
+    r"|financial position|cash flows?|income|operations)"
+    r"|income statement|balance sheets?(?! date)|cash[- ]flow statement",
+    re.IGNORECASE,
+)
+# A running header naming the parent-only accounts ("Separate Financial Statements").
+_PARENT_ONLY = re.compile(
+    r"separate financial statements|parent company|non-consolidated", re.IGNORECASE
+)
+_NUMBER_CELL = re.compile(r"\(?\d{1,3}(?:[,.\s]\d{3})+\)?|\(\d+\)")
+_TITLE_ZONE = 200  # characters at the top of a page where a statement's title is printed
+_TAIL_ZONE = 400  # characters at the foot of a page where a statement can begin
+_MIN_FIGURES = 8
 
 # ------------------------------------------------------------------------------ concept list
 
@@ -146,7 +162,9 @@ ALLOWED_CONCEPTS: dict[str, AllowedConcept] = {
     "ifrs-full:EquityAttributableToOwnersOfParent": _C(
         "instant", "balance_sheet", "Equity attributable to owners of the parent"
     ),
-    "ifrs-full:NoncontrollingInterests": _C("instant", "balance_sheet", "Non-controlling interests"),
+    "ifrs-full:NoncontrollingInterests": _C(
+        "instant", "balance_sheet", "Non-controlling interests"
+    ),
     "ifrs-full:CurrentBorrowings": _C(
         "instant", "balance_sheet", "Current borrowings / current interest-bearing debt"
     ),
@@ -175,7 +193,7 @@ ALLOWED_CONCEPTS: dict[str, AllowedConcept] = {
 
 SCALES = {"units": 1, "thousands": 10**3, "millions": 10**6, "billions": 10**9}
 _SUFFIX = {"k": 10**3, "m": 10**6, "mn": 10**6, "mm": 10**6, "b": 10**9, "bn": 10**9}
-_DASHES = "‐‑‒–—―−﹣－"
+_DASHES = "‐‑‒–—―−﹣－"  # noqa: RUF001
 _CURRENCY_MARKS = re.compile(r"[€$£¥￥]|(?<![A-Za-z])[A-Z]{3}(?![A-Za-z])")
 _ISO_CURRENCY = re.compile(r"^[A-Z]{3}$")
 
@@ -243,7 +261,7 @@ otherwise for share counts.
 - period_start and period_end are the dates of the column. For a year ending 31 December 2025 \
 that is 2025-01-01 and 2025-12-31. A balance-sheet line has no period_start and its \
 period_end is the balance-sheet date.
-- page is the PDF page index (first page = 1), not a printed page label.
+- page is the n of the <page n="..."> section the row is in, not a printed page label.
 - quote is the verbatim row as text, copied character for character from the page: the label \
 then the printed numbers. Keep it to one row.
 - shown_as_deduction is true for a cost, expense or outflow that the statement prints in \
@@ -302,7 +320,7 @@ def parse_printed_number(text: str) -> tuple[Decimal, int | None] | None:
         if multiplier is None:
             return None
         s = s[: match.start()].strip()
-    s = re.sub(r"[\s'’]+", "", s)
+    s = re.sub(r"[\s'’]+", "", s)  # noqa: RUF001
     if not re.fullmatch(r"[0-9.,]+", s) or not re.search(r"\d", s):
         return None
     if "," in s and "." in s:
@@ -324,9 +342,7 @@ def parse_printed_number(text: str) -> tuple[Decimal, int | None] | None:
     return (-number if negative else number), multiplier
 
 
-def to_value(
-    printed: str, scale: str, *, per_share: bool = False
-) -> tuple[Decimal, str] | None:
+def to_value(printed: str, scale: str, *, per_share: bool = False) -> tuple[Decimal, str] | None:
     """(value in the reporting unit, decimals) of a printed figure in the table's scale.
 
     `decimals` is the XBRL precision (-6: to the million) so the identity checks know how much
@@ -420,9 +436,7 @@ def validate_lines(
         for line in lines
         if (spec := ALLOWED_CONCEPTS.get(line.concept)) and spec.kind in ("flow", "instant")
     )
-    report_currency = expected_currency or (
-        currencies.most_common(1)[0][0] if currencies else None
-    )
+    report_currency = expected_currency or (currencies.most_common(1)[0][0] if currencies else None)
     for line in lines:
         spec = ALLOWED_CONCEPTS.get(line.concept)
         if spec is None:
@@ -537,7 +551,9 @@ def statement_rows(
     return apply_reconciliation(marked, internal_checks(marked))
 
 
-def pick_amended(prior: list[tuple[str, dt.date]], accession: str, primary_end: dt.date) -> str | None:
+def pick_amended(
+    prior: list[tuple[str, dt.date]], accession: str, primary_end: dt.date
+) -> str | None:
     """The accession of an earlier read report for the same period end, which this one
     restates (the PDF counterpart of ESEF's corrected package). `prior` is (accession, latest
     period end) of the reports already stored, oldest first. A later interim or annual report
@@ -740,24 +756,62 @@ def pdf_page_texts(data: bytes) -> list[str]:
         raise FetchError(f"unreadable PDF: {exc}") from exc
 
 
+def statement_pages(pages: list[str], limit: int = MAX_STATEMENT_PAGES) -> list[int]:
+    """1-based numbers of the pages most likely to hold the primary statements, in page order.
+
+    A statement starts on a page whose top carries its title ("Consolidated Statement of
+    Financial Position"), which pypdf may break over lines, and prints a table of figures; the
+    page after it is taken too, since statements run on. Notes name the statements in passing
+    and the parent-only accounts repeat the same titles, so neither counts as a title. A report
+    with no titled page (a results release) falls back to the pages densest in figures."""
+    flat = [re.sub(r"\s+", " ", text) for text in pages]
+    figures = [len(_NUMBER_CELL.findall(text)) for text in flat]
+    titled = [
+        number
+        for number, text in enumerate(flat, 1)
+        if figures[number - 1] >= _MIN_FIGURES
+        and _STATEMENT_HEADINGS.search(text[:_TITLE_ZONE])
+        and not _PARENT_ONLY.search(text[:_TITLE_ZONE])
+    ]
+    if titled:
+        chosen = set(titled)
+        chosen.update(n + 1 for n in titled if n < len(pages) and figures[n] >= _MIN_FIGURES)
+        # A release can open a statement at the foot of the page before its titled page.
+        chosen.update(
+            n - 1 for n in titled if n > 1 and _STATEMENT_HEADINGS.search(flat[n - 2][-_TAIL_ZONE:])
+        )
+        return sorted(chosen)[:limit]
+    scored = [
+        (len(_STATEMENT_HEADINGS.findall(text)) * 30 + min(figures[number - 1], 120), number)
+        for number, text in enumerate(flat, 1)
+        if figures[number - 1] >= _MIN_FIGURES and not _PARENT_ONLY.search(text[:_TITLE_ZONE])
+    ]
+    return sorted(number for _, number in sorted(scored, reverse=True)[:limit])
+
+
+def pages_document(pages: list[str], chosen: list[int]) -> str:
+    """The chosen pages as tagged text, so a quote's page is the tag the model read it in."""
+    return "\n\n".join(f'<page n="{n}">\n{pages[n - 1]}\n</page>' for n in chosen)
+
+
 async def extract_statements(
     client: RoutingClient,
     cfg: PdfStatementsSettings,
     document: Document,
+    page_text: str,
     user_text: str,
     usage: Usage,
 ) -> PdfExtraction:
-    """One model call for one PDF (the PDF goes in natively as a document block). The tokens
-    billed are added to `usage` even when the call then fails."""
+    """One model call for one PDF's statement pages. The pages go in as the text pypdf extracts
+    (the routed providers are not sent PDF bytes: `steward.llm.routing` drops a base64 document
+    block, which left the model reading nothing and printing a statement it made up), the same
+    text the quotes are then checked against. The tokens billed are added to `usage` even when
+    the call then fails."""
     content: list[dict[str, Any]] = [
         {
             "type": "document",
-            "source": {
-                "type": "base64",
-                "media_type": "application/pdf",
-                "data": base64.standard_b64encode(document.data).decode("ascii"),
-            },
-            "title": f"{document.url} (PDF)",
+            "source": {"type": "text", "media_type": "text/plain", "data": page_text},
+            "title": f"{document.url} (statement pages of the PDF)",
         },
         {"type": "text", "text": user_text},
     ]
@@ -780,7 +834,7 @@ async def extract_statements(
         raise PdfExtractionError("the extraction hit max_tokens before finishing")
     if response.parsed_output is None:
         raise PdfExtractionError("the extraction returned no parseable JSON")
-    return response.parsed_output
+    return cast(PdfExtraction, response.parsed_output)
 
 
 # --------------------------------------------------------------------------------- the job
@@ -857,13 +911,18 @@ async def read_document(
     ):
         return {"url": url, "outcome": "same content already read"}
     pages = await asyncio.to_thread(pdf_page_texts, document.data)
+    chosen = statement_pages(pages)
+    if not chosen:
+        return {"url": url, "pages": len(pages), "outcome": "no statement pages in the text"}
     company = profile.company_name if profile else ""
     fye = profile.fiscal_year_end_month if profile else 12
     user_text = build_user_text(
         company, ticker, profile.reporting_currency if profile else None, fye, dt.date.today()
     )
     try:
-        extraction = await extract_statements(client, cfg, document, user_text, usage)
+        extraction = await extract_statements(
+            client, cfg, document, pages_document(pages, chosen), user_text, usage
+        )
     except PdfExtractionError as exc:
         return {"url": url, "outcome": f"extraction failed: {exc}"[:200]}
     result = validate_lines(
@@ -872,6 +931,7 @@ async def read_document(
     detail: dict[str, Any] = {
         "url": url,
         "pages": len(pages),
+        "sent_pages": chosen,
         "read": len(extraction.lines),
         "accepted": len(result.accepted),
         "dropped": [d.as_detail() for d in result.dropped[:MAX_DROPPED_LISTED]],

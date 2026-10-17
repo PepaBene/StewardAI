@@ -382,6 +382,12 @@ export const SCHEDULES: Record<
       "Finds investor-relations pages for holdings that have none, by web search; checks them and has AI approve them. Pages you set yourself are never changed.",
     cron: "30 7 * * 1",
   },
+  pdf_statements: {
+    label: "Statements from PDF reports",
+    description:
+      "Reads the income statement, balance sheet and cash flow from the company's own PDF reports for held stocks with no SEC or ESEF filing. AI reads the PDF; every value must be quoted from its page or it is dropped.",
+    cron: "20 8 * * 6",
+  },
   news_ai_search: {
     label: "AI news search",
     description:
@@ -535,6 +541,9 @@ export const DEFAULT_JOBS: JobsConfig = {
     refresh_peers: true,
     peer_refresh_days: 30,
     peer_refresh_per_run: 8,
+    propose_peers: true,
+    min_confirmed_peers: 4,
+    peer_proposals_per_run: 12,
     min_confidence: 0.8,
     max_confirmed_peers: 8,
     max_calls_per_run: 40,
@@ -600,6 +609,14 @@ export const DEFAULT_JOBS: JobsConfig = {
     index_agent_notes: true,
     news_per_run: 600,
     news_days: 365,
+  },
+  pdf_statements_settings: {
+    enabled: true,
+    model: "gemini-3.8-flash",
+    effort: "low",
+    holdings_per_run: 3,
+    docs_per_holding: 2,
+    max_pdf_mb: 40,
   },
   gap_research_settings: {
     model: "gpt-6.1-sol",
