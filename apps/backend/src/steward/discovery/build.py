@@ -200,34 +200,43 @@ def trailing_inputs(period: dict[str, Any], periods: list[dict[str, Any]]) -> di
     current = {k: v["value"] for k, v in period["inputs"].items()}
     if _is_annual(period["duration_days"]):
         return current
-    end, days = period["period_end"], period["duration_days"] or 0
-    same_basis = [p for p in periods if p["basis"] == period["basis"]]
-    annual = max(
+    end = period["period_end"]
+    # One period end is often stored several times (a quarter and a year to date, statements
+    # with and without inputs): an empty copy picked as "the year" dropped every flow, so
+    # GOOGL's and KO's P/E read unknown. Spans are merged by end and length.
+    same_basis = [p for p in periods if p["basis"] == period["basis"] and p["inputs"]]
+
+    def merged(at_end: dt.date, days: int) -> dict[str, Decimal]:
+        out: dict[str, Decimal] = {}
+        for p in same_basis:
+            if p["period_end"] == at_end and abs((p["duration_days"] or 0) - days) <= 10:
+                for k, v in p["inputs"].items():
+                    out.setdefault(k, v["value"])
+        return out
+
+    out = {k: v for k, v in current.items() if k not in FLOW_INPUTS}
+    year_end = max(
         (
-            p
+            p["period_end"]
             for p in same_basis
             if _is_annual(p["duration_days"]) and 0 < (end - p["period_end"]).days <= 370
         ),
-        key=lambda p: p["period_end"],
         default=None,
     )
-    prior = next(
-        (
-            p
-            for p in same_basis
-            if abs((p["duration_days"] or 0) - days) <= 10
-            and 350 <= (end - p["period_end"]).days <= 380
-        ),
-        None,
-    )
-    out = {k: v for k, v in current.items() if k not in FLOW_INPUTS}
-    if annual is None:
+    if year_end is None:
         return out  # no year to build on: a multiple stays unknown rather than understated
-    year = {k: v["value"] for k, v in annual["inputs"].items()}
-    before = {k: v["value"] for k, v in prior["inputs"].items()} if prior else {}
+    year = merged(year_end, 365)
+    # The year to date since that year end, less the same span a year earlier. A quarter is
+    # that span only in the first quarter: FY + Q2 - last year's Q2 is not a trailing year.
+    span = (end - year_end).days
+    ytd = merged(end, span)
+    prior_ends = sorted(
+        {p["period_end"] for p in same_basis if 350 <= (end - p["period_end"]).days <= 380}
+    )
+    before = next((b for b in (merged(e, span) for e in prior_ends) if b), {})
     for key in FLOW_INPUTS:
-        if key in year and key in current and key in before:
-            out[key] = year[key] + current[key] - before[key]
+        if key in year and key in ytd and key in before:
+            out[key] = year[key] + ytd[key] - before[key]
         elif key in year:
             out[key] = year[key]
     return out

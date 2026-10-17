@@ -342,6 +342,22 @@ def test_multiples_use_a_trailing_year_when_the_newest_period_is_a_half_year() -
     assert r.values["earnings_yield"].value == D(150) / cap
 
 
+def test_an_empty_copy_of_the_year_or_a_lone_quarter_does_not_lose_the_trailing_year() -> None:
+    # Production, 17 Oct 2026: GOOGL's year end was stored twice, once without inputs, and the
+    # empty copy was taken as "the year", so its P/E read unknown.
+    from steward.discovery.build import trailing_inputs
+
+    year = period()  # FY2025: net income 150
+    empty_year = {**period(), "inputs": {}}
+    quarter = half_year(dt.date(2026, 6, 30), 40, 60)
+    quarter = {**quarter, "duration_days": 91,
+               "period_start": dt.date(2026, 4, 1)}  # fmt: skip
+    got = trailing_inputs(quarter, [empty_year, year, quarter])
+    # A second quarter alone is not the year to date: the full year stands in, not 150 + 40.
+    assert got["net_income"] == D(150)
+    assert got["equity"] == D(900)
+
+
 def test_an_ads_price_is_valued_on_ads_not_on_home_market_shares() -> None:
     # Production, 17 Oct 2026: TSM's P/E read 198x, its ADS price times 25.9bn common shares.
     member = m("X", country="US", currency="USD", status="active", has_statements=True)
