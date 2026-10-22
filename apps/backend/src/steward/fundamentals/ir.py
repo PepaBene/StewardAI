@@ -88,23 +88,45 @@ class FetchedDocument:
     content_type: str
     last_modified: dt.datetime | None
     sha256: str
+    # The response's validators as sent, for the next conditional request.
+    etag: str | None = None
+    last_modified_header: str | None = None
+
+
+class NotModified(Exception):
+    """The server answered 304 to a conditional request: the page has not changed."""
 
 
 async def fetch_document(
-    http: httpx.AsyncClient, url: str, max_bytes: int = MAX_BYTES
+    http: httpx.AsyncClient,
+    url: str,
+    max_bytes: int = MAX_BYTES,
+    *,
+    etag: str | None = None,
+    modified_since: str | None = None,
 ) -> FetchedDocument:
+    """With `etag` / `modified_since` (the previous response's ETag and Last-Modified), the
+    request is conditional and an unchanged page raises NotModified without a body."""
     assert_fetchable(url)
-    async with http.stream("GET", url, follow_redirects=True) as response:
+    headers = {}
+    if etag:
+        headers["If-None-Match"] = etag
+    if modified_since:
+        headers["If-Modified-Since"] = modified_since
+    async with http.stream("GET", url, headers=headers, follow_redirects=True) as response:
+        if response.status_code == 304 and headers:
+            raise NotModified(url)
         if response.status_code != 200:
             raise IrError(f"{url} returned HTTP {response.status_code}")
         assert_fetchable(str(response.url))
-        chunks: list[bytes] = []
-        size = 0
+        # One buffer, hashed as it arrives: a chunk list plus its join held the file twice.
+        buffer = io.BytesIO()
+        hasher = hashlib.sha256()
         async for chunk in response.aiter_bytes():
-            size += len(chunk)
-            if size > max_bytes:
+            if buffer.tell() + len(chunk) > max_bytes:
                 raise IrError(f"{url} is larger than {max_bytes} bytes")
-            chunks.append(chunk)
+            buffer.write(chunk)
+            hasher.update(chunk)
         modified = None
         header = response.headers.get("last-modified")
         if header:
@@ -114,13 +136,14 @@ async def fetch_document(
                 modified = parsedate_to_datetime(header)
             except (TypeError, ValueError):
                 modified = None
-        body = b"".join(chunks)
         return FetchedDocument(
             url=url,
-            body=body,
+            body=buffer.getvalue(),
             content_type=response.headers.get("content-type", "").split(";")[0].strip().lower(),
             last_modified=modified,
-            sha256=hashlib.sha256(body).hexdigest(),
+            sha256=hasher.hexdigest(),
+            etag=response.headers.get("etag"),
+            last_modified_header=header,
         )
 
 
@@ -551,6 +574,8 @@ class SourceRow:
     release_type: str
     basis: str | None
     last_hash: str | None
+    last_etag: str | None = None
+    last_modified_header: str | None = None
 
 
 async def store_version(
@@ -675,7 +700,23 @@ async def check_source(
 ) -> None:
     now = dt.datetime.now(dt.UTC)
     try:
-        fetched = await fetch_document(http, source.url)
+        # Conditional only once a version is stored: a 304 then means "same as last_hash".
+        fetched = await fetch_document(
+            http,
+            source.url,
+            etag=source.last_etag if source.last_hash else None,
+            modified_since=source.last_modified_header if source.last_hash else None,
+        )
+    except NotModified:
+        detail["unchanged"] = True
+        detail["not_modified"] = True
+        await pool.execute(
+            "update public.issuer_ir_source set last_checked_at=$2,last_status='unchanged',"
+            " last_error=null where id=$1",
+            source.id,
+            now,
+        )
+        return
     except (IrError, httpx.HTTPError) as exc:
         detail["error"] = f"{type(exc).__name__}: {exc}"[:300]
         await pool.execute(
@@ -690,9 +731,11 @@ async def check_source(
         detail["unchanged"] = True
         await pool.execute(
             "update public.issuer_ir_source set last_checked_at=$2,last_status='unchanged',"
-            " last_error=null where id=$1",
+            " last_error=null,last_etag=$3,last_modified_header=$4 where id=$1",
             source.id,
             now,
+            fetched.etag,
+            fetched.last_modified_header,
         )
         return
     parsed: ParsedRelease | None = None
@@ -709,12 +752,14 @@ async def check_source(
     detail.update(release_id=release_id, forward_rows=stored, parse_error=error)
     await pool.execute(
         "update public.issuer_ir_source set last_checked_at=$2,last_changed_at=$2,last_hash=$3,"
-        " last_status=$4,last_error=$5 where id=$1",
+        " last_status=$4,last_error=$5,last_etag=$6,last_modified_header=$7 where id=$1",
         source.id,
         now,
         fetched.sha256,
         "parse_failed" if error else "changed",
         error,
+        fetched.etag,
+        fetched.last_modified_header,
     )
 
 
@@ -722,7 +767,8 @@ async def run_ir_releases(ctx: JobContext, http: httpx.AsyncClient) -> None:
     """The job body. One failing page (fetch, parse or database) never stops the others."""
     only = ctx.params.get("ticker")
     rows = await ctx.pool.fetch(
-        """select id,ticker,url,release_type,basis,last_hash from public.issuer_ir_source
+        """select id,ticker,url,release_type,basis,last_hash,last_etag,last_modified_header
+           from public.issuer_ir_source
            where active and ($1::text is null or ticker=$1) order by id""",
         only if isinstance(only, str) and only else None,
     )

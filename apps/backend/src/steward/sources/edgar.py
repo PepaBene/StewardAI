@@ -10,6 +10,7 @@ No key is needed, but the SEC requires a descriptive User-Agent with a contact a
 
 import asyncio
 import datetime as dt
+import io
 import re
 import time
 from dataclasses import dataclass
@@ -152,11 +153,24 @@ class EdgarClient:
         return [str(i["name"]) for i in items if isinstance(i, dict) and i.get("name")]
 
     async def document(self, url: str, max_bytes: int = 64 * 1024 * 1024) -> bytes:
-        """A filing document's bytes (an XBRL instance is 3-11 MB)."""
-        content = (await self._get(url)).content
-        if len(content) > max_bytes:
-            raise EdgarError(f"EDGAR {url} is {len(content)} bytes, over the {max_bytes} limit")
-        return content
+        """A filing document's bytes (an XBRL instance is 3-11 MB). Streamed into one buffer and
+        cut off at `max_bytes`, so an oversized file is never held whole."""
+        async with self._lock:
+            wait = MIN_INTERVAL - (time.monotonic() - self._last)
+            if wait > 0:
+                await asyncio.sleep(wait)
+            self._last = time.monotonic()
+        buffer = io.BytesIO()
+        async with self._http.stream(
+            "GET", url, headers=self._headers, follow_redirects=True
+        ) as response:
+            if response.status_code != 200:
+                raise EdgarError(f"EDGAR {url} returned HTTP {response.status_code}")
+            async for chunk in response.aiter_bytes():
+                if buffer.tell() + len(chunk) > max_bytes:
+                    raise EdgarError(f"EDGAR {url} is over the {max_bytes} byte limit")
+                buffer.write(chunk)
+        return buffer.getvalue()
 
     async def exhibit_documents(self, filing: Filing) -> list[tuple[str, str]]:
         """(type, file name) of every document in the filing, from its index page."""

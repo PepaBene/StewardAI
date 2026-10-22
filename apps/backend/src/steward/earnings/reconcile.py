@@ -35,7 +35,13 @@ from steward.earnings.units import SCALE_FACTOR
 from steward.earnings.verdicts import run_verdicts
 from steward.jobs.runner import JobContext
 from steward.settings import get_settings
-from steward.sources.edgar import EdgarClient, EdgarError
+from steward.sources.edgar import (
+    ANNUAL_FORMS,
+    PERIODIC_FORMS,
+    QUARTER_FORMS,
+    EdgarClient,
+    EdgarError,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -356,6 +362,50 @@ async def reconcile_ticker(
     return summary
 
 
+# The issuer's XBRL (companyfacts, 5-30 MB) only changes when it files a periodic report, so a
+# ticker is compared again when a newer one appears, and at least weekly so a report that is
+# overdue still gets its "no XBRL figure although due" record.
+RECHECK_DAYS = 7
+CHECK_STATE_PREFIX = "fact_reconcile:"
+
+
+async def newest_periodic_report(edgar: EdgarClient, cik: str) -> str | None:
+    """Accession of the issuer's latest 10-Q / 10-K / 20-F / 40-F (or amendment), from the
+    small submissions index rather than the full XBRL."""
+    periodic = [
+        f
+        for f in await edgar.filings(cik)
+        if f.form in PERIODIC_FORMS or f.form in ANNUAL_FORMS or f.form in QUARTER_FORMS
+    ]
+    newest = max(periodic, key=lambda f: (f.filing_date, f.accession), default=None)
+    return newest.accession if newest else None
+
+
+async def due_for_check(
+    pool: asyncpg.Pool, ticker: str, newest: str | None, today: dt.date
+) -> bool:
+    raw = await pool.fetchval(
+        "select value from public.sync_state where key = $1", CHECK_STATE_PREFIX + ticker
+    )
+    if raw is None:
+        return True
+    state = json.loads(raw) if isinstance(raw, str) else raw
+    try:
+        checked = dt.date.fromisoformat(state["checked_on"])
+    except (KeyError, TypeError, ValueError):
+        return True
+    return state.get("accession") != newest or (today - checked).days >= RECHECK_DAYS
+
+
+async def record_check(pool: asyncpg.Pool, ticker: str, newest: str | None, today: dt.date) -> None:
+    await pool.execute(
+        "insert into public.sync_state (key, value) values ($1, $2::jsonb)"
+        " on conflict (key) do update set value = excluded.value",
+        CHECK_STATE_PREFIX + ticker,
+        json.dumps({"accession": newest, "checked_on": today.isoformat()}),
+    )
+
+
 async def fact_reconcile_handler(ctx: JobContext) -> None:
     settings = get_settings()
     pool = ctx.pool
@@ -387,16 +437,25 @@ async def fact_reconcile_handler(ctx: JobContext) -> None:
                     "select t212_ticker, cik from public.instrument where t212_ticker = $1",
                     ticker,
                 )
+                if not await facts_to_check(pool, ticker):
+                    step.detail["skipped"] = "nothing left to reconcile"
+                    continue
                 cik = await resolve_cik(pool, edgar, profile, instrument)
                 if cik is None:
                     step.detail["skipped"] = "no SEC CIK (not an EDGAR filer)"
                     continue
                 try:
+                    newest = await newest_periodic_report(edgar, cik)
+                    if not only and not await due_for_check(pool, ticker, newest, today):
+                        step.detail["skipped"] = "no periodic report since the last check"
+                        continue
                     company_facts = await edgar.company_facts(cik)
                 except (EdgarError, httpx.HTTPError, json.JSONDecodeError) as exc:
                     step.detail["error"] = str(exc)[:300]
                     continue
                 summary = await reconcile_ticker(pool, ticker, company_facts, today, ctx.job_id)
+                del company_facts  # 5-30 MB of parsed JSON: free it before the next ticker
+                await record_check(pool, ticker, newest, today)
                 step.detail.update(summary.as_detail())
                 if summary.quarantined and config.theses_version_id is not None:
                     verdicts = await run_verdicts(

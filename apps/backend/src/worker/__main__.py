@@ -20,6 +20,7 @@ import contextlib
 import datetime as dt
 import logging
 import signal
+from collections.abc import Iterable
 from typing import Any
 
 import asyncpg
@@ -49,7 +50,9 @@ from worker.scheduler import apply_jobs_config, build_scheduler
 logger = logging.getLogger("worker")
 
 CONFIG_REFRESH_SECONDS = 300
-QUEUE_POLL_SECONDS = 1.0
+# Every second was ~86K queue reads a day for jobs the owner starts by hand; 5 s keeps the
+# wait unnoticeable and lets the worker and Postgres sit idle in between.
+QUEUE_POLL_SECONDS = 5.0
 # A queued job is hidden from other readers for this long; a crashed worker's message
 # becomes visible again afterwards and is retried. While its job runs, the worker keeps
 # pushing the timeout out every QUEUE_EXTEND_SECONDS, so a long run is not redelivered.
@@ -68,6 +71,29 @@ QUEUE_RELEASE_SECONDS = 30
 SCHEDULE_RETRY_SECONDS = 300
 MAX_CONCURRENT_QUEUED_JOBS = 4
 DISPATCH_SECONDS = 15
+# Python keeps the memory a heavy job used (the container settled at ~0.87 GB after starting at
+# ~0.2 GB), and Railway bills memory in use. So an idle worker whose private memory has grown
+# past RECYCLE_PRIVATE_MB exits, and the launcher forks a fresh one from the parent's imports.
+RECYCLE_CHECK_SECONDS = 60
+RECYCLE_PRIVATE_MB = 300
+RECYCLE_MIN_UPTIME_SECONDS = 600
+
+
+def private_memory_mb(lines: Iterable[str] | None = None) -> float | None:
+    """This process's private (not shared with the launcher) resident memory in MB, from
+    /proc/self/smaps_rollup or the given lines of one; None where /proc is missing (not Linux)."""
+    try:
+        if lines is None:
+            with open("/proc/self/smaps_rollup", encoding="ascii") as f:
+                return private_memory_mb(f.readlines())
+        kb = sum(
+            int(line.split()[1])
+            for line in lines
+            if line.startswith(("Private_Clean:", "Private_Dirty:"))
+        )
+    except (OSError, ValueError, IndexError):
+        return None
+    return kb / 1024
 
 
 class Worker:
@@ -76,8 +102,34 @@ class Worker:
         self._tasks: set[asyncio.Task[None]] = set()
         self._slots = asyncio.Semaphore(MAX_CONCURRENT_QUEUED_JOBS)
         self._in_flight: set[int] = set()
+        self._active = 0  # job runs (scheduled, queued, catch-up) in progress, retry waits too
+        self._idle_checks = 0
+
+    def is_idle(self) -> bool:
+        return self._active == 0 and not self._tasks
+
+    def should_recycle(self, uptime: float, private_mb: float | None) -> bool:
+        """True on the second check in a row that finds the worker idle and grown; a single idle
+        moment between two jobs is not enough."""
+        if (
+            private_mb is None
+            or private_mb < RECYCLE_PRIVATE_MB
+            or uptime < RECYCLE_MIN_UPTIME_SECONDS
+            or not self.is_idle()
+        ):
+            self._idle_checks = 0
+            return False
+        self._idle_checks += 1
+        return self._idle_checks >= 2
 
     async def run_scheduled(self, job_type: str) -> None:
+        self._active += 1
+        try:
+            await self._run_scheduled(job_type)
+        finally:
+            self._active -= 1
+
+    async def _run_scheduled(self, job_type: str) -> None:
         """A scheduled run that the database dropped out of (a Postgres restart) is tried
         again a few minutes later instead of waiting for its next slot, which for a daily job
         such as portfolio_sync is a whole day away. Any other failure is the job's own."""
@@ -124,9 +176,19 @@ class Worker:
                     job_id,
                 )
             return None
-        return await run_job(
-            self.pool, job_type, handler, trigger=trigger, job_id=job_id, params=params, wait=wait
-        )
+        self._active += 1
+        try:
+            return await run_job(
+                self.pool,
+                job_type,
+                handler,
+                trigger=trigger,
+                job_id=job_id,
+                params=params,
+                wait=wait,
+            )
+        finally:
+            self._active -= 1
 
     async def recover(self) -> None:
         """At start: close scheduled and catch-up runs a killed worker left `running`."""
@@ -363,6 +425,23 @@ async def run() -> None:
     scheduler.start()
     if worker is not None:
         catching_up = asyncio.create_task(worker.catch_up(stop))
+        started = loop.time()
+
+        async def recycle_when_idle() -> None:  # a coroutine: runs on the loop, not a thread
+            if catching_up is not None and not catching_up.done():
+                return
+            private_mb = private_memory_mb()
+            if worker is not None and worker.should_recycle(loop.time() - started, private_mb):
+                logger.info("idle at %.0f MB private memory: restarting the worker", private_mb)
+                stop.set()
+
+        scheduler.add_job(
+            recycle_when_idle,
+            "interval",
+            seconds=RECYCLE_CHECK_SECONDS,
+            id="internal:recycle",
+            name="recycle",
+        )
     config_jobs = [j for j in scheduler.get_jobs() if not j.id.startswith("internal:")]
     logger.info(
         "scheduler started (version %s, %d jobs registered, tz %s)",

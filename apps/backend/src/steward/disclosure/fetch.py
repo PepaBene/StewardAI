@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import datetime as dt
 import hashlib
+import io
 from dataclasses import dataclass
 from decimal import Decimal
 from typing import Literal
@@ -260,7 +261,9 @@ class DisclosureFetcher:
                     status_code=status,
                     retry_at=retry_at,
                 )
-            chunks: list[bytes] = []
+            # One buffer, hashed as it arrives: a chunk list plus its join held the file twice.
+            buffer = io.BytesIO()
+            hasher = hashlib.sha256()
             total = 0
             async for chunk in response.aiter_bytes():
                 total += len(chunk)
@@ -270,13 +273,14 @@ class DisclosureFetcher:
                         f"{safe_url(url)} is larger than the {self._max_bytes} byte limit",
                         status_code=200,
                     )
-                chunks.append(chunk)
+                buffer.write(chunk)
+                hasher.update(chunk)
             content_type = response.headers.get("Content-Type")
             validators = Validators(
                 response.headers.get("ETag"), response.headers.get("Last-Modified")
             )
-        content = b"".join(chunks)
-        digest = hashlib.sha256(content).hexdigest()
+        content = buffer.getvalue()
+        digest = hasher.hexdigest()
         archive = None
         if self._store is not None:
             archive = evidence_path(digest, extension_for(content_type, url))
