@@ -231,8 +231,22 @@ async def resolve_cik(
         return str(instrument["cik"])
     if edgar is None:
         return None
+    symbols = [profile.edgar_ticker()]
+    if not profile.sec_ticker:
+        # Trading212 keeps a renamed company's old ticker (Meta is FB_US_EQ, and SEC no longer
+        # lists FB); the price symbol names the listing as it trades now (meta.us).
+        listing = await pool.fetchval(
+            "select price_symbol from public.investment_universe where ticker = $1",
+            profile.ticker,
+        )
+        if isinstance(listing, str) and listing.lower().endswith(".us"):
+            symbols.append(listing[: -len(".us")].upper())
+    cik = None
     try:
-        cik = await edgar.cik_for_ticker(profile.edgar_ticker())
+        for symbol in dict.fromkeys(s.upper() for s in symbols):
+            cik = await edgar.cik_for_ticker(symbol)
+            if cik:
+                break
     except (EdgarError, httpx.HTTPError):
         return None
     if cik and instrument is not None:
